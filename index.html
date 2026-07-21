@@ -51,7 +51,6 @@
         /* Quiz Layout */
         .quiz-photo-container { text-align: center; margin-bottom: 20px; min-height: 350px; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #111; border-radius: var(--radius); border: 1px solid var(--border); position: relative; padding: 10px; }
         
-        /* New Zoom Cursor for Images */
         .quiz-photo-container img { max-width: 100%; max-height: 350px; border-radius: 4px; object-fit: contain; cursor: zoom-in; transition: opacity 0.2s; }
         .quiz-photo-container img:hover { opacity: 0.9; }
         
@@ -61,8 +60,16 @@
         .photo-controls button:disabled { opacity: 0.3; cursor: not-allowed; }
         #photo-counter { font-size: 14px; font-weight: bold; color: #ccc; min-width: 40px; text-align: center; }
         
+        /* Metadata Styles */
+        .quiz-meta { font-size: 13px; color: #ccc; margin-top: 10px; background-color: #333; padding: 5px 15px; border-radius: 20px; text-align: center; max-width: 90%; }
+        .quiz-meta .divider { margin: 0 8px; color: #666; }
+        .quiz-meta a { color: #81c784; text-decoration: none; transition: color 0.2s; }
+        .quiz-meta a:hover { text-decoration: underline; color: #a5d6a7; }
+
         .attribution { font-size: 12px; color: #888; margin-top: 5px; display: block; }
+        
         #quiz-loading { font-weight: bold; color: #aaa; animation: pulse 1.5s infinite; }
+        #quiz-error { color: var(--error); font-weight: bold; padding: 20px; text-align: center; }
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
         
         #feedback { font-weight: bold; margin-top: 15px; padding: 10px; border-radius: var(--radius); display: none; }
@@ -132,12 +139,19 @@
         
         <div class="quiz-photo-container">
             <div id="quiz-loading">Fetching random observation...</div>
+            <div id="quiz-error" style="display:none;"></div>
+            
             <img id="quiz-image" src="" alt="Observation photo" style="display:none;" title="Click to view full resolution">
             
             <div id="photo-controls" class="photo-controls" style="display:none;">
                 <button id="btn-prev-photo">◀</button>
                 <span id="photo-counter">1 / 1</span>
                 <button id="btn-next-photo">▶</button>
+            </div>
+            
+            <!-- Metadata Container -->
+            <div id="quiz-meta" class="quiz-meta" style="display:none;">
+                <span id="meta-date"></span> <span class="divider">•</span> <a id="meta-location" target="_blank" href="#"></a>
             </div>
             
             <span id="quiz-attribution" class="attribution" style="display:none;"></span>
@@ -173,7 +187,7 @@
     const state = {
         placeId: null, lat: null, lng: null, taxonId: null,
         questions: [], currentIndex: 0, score: 0,
-        currentPhotoArray: [], currentPhotoIndex: 0, isQuestionLoaded: false
+        currentPhotoArray: [], currentPhotoIndex: 0, currentMeta: null, isQuestionLoaded: false
     };
 
     // --- UTILITIES ---
@@ -182,7 +196,7 @@
         document.getElementById(viewId).classList.add('active');
     }
 
-    function debounce(func, timeout = 300) {
+    function debounce(func, timeout = 1000) {
         let timer;
         return (...args) => { clearTimeout(timer); timer = setTimeout(() => { func.apply(this, args); }, timeout); };
     }
@@ -272,7 +286,7 @@
         else poolUrl += `&lat=${state.lat}&lng=${state.lng}&radius=10`;
         if (state.taxonId) poolUrl += `&taxon_id=${state.taxonId}`;
 
-        const poolFields = encodeURIComponent('(count:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,default_photo:(medium_url:!t,original_url:!t,attribution:!t)))');
+        const poolFields = encodeURIComponent('(count:!t,taxon:(id:!t,name:!t,preferred_common_name:!t))');
         poolUrl += `&fields=${poolFields}`;
 
         try {
@@ -325,7 +339,7 @@
         if (state.placeId) url += `&place_id=${state.placeId}`;
         else url += `&lat=${state.lat}&lng=${state.lng}&radius=10`;
         
-        const fields = encodeURIComponent('(photos:(url:!t,attribution:!t))');
+        const fields = encodeURIComponent('(observed_on:!t,place_guess:!t,location:!t,photos:(url:!t,attribution:!t))');
         url += `&fields=${fields}`;
 
         try {
@@ -337,10 +351,10 @@
                 state.questions[index].observation = obs; 
                 resolver(obs); 
             } else {
-                resolver({ fallback: true }); 
+                resolver({ error: true });
             }
         } catch(e) {
-            resolver({ fallback: true });
+            resolver({ error: true });
         }
     }
 
@@ -389,7 +403,9 @@
         
         document.getElementById('quiz-image').style.display = 'none';
         document.getElementById('photo-controls').style.display = 'none';
+        document.getElementById('quiz-meta').style.display = 'none';
         document.getElementById('quiz-attribution').style.display = 'none';
+        document.getElementById('quiz-error').style.display = 'none';
         document.getElementById('quiz-loading').style.display = 'block';
         
         const input = document.getElementById('input-answer');
@@ -403,33 +419,76 @@
         let obsData = q.observation;
         if (obsData instanceof Promise) obsData = await obsData;
 
-        // Map both the medium and original URLs for the click-to-enlarge feature
-        if (obsData.fallback) {
-            // Note: In a fallback scenario, default_photo provides a medium_url. We swap it for original just in case original_url isn't explicitly returned
-            state.currentPhotoArray = [{
-                mediumUrl: q.taxon.default_photo.medium_url,
-                originalUrl: q.taxon.default_photo.original_url || q.taxon.default_photo.medium_url.replace('medium', 'original'),
-                attribution: q.taxon.default_photo.attribution
-            }];
-        } else {
-            state.currentPhotoArray = obsData.photos.map(p => ({
-                mediumUrl: p.url.replace('square', 'medium'),
-                originalUrl: p.url.replace('square', 'original'),
-                attribution: p.attribution
-            }));
+        // Display error message if the fetch failed
+        if (obsData.error) {
+            document.getElementById('quiz-loading').style.display = 'none';
+            const errorDiv = document.getElementById('quiz-error');
+            const taxonName = q.taxon.preferred_common_name || q.taxon.name;
+            errorDiv.innerHTML = `❌ Failed to load an observation for <strong>${taxonName}</strong>.<br><br><span style="color:#aaa;font-weight:normal;">It may lack research-grade photos in this area.</span>`;
+            errorDiv.style.display = 'block';
+            
+            // Mark question as "loaded" so we can prefetch the next, but skip the answer phase
+            state.isQuestionLoaded = true;
+            document.getElementById('btn-next').style.display = 'block';
+            document.getElementById('btn-next').textContent = "Skip to Next ➔";
+            document.getElementById('btn-next').focus();
+            
+            loadObservationForQuestion(state.currentIndex + 1);
+            return; // Exit early
         }
+
+        // Handle normal case
+        state.currentPhotoArray = obsData.photos.map(p => ({
+            mediumUrl: p.url.replace('square', 'medium'),
+            originalUrl: p.url.replace('square', 'original'),
+            attribution: p.attribution
+        }));
+        
+        // Save the metadata
+        state.currentMeta = {
+            date: obsData.observed_on,
+            locationText: obsData.place_guess,
+            coordinates: obsData.location // API returns "lat,lng" string
+        };
         
         state.currentPhotoIndex = 0;
         updatePhotoDisplay();
     }
 
-    // Runs every time a photo finishes loading (including carousel clicks)
+    // Runs every time a photo finishes loading
     document.getElementById('quiz-image').onload = () => {
         document.getElementById('quiz-loading').style.display = 'none';
         document.getElementById('quiz-image').style.display = 'block';
         document.getElementById('quiz-attribution').style.display = 'block';
         
-        // Only trigger the focus and next-fetch once per question, not on every carousel swipe
+        // Format and display metadata
+        if (state.currentMeta) {
+            const dateStr = state.currentMeta.date 
+                ? new Date(state.currentMeta.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) 
+                : 'Unknown Date';
+            
+            document.getElementById('meta-date').textContent = `📅 ${dateStr}`;
+            
+            const locLink = document.getElementById('meta-location');
+            const locText = state.currentMeta.locationText || 'Unknown Location';
+            locLink.textContent = `📍 ${locText}`;
+            
+            // Try to map by exact coordinates first, fallback to text search
+            if (state.currentMeta.coordinates) {
+                locLink.href = `https://www.google.com/maps/search/?api=1&query=${state.currentMeta.coordinates}`;
+                locLink.style.pointerEvents = 'auto';
+            } else if (state.currentMeta.locationText) {
+                locLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(state.currentMeta.locationText)}`;
+                locLink.style.pointerEvents = 'auto';
+            } else {
+                locLink.href = "#";
+                locLink.style.pointerEvents = 'none'; // Disable link if no data
+            }
+            
+            document.getElementById('quiz-meta').style.display = 'inline-block';
+        }
+        
+        // Only trigger the focus and next-fetch once per question
         if (!state.isQuestionLoaded) {
             state.isQuestionLoaded = true;
             document.getElementById('input-answer').disabled = false; 
@@ -465,15 +524,21 @@
         feedback.style.display = 'block';
         document.getElementById('input-answer').disabled = true;
         document.getElementById('btn-submit').style.display = 'none';
-        document.getElementById('btn-next').style.display = 'block';
-        document.getElementById('btn-next').focus();
+        
+        const btnNext = document.getElementById('btn-next');
+        btnNext.textContent = "Next Observation ➔"; // Ensure normal text is set
+        btnNext.style.display = 'block';
+        btnNext.focus();
     });
 
     document.getElementById('input-answer').addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.target.disabled) document.getElementById('btn-submit').click();
     });
 
-    document.getElementById('btn-next').addEventListener('click', () => {
+    document.getElementById('btn-next').addEventListener('click', (e) => {
+        // Reset text in case it was changed by an error state
+        e.target.textContent = "Next Observation ➔";
+        
         state.currentIndex++;
         if (state.currentIndex >= state.questions.length) {
             document.getElementById('final-score').textContent = `${state.score} / ${state.questions.length}`;
