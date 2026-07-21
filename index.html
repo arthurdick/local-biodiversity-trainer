@@ -501,32 +501,96 @@
     };
 
     // --- ANSWER LOGIC ---
-    document.getElementById('btn-submit').addEventListener('click', () => {
-        const taxon = state.questions[state.currentIndex].taxon;
-        const inputStr = document.getElementById('input-answer').value;
+    document.getElementById('btn-submit').addEventListener('click', async () => {
+        const inputStr = document.getElementById('input-answer').value.trim();
+        if (!inputStr) return;
+
+        const q = state.questions[state.currentIndex];
+        const taxon = q.taxon;
+        const targetTaxonId = taxon.id;
         const feedback = document.getElementById('feedback');
+        const btnSubmit = document.getElementById('btn-submit');
+        const inputAnswer = document.getElementById('input-answer');
         
+        inputAnswer.disabled = true;
+        btnSubmit.disabled = true;
+        btnSubmit.textContent = "Checking...";
+
+        let isCorrect = false;
+        let matchedNameDisplay = "";
+
+        // 1. Fast Local Check
         const normalizedInput = normalize(inputStr);
         const matchSci = normalizedInput === normalize(taxon.name);
         const matchCommon = taxon.preferred_common_name ? (normalizedInput === normalize(taxon.preferred_common_name)) : false;
-        const displayName = taxon.preferred_common_name ? `${taxon.preferred_common_name} (${taxon.name})` : taxon.name;
 
         if (matchSci || matchCommon) {
-            state.score++;
-            feedback.textContent = `✅ Correct! It's a ${displayName}`;
-            feedback.className = 'correct';
+            isCorrect = true;
+            matchedNameDisplay = matchSci ? taxon.name : taxon.preferred_common_name;
         } else {
-            feedback.innerHTML = `❌ Not quite.<br>Answer: <strong>${displayName}</strong>`;
+            // 2. Deep Alias & Lineage Check via Autocomplete
+            try {
+                // Request matched_term (the exact alias hit) and ancestor_ids (for lineage checking)
+                const fields = encodeURIComponent('(id:!t,name:!t,preferred_common_name:!t,matched_term:!t,ancestor_ids:!t)');
+                const url = `${API_BASE}/taxa/autocomplete?q=${encodeURIComponent(inputStr)}&is_active=true&per_page=30&fields=${fields}`;
+                const searchRes = await fetch(url);
+                const searchData = await searchRes.json();
+                
+                if (searchData.results && searchData.results.length > 0) {
+                    for (const result of searchData.results) {
+                        // A. Is this result the exact target, or a valid biological descendant?
+                        const isTargetOrDescendant = result.id === targetTaxonId || (result.ancestor_ids && result.ancestor_ids.includes(targetTaxonId));
+                        
+                        // B. Did the user type the FULL matched name?
+                        const validNames = [normalize(result.name), normalize(result.preferred_common_name), normalize(result.matched_term)];
+                        const isExactNameMatch = validNames.includes(normalizedInput);
+                        
+                        if (isTargetOrDescendant && isExactNameMatch) {
+                            isCorrect = true;
+                            // Grab the specific alias they matched for UI display
+                            matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;
+                            break;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.warn("API check failed. Relying on local strict match.");
+            }
+        }
+        
+        // 3. Update UI with Results
+        const primaryDisplayName = taxon.preferred_common_name ? `${taxon.preferred_common_name} (${taxon.name})` : taxon.name;
+        const primaryCommonNorm = taxon.preferred_common_name ? normalize(taxon.preferred_common_name) : "";
+        const sciNorm = normalize(taxon.name);
+        const matchedNorm = normalize(matchedNameDisplay);
+
+        if (isCorrect) {
+            state.score++;
+            
+            // If they matched a valid alias/subspecies that isn't the primary name, show both
+            if (matchedNorm && matchedNorm !== primaryCommonNorm && matchedNorm !== sciNorm) {
+                // Capitalize the matched term nicely for display
+                const displayAlias = matchedNameDisplay.replace(/\b\w/g, c => c.toUpperCase());
+                feedback.innerHTML = `✅ Correct! <strong>${displayAlias}</strong><br><span style="font-size: 0.9em; font-weight: normal;">(Recorded broadly as: ${primaryDisplayName})</span>`;
+            } else {
+                feedback.innerHTML = `✅ Correct! <strong>${primaryDisplayName}</strong>`;
+            }
+            feedback.className = 'correct';
+            
+        } else {
+            feedback.innerHTML = `❌ Not quite.<br>Answer: <strong>${primaryDisplayName}</strong>`;
             feedback.className = 'incorrect';
         }
 
         document.getElementById('quiz-score').textContent = `Score: ${state.score}`;
         feedback.style.display = 'block';
-        document.getElementById('input-answer').disabled = true;
-        document.getElementById('btn-submit').style.display = 'none';
+        
+        btnSubmit.style.display = 'none';
+        btnSubmit.disabled = false;
+        btnSubmit.textContent = "Check Answer";
         
         const btnNext = document.getElementById('btn-next');
-        btnNext.textContent = "Next Observation ➔"; // Ensure normal text is set
+        btnNext.textContent = "Next Observation ➔";
         btnNext.style.display = 'block';
         btnNext.focus();
     });
