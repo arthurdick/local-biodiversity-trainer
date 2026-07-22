@@ -95,6 +95,84 @@
         
         .progress { display: flex; justify-content: space-between; color: var(--text-muted); font-size: 14px; margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
 
+        /* Missed Species Grid */
+        .missed-title {
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: var(--text-main);
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 6px;
+        }
+        .missed-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 12px;
+            max-height: 420px;
+            overflow-y: auto;
+            padding-right: 5px;
+            margin-bottom: 20px;
+        }
+        .missed-card {
+            background: var(--bg-color);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            font-size: 13px;
+        }
+        .missed-card img {
+            width: 100%;
+            height: 130px;
+            object-fit: cover;
+            background: #222;
+        }
+        .missed-card-body {
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            justify-content: space-between;
+        }
+        .missed-card-name {
+            font-weight: bold;
+            color: var(--text-main);
+            line-height: 1.2;
+            margin-bottom: 2px;
+        }
+        .missed-card-sci {
+            font-style: italic;
+            color: var(--text-muted);
+            font-size: 0.9em;
+        }
+        .missed-card-guess {
+            margin-top: 8px;
+            font-size: 12px;
+            color: var(--error);
+            background: #fdeaea;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            word-break: break-word;
+        }
+        .missed-card-links {
+            margin-top: 10px;
+            font-size: 11px;
+            display: flex;
+            gap: 10px;
+            border-top: 1px solid var(--border);
+            padding-top: 6px;
+        }
+        .missed-card-links a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .missed-card-links a:hover {
+            text-decoration: underline;
+        }
+
         /* App Footer */
         .app-footer { margin-top: 25px; padding-top: 15px; border-top: 1px solid var(--border); text-align: center; font-size: 12px; color: var(--text-muted); }
         .app-footer a { color: var(--primary); text-decoration: none; font-weight: bold; }
@@ -187,7 +265,10 @@
     <!-- Results View -->
     <div id="results-view" class="view">
         <h1 style="text-align: center;">Quiz Complete!</h1>
-        <h2 style="text-align: center; font-size: 3em;" id="final-score"></h2>
+        <h2 style="text-align: center; font-size: 2.5em; margin-bottom: 20px;" id="final-score"></h2>
+        
+        <div id="review-container"></div>
+        
         <button id="btn-restart">Play Again</button>
     </div>
 
@@ -657,6 +738,11 @@
             }
         }
         
+        // Store answer data on the question object for review screen
+        q.userAnswer = inputStr;
+        q.isCorrect = isCorrect;
+        q.photoUrl = state.currentPhotoArray[state.currentPhotoIndex]?.mediumUrl || '';
+        
         // 3. Update UI with Results
         const primaryDisplayName = taxon.preferred_common_name ? `${taxon.preferred_common_name} (${taxon.name})` : taxon.name;
         const primaryCommonNorm = taxon.preferred_common_name ? normalize(taxon.preferred_common_name) : "";
@@ -708,17 +794,74 @@
     });
 
     document.getElementById('btn-next').addEventListener('click', (e) => {
-        // Reset text in case it was changed by an error state
         e.target.textContent = "Next Observation ➔";
         
+        const currentQ = state.questions[state.currentIndex];
+        // Default to skipped if user clicked Next/Skip without submitting an answer
+        if (currentQ.isCorrect === undefined) {
+            currentQ.isCorrect = false;
+            currentQ.userAnswer = "(Skipped)";
+            currentQ.photoUrl = state.currentPhotoArray[state.currentPhotoIndex]?.mediumUrl || '';
+        }
+
         state.currentIndex++;
         if (state.currentIndex >= state.questions.length) {
-            document.getElementById('final-score').textContent = `${state.score} / ${state.questions.length}`;
-            showView('results-view');
+            renderResultsView();
         } else {
             renderQuizQuestion();
         }
     });
+    
+    // --- RESULTS REVIEW GRID ---
+    function renderResultsView() {
+        document.getElementById('final-score').textContent = `${state.score} / ${state.questions.length}`;
+        
+        const reviewContainer = document.getElementById('review-container');
+        const missedQuestions = state.questions.filter(q => !q.isCorrect);
+
+        if (missedQuestions.length === 0) {
+            reviewContainer.innerHTML = `
+                <div style="text-align: center; padding: 20px; background: #e8f5e9; color: var(--success); border-radius: var(--radius); margin-bottom: 20px; font-weight: bold;">
+                    🎉 Perfect score! You identified every species correctly!
+                </div>
+            `;
+        } else {
+            let html = `
+                <div class="missed-title">Review Missed Species (${missedQuestions.length})</div>
+                <div class="missed-grid">
+            `;
+
+            missedQuestions.forEach(q => {
+                const taxon = q.taxon;
+                const primaryCommon = taxon.preferred_common_name || '';
+                const sciName = taxon.name;
+                const imgUrl = q.photoUrl || '';
+                const userGuess = q.userAnswer || '(Skipped)';
+
+                html += `
+                    <div class="missed-card">
+                        ${imgUrl ? `<img src="${imgUrl}" alt="${primaryCommon || sciName}">` : '<div style="height:130px;background:#333;display:flex;align-items:center;justify-content:center;color:#888;">No Photo</div>'}
+                        <div class="missed-card-body">
+                            <div>
+                                <div class="missed-card-name">${primaryCommon || sciName}</div>
+                                ${primaryCommon ? `<div class="missed-card-sci">${sciName}</div>` : ''}
+                                <div class="missed-card-guess">Your answer: <strong>${userGuess}</strong></div>
+                            </div>
+                            <div class="missed-card-links">
+                                <a href="https://www.inaturalist.org/taxa/${taxon.id}" target="_blank" rel="noopener">iNaturalist ↗</a>
+                                <a href="https://en.wikipedia.org/wiki/${encodeURIComponent(sciName)}" target="_blank" rel="noopener">Wikipedia ↗</a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `</div>`;
+            reviewContainer.innerHTML = html;
+        }
+
+        showView('results-view');
+    }
 
     document.getElementById('btn-restart').addEventListener('click', () => {
         state.questions = [];
