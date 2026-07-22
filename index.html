@@ -348,8 +348,13 @@
             const data = await res.json();
             if (data.results && data.results.length > 0) {
                 const obs = data.results[0];
-                state.questions[index].observation = obs; 
-                resolver(obs); 
+                state.questions[index].observation = obs;
+                resolver(obs);
+                
+                if (obs.photos && obs.photos.length > 0) {
+                    const preload = new Image();
+                    preload.src = obs.photos[0].url.replace('square', 'medium');
+                }
             } else {
                 resolver({ error: true });
             }
@@ -404,6 +409,8 @@
         document.getElementById('quiz-error').style.display = 'none';
         document.getElementById('quiz-loading').style.display = 'block';
         
+        document.getElementById('quiz-image').removeAttribute('src');
+        
         const input = document.getElementById('input-answer');
         input.value = ""; input.disabled = true;
         document.getElementById('btn-submit').style.display = 'none';
@@ -434,6 +441,22 @@
             
             loadObservationForQuestion(state.currentIndex + 1);
             return; // Exit early
+        }
+        
+        // Handle edge cases where photos are missing
+        if (!obsData.photos || obsData.photos.length === 0) {
+            document.getElementById('quiz-loading').style.display = 'none';
+            const errorDiv = document.getElementById('quiz-error');
+            errorDiv.innerHTML = `❌ This observation is missing photo data.<br><br><span style="color:#aaa;font-weight:normal;">This occasionally happens in the iNaturalist database.</span>`;
+            errorDiv.style.display = 'block';
+            
+            state.isQuestionLoaded = true;
+            document.getElementById('btn-next').style.display = 'block';
+            document.getElementById('btn-next').textContent = "Skip to Next ➔";
+            document.getElementById('btn-next').focus();
+            
+            loadObservationForQuestion(state.currentIndex + 1);
+            return;
         }
 
         // Handle normal case
