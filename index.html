@@ -371,13 +371,9 @@
         document.getElementById('quiz-attribution').textContent = `Photo: ${photo.attribution}`;
         document.getElementById('photo-counter').textContent = `${state.currentPhotoIndex + 1} / ${state.currentPhotoArray.length}`;
         
-        const controls = document.getElementById('photo-controls');
         if (state.currentPhotoArray.length > 1) {
-            controls.style.display = 'flex';
             document.getElementById('btn-prev-photo').disabled = state.currentPhotoIndex === 0;
             document.getElementById('btn-next-photo').disabled = state.currentPhotoIndex === state.currentPhotoArray.length - 1;
-        } else {
-            controls.style.display = 'none';
         }
     }
 
@@ -415,6 +411,9 @@
         document.getElementById('feedback').style.display = 'none';
 
         const q = state.questions[state.currentIndex];
+        if (!q.observation) {
+            loadObservationForQuestion(state.currentIndex);
+        }
         
         let obsData = q.observation;
         if (obsData instanceof Promise) obsData = await obsData;
@@ -461,6 +460,10 @@
         document.getElementById('quiz-image').style.display = 'block';
         document.getElementById('quiz-attribution').style.display = 'block';
         
+        if (state.currentPhotoArray.length > 1) {
+            document.getElementById('photo-controls').style.display = 'flex';
+        }
+        
         // Format and display metadata
         if (state.currentMeta) {
             const dateStr = state.currentMeta.date 
@@ -498,6 +501,24 @@
             // Kick off prefetch for next question
             loadObservationForQuestion(state.currentIndex + 1);
         }
+    };
+    
+    document.getElementById('quiz-image').onerror = () => {
+        document.getElementById('quiz-loading').style.display = 'none';
+        document.getElementById('photo-controls').style.display = 'none';
+        
+        const errorDiv = document.getElementById('quiz-error');
+        errorDiv.innerHTML = `❌ Failed to load the image.<br><br><span style="color:#aaa;font-weight:normal;">Please check your internet connection.</span>`;
+        errorDiv.style.display = 'block';
+        
+        // Bypass the answer step and let the user skip
+        state.isQuestionLoaded = true;
+        document.getElementById('btn-next').style.display = 'block';
+        document.getElementById('btn-next').textContent = "Skip to Next ➔";
+        document.getElementById('btn-next').focus();
+        
+        // Kick off prefetch for the next question
+        loadObservationForQuestion(state.currentIndex + 1);
     };
 
     // --- ANSWER LOGIC ---
