@@ -44,6 +44,53 @@
         .checkbox-label { display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; }
         .checkbox-label input { width: 18px; height: 18px; cursor: pointer; }
 
+        /* Month Filter Grid */
+        .month-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 8px;
+        }
+        .month-actions {
+            font-size: 12px;
+            margin-top: 8px;
+            text-align: right;
+        }
+
+        /* Fieldset Reset & Accessible Text Button Styling */
+        .fieldset-reset {
+            border: none;
+            padding: 0;
+            margin: 0 0 20px 0;
+        }
+        .group-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            padding: 0;
+            color: var(--text-main);
+            display: block;
+        }
+        .text-link-btn {
+            background: none;
+            border: none;
+            color: var(--primary);
+            font-weight: bold;
+            font-size: 12px;
+            padding: 0;
+            margin-left: 10px;
+            width: auto;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .text-link-btn:hover {
+            text-decoration: underline;
+            background: none;
+        }
+        .text-link-btn:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
         button { background-color: var(--primary); color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: var(--radius); cursor: pointer; transition: background 0.2s; width: 100%; font-weight: bold; }
         button:hover { background-color: var(--primary-hover); }
         button:disabled { opacity: 0.6; cursor: not-allowed; }
@@ -236,9 +283,31 @@
             </div>
         </div>
 
+        <fieldset class="form-group fieldset-reset">
+            <legend class="group-label">4. Seasonality (Months)</legend>
+            <div class="month-grid" id="month-filters">
+                <label class="checkbox-label"><input type="checkbox" value="1" aria-label="January" checked> Jan</label>
+                <label class="checkbox-label"><input type="checkbox" value="2" aria-label="February" checked> Feb</label>
+                <label class="checkbox-label"><input type="checkbox" value="3" aria-label="March" checked> Mar</label>
+                <label class="checkbox-label"><input type="checkbox" value="4" aria-label="April" checked> Apr</label>
+                <label class="checkbox-label"><input type="checkbox" value="5" aria-label="May" checked> May</label>
+                <label class="checkbox-label"><input type="checkbox" value="6" aria-label="June" checked> Jun</label>
+                <label class="checkbox-label"><input type="checkbox" value="7" aria-label="July" checked> Jul</label>
+                <label class="checkbox-label"><input type="checkbox" value="8" aria-label="August" checked> Aug</label>
+                <label class="checkbox-label"><input type="checkbox" value="9" aria-label="September" checked> Sep</label>
+                <label class="checkbox-label"><input type="checkbox" value="10" aria-label="October" checked> Oct</label>
+                <label class="checkbox-label"><input type="checkbox" value="11" aria-label="November" checked> Nov</label>
+                <label class="checkbox-label"><input type="checkbox" value="12" aria-label="December" checked> Dec</label>
+            </div>
+            <div class="month-actions">
+                <button type="button" id="btn-months-all" class="text-link-btn">Select All</button>
+                <button type="button" id="btn-months-none" class="text-link-btn">Select None</button>
+            </div>
+        </fieldset>
+
         <div class="form-row">
             <div class="form-group">
-                <label for="input-difficulty">4. Pool Size</label>
+                <label for="input-difficulty">5. Pool Size</label>
                 <select id="input-difficulty">
                     <option value="15">Top 15 Species</option>
                     <option value="50" selected>Top 50 Species</option>
@@ -247,7 +316,7 @@
                 </select>
             </div>
             <div class="form-group">
-                <label for="input-questions">5. Questions</label>
+                <label for="input-questions">6. Questions</label>
                 <select id="input-questions">
                     <option value="5">5</option>
                     <option value="10" selected>10</option>
@@ -340,6 +409,22 @@
         if (!photos && sounds) return '&sounds=true';
         return '';
     }
+
+    function getMonthParams() {
+        const checkboxes = document.querySelectorAll('#month-filters input:checked');
+        if (checkboxes.length === 12 || checkboxes.length === 0) return '';
+        const months = Array.from(checkboxes).map(cb => cb.value).join(',');
+        return `&month=${months}`;
+    }
+
+    // Month Select All / Select None handlers
+    document.getElementById('btn-months-all').addEventListener('click', () => {
+        document.querySelectorAll('#month-filters input').forEach(cb => cb.checked = true);
+    });
+
+    document.getElementById('btn-months-none').addEventListener('click', () => {
+        document.querySelectorAll('#month-filters input').forEach(cb => cb.checked = false);
+    });
     
     // --- LOCALSTORAGE PERSISTENCE ---
     function savePreferences() {
@@ -353,7 +438,8 @@
             difficulty: document.getElementById('input-difficulty').value,
             questions: document.getElementById('input-questions').value,
             chkPhotos: document.getElementById('chk-photos').checked,
-            chkSounds: document.getElementById('chk-sounds').checked
+            chkSounds: document.getElementById('chk-sounds').checked,
+            months: Array.from(document.querySelectorAll('#month-filters input:checked')).map(cb => cb.value)
         };
         localStorage.setItem('bio_trainer_prefs', JSON.stringify(prefs));
     }
@@ -375,6 +461,11 @@
             if (prefs.questions) document.getElementById('input-questions').value = prefs.questions;
             if (prefs.chkPhotos !== undefined) document.getElementById('chk-photos').checked = prefs.chkPhotos;
             if (prefs.chkSounds !== undefined) document.getElementById('chk-sounds').checked = prefs.chkSounds;
+            if (prefs.months) {
+                document.querySelectorAll('#month-filters input').forEach(cb => {
+                    cb.checked = prefs.months.includes(cb.value);
+                });
+            }
         } catch (e) {
             console.warn("Could not load saved preferences", e);
         }
@@ -495,6 +586,10 @@
             return alert("Please select at least one media type (Photos or Sounds).");
         }
 
+        if (document.querySelectorAll('#month-filters input:checked').length === 0) {
+            return alert("Please select at least one month for seasonality.");
+        }
+
         if (!state.placeId && !state.lat) return alert("Please select a location.");
         
         savePreferences();
@@ -505,7 +600,7 @@
         const difficulty = document.getElementById('input-difficulty').value;
         const questionLimit = parseInt(document.getElementById('input-questions').value);
 
-        let poolUrl = `${API_BASE}/observations/species_counts?quality_grade=research&captive=false&per_page=${difficulty}${getMediaParams()}`;
+        let poolUrl = `${API_BASE}/observations/species_counts?quality_grade=research&captive=false&per_page=${difficulty}${getMediaParams()}${getMonthParams()}`;
         if (state.placeId) poolUrl += `&place_id=${state.placeId}`;
         else poolUrl += `&lat=${state.lat}&lng=${state.lng}&radius=10`;
         if (state.taxonId) poolUrl += `&taxon_id=${state.taxonId}`;
@@ -519,7 +614,7 @@
             
             if (!data.results || data.results.length === 0) {
                 btn.disabled = false; btn.textContent = "Load Quiz Pool";
-                return alert("No research-grade observations found for these settings. Try a broader location or taxon.");
+                return alert("No research-grade observations found for these settings. Try a broader location, taxon, or month range.");
             }
 
             let totalWeights = 0;
@@ -559,7 +654,7 @@
 
         const taxon = state.questions[index].taxon;
         
-        let url = `${API_BASE}/observations?taxon_id=${taxon.id}&quality_grade=research&captive=false&per_page=1&order_by=random${getMediaParams()}`;
+        let url = `${API_BASE}/observations?taxon_id=${taxon.id}&quality_grade=research&captive=false&per_page=1&order_by=random${getMediaParams()}${getMonthParams()}`;
         if (state.placeId) url += `&place_id=${state.placeId}`;
         else url += `&lat=${state.lat}&lng=${state.lng}&radius=10`;
         
@@ -606,7 +701,6 @@
             
             audioContainer.style.display = 'none';
             // Only show the image element if it's already loaded, or rely on img.onload
-            // In case we're switching back to a cached photo:
             if (imgElement.complete) {
                 imgElement.style.display = 'block';
             }
@@ -723,7 +817,7 @@
             });
         }
 
-        // Failsafe: If filtering resulted in an empty array (should be rare due to API params), skip it
+        // Failsafe: If filtering resulted in an empty array, skip it
         if (state.currentMediaArray.length === 0) {
             handleFetchError(q, true);
             return;
@@ -732,7 +826,7 @@
         state.currentMediaIndex = 0;
         updateMediaDisplay();
 
-        // If the first media is a sound, trigger ready immediately (no onload to wait for)
+        // If the first media is a sound, trigger ready immediately
         if (state.currentMediaArray[0].type === 'sound') {
             triggerQuestionReady();
         }
@@ -746,7 +840,7 @@
             errorDiv.innerHTML = `❌ Observation missing media data.<br><br><span style="color:#aaa;font-weight:normal;">This occasionally happens in the iNaturalist database.</span>`;
         } else {
             const taxonName = q.taxon.preferred_common_name || q.taxon.name;
-            errorDiv.innerHTML = `❌ Failed to load an observation for <strong>${taxonName}</strong>.<br><br><span style="color:#aaa;font-weight:normal;">It may lack observations with the selected media types in this area.</span>`;
+            errorDiv.innerHTML = `❌ Failed to load an observation for <strong>${taxonName}</strong>.<br><br><span style="color:#aaa;font-weight:normal;">It may lack observations matching your selected media types or seasonal filters.</span>`;
         }
         
         errorDiv.style.display = 'block';
@@ -877,7 +971,7 @@
         q.userAnswer = inputStr;
         q.isCorrect = isCorrect;
         
-        // Grab a thumbnail specifically for the review grid (defaulting to empty if it's audio only)
+        // Grab a thumbnail specifically for the review grid
         q.thumbnailUrl = state.currentMediaArray.find(m => m.type === 'photo')?.mediumUrl || '';
         
         const primaryDisplayName = taxon.preferred_common_name ? `${taxon.preferred_common_name} (${taxon.name})` : taxon.name;
