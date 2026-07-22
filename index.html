@@ -36,6 +36,42 @@
         .z-high { z-index: 10; }
         .z-mid { z-index: 5; }
 
+        /* Input Wrapper & Clear Button */
+        .input-relative-wrapper {
+            position: relative;
+            display: block;
+        }
+
+        .input-relative-wrapper input[type="text"] {
+            padding-right: 40px;
+        }
+
+        .btn-clear {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 22px;
+            cursor: pointer;
+            padding: 0 5px;
+            display: none;
+            width: auto;
+            font-weight: normal;
+        }
+
+        .btn-clear:hover {
+            color: var(--error);
+            background: transparent;
+        }
+
+        .btn-clear:focus-visible {
+            outline: 2px solid var(--primary);
+            border-radius: 4px;
+        }
+
         label { display: block; font-weight: bold; margin-bottom: 5px; }
         input[type="text"], select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 16px; }
         
@@ -261,13 +297,19 @@
         <div class="form-group z-high autocomplete-wrapper">
             <label for="input-place">1. Location</label>
             <button id="btn-gps" type="button" style="margin-bottom: 10px; background-color: #555;">📍 Use My Exact Location (GPS)</button>
-            <input type="text" id="input-place" placeholder="...or search a city, park, or country" autocomplete="off">
+            <div class="input-relative-wrapper">
+                <input type="text" id="input-place" placeholder="...or search a city, park, or country" autocomplete="off">
+                <button type="button" id="clear-place" class="btn-clear" aria-label="Clear location input" title="Clear location">&times;</button>
+            </div>
             <ul id="list-place" class="autocomplete-list" role="listbox"></ul>
         </div>
 
         <div class="form-group z-mid autocomplete-wrapper">
             <label for="input-taxon">2. Target Taxon (Optional)</label>
-            <input type="text" id="input-taxon" placeholder="e.g., Birds, Fungi, Owls..." autocomplete="off">
+            <div class="input-relative-wrapper">
+                <input type="text" id="input-taxon" placeholder="e.g., Birds, Fungi, Owls..." autocomplete="off">
+                <button type="button" id="clear-taxon" class="btn-clear" aria-label="Clear target taxon input" title="Clear taxon">&times;</button>
+            </div>
             <ul id="list-taxon" class="autocomplete-list" role="listbox"></ul>
         </div>
 
@@ -401,6 +443,32 @@
         currentMediaArray: [], currentMediaIndex: 0, currentMeta: null, isQuestionLoaded: false
     };
 
+    // --- CLEAR BUTTON LOGIC ---
+    function toggleClearButton(inputId, btnId) {
+        const input = document.getElementById(inputId);
+        const btn = document.getElementById(btnId);
+        btn.style.display = input.value.length > 0 ? 'block' : 'none';
+    }
+
+    document.getElementById('clear-place').addEventListener('click', () => {
+        const input = document.getElementById('input-place');
+        input.value = '';
+        state.placeId = null;
+        state.lat = null;
+        state.lng = null;
+        document.getElementById('setup-status').textContent = "";
+        toggleClearButton('input-place', 'clear-place');
+        input.focus();
+    });
+
+    document.getElementById('clear-taxon').addEventListener('click', () => {
+        const input = document.getElementById('input-taxon');
+        input.value = '';
+        state.taxonId = null;
+        toggleClearButton('input-taxon', 'clear-taxon');
+        input.focus();
+    });
+
     function getMediaParams() {
         const photos = document.getElementById('chk-photos').checked;
         const sounds = document.getElementById('chk-sounds').checked;
@@ -469,6 +537,8 @@
         } catch (e) {
             console.warn("Could not load saved preferences", e);
         }
+        toggleClearButton('input-place', 'clear-place');
+        toggleClearButton('input-taxon', 'clear-taxon');
     }
 
     // --- UTILITIES ---
@@ -495,6 +565,7 @@
 
     // --- AUTOCOMPLETE ---
     document.getElementById('input-place').addEventListener('input', debounce(async (e) => {
+        toggleClearButton('input-place', 'clear-place');
         const query = e.target.value;
         const list = document.getElementById('list-place');
         list.innerHTML = ''; state.placeId = null;
@@ -516,6 +587,7 @@
                 state.placeId = place.id; state.lat = null; state.lng = null;
                 document.getElementById('input-place').value = displayName;
                 list.classList.remove('show');
+                toggleClearButton('input-place', 'clear-place');
             };
             
             li.onclick = selectItem;
@@ -531,6 +603,7 @@
     }));
 
     document.getElementById('input-taxon').addEventListener('input', debounce(async (e) => {
+        toggleClearButton('input-taxon', 'clear-taxon');
         const query = e.target.value;
         const list = document.getElementById('list-taxon');
         list.innerHTML = ''; state.taxonId = null; 
@@ -552,6 +625,7 @@
                 state.taxonId = taxon.id;
                 document.getElementById('input-taxon').value = li.textContent;
                 list.classList.remove('show');
+                toggleClearButton('input-taxon', 'clear-taxon');
             };
             
             li.onclick = selectItem;
@@ -572,6 +646,7 @@
                 state.lat = pos.coords.latitude; state.lng = pos.coords.longitude; state.placeId = null;
                 document.getElementById('input-place').value = `📍 GPS Coordinates Captured`;
                 document.getElementById('setup-status').textContent = "";
+                toggleClearButton('input-place', 'clear-place');
             },
             () => document.getElementById('setup-status').textContent = "Could not get location."
         );
