@@ -52,6 +52,7 @@
         .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 0 0 var(--radius) var(--radius); max-height: 200px; overflow-y: auto; margin: 0; padding: 0; list-style: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: none; }
         .autocomplete-list.show { display: block; }
         .autocomplete-list li { padding: 10px; cursor: pointer; border-bottom: 1px solid var(--border); }
+        .autocomplete-list li:focus { background: var(--bg-color); outline: 2px solid var(--primary); outline-offset: -2px; }
         .autocomplete-list li:hover { background: var(--bg-color); }
         
         /* Quiz Layout */
@@ -211,16 +212,16 @@
         <p>Learn local species weighted by real-world frequencies.</p>
 
         <div class="form-group z-high autocomplete-wrapper">
-            <label>1. Location</label>
+            <label for="input-place">1. Location</label>
             <button id="btn-gps" type="button" style="margin-bottom: 10px; background-color: #555;">📍 Use My Exact Location (GPS)</button>
             <input type="text" id="input-place" placeholder="...or search a city, park, or country" autocomplete="off">
-            <ul id="list-place" class="autocomplete-list"></ul>
+            <ul id="list-place" class="autocomplete-list" role="listbox"></ul>
         </div>
 
         <div class="form-group z-mid autocomplete-wrapper">
-            <label>2. Target Taxon (Optional)</label>
+            <label for="input-taxon">2. Target Taxon (Optional)</label>
             <input type="text" id="input-taxon" placeholder="e.g., Birds, Fungi, Owls..." autocomplete="off">
-            <ul id="list-taxon" class="autocomplete-list"></ul>
+            <ul id="list-taxon" class="autocomplete-list" role="listbox"></ul>
         </div>
 
         <div class="form-group">
@@ -237,7 +238,7 @@
 
         <div class="form-row">
             <div class="form-group">
-                <label>4. Pool Size</label>
+                <label for="input-difficulty">4. Pool Size</label>
                 <select id="input-difficulty">
                     <option value="15">Top 15 Species</option>
                     <option value="50" selected>Top 50 Species</option>
@@ -246,7 +247,7 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>5. Questions</label>
+                <label for="input-questions">5. Questions</label>
                 <select id="input-questions">
                     <option value="5">5</option>
                     <option value="10" selected>10</option>
@@ -262,29 +263,29 @@
 
     <!-- Quiz View -->
     <div id="quiz-view" class="view">
-        <div class="progress">
+        <div class="progress" aria-live="polite">
             <span id="quiz-counter">Question 1 of 10</span>
             <span id="quiz-score">Score: 0</span>
         </div>
         
         <div class="quiz-media-container">
-            <div id="quiz-loading">Fetching random observation...</div>
-            <div id="quiz-error" style="display:none;"></div>
+            <div id="quiz-loading" aria-live="assertive">Fetching random observation...</div>
+            <div id="quiz-error" style="display:none;" aria-live="assertive"></div>
             
             <!-- Photo Element -->
             <img id="quiz-image" src="" alt="Observation photo" style="display:none;" title="Click to view full resolution">
             
             <!-- Audio Element -->
             <div id="quiz-audio-container" class="audio-player-wrapper" style="display:none;">
-                <div class="audio-icon">🎧</div>
+                <div class="audio-icon" aria-hidden="true">🎧</div>
                 <audio id="quiz-audio-player" controls preload="auto"></audio>
             </div>
 
             <!-- Unified Media Controls -->
             <div id="media-controls" class="media-controls" style="display:none;">
-                <button id="btn-prev-media">◀</button>
-                <span id="media-counter">1 / 1</span>
-                <button id="btn-next-media">▶</button>
+                <button id="btn-prev-media" aria-label="Previous Media">◀</button>
+                <span id="media-counter" aria-live="polite">1 / 1</span>
+                <button id="btn-next-media" aria-label="Next Media">▶</button>
             </div>
             
             <!-- Metadata Container -->
@@ -296,12 +297,12 @@
         </div>
 
         <div class="form-group" id="answer-form">
-            <label>What is this?</label>
+            <label for="input-answer">What is this?</label>
             <input type="text" id="input-answer" placeholder="Common or scientific name..." autocomplete="off">
             <button id="btn-submit" style="margin-top: 10px;">Check Answer</button>
         </div>
 
-        <div id="feedback"></div>
+        <div id="feedback" aria-live="polite"></div>
         <button id="btn-next" style="display:none; margin-top: 15px;">Next Observation ➔</button>
     </div>
 
@@ -417,10 +418,23 @@
             const li = document.createElement('li');
             const displayName = place.display_name || place.name;
             li.textContent = displayName;
-            li.onclick = () => {
+            li.tabIndex = 0; // Accessibility: Make focusable via keyboard
+            li.setAttribute('role', 'option');
+            
+            const selectItem = () => {
                 state.placeId = place.id; state.lat = null; state.lng = null;
-                e.target.value = displayName; list.classList.remove('show');
+                document.getElementById('input-place').value = displayName;
+                list.classList.remove('show');
             };
+            
+            li.onclick = selectItem;
+            li.onkeydown = (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    selectItem();
+                }
+            };
+            
             list.appendChild(li);
         });
     }));
@@ -440,8 +454,21 @@
             const li = document.createElement('li');
             const common = taxon.preferred_common_name ? `${taxon.preferred_common_name} ` : '';
             li.textContent = `${common}(${taxon.name})`;
-            li.onclick = () => {
-                state.taxonId = taxon.id; e.target.value = li.textContent; list.classList.remove('show');
+            li.tabIndex = 0; // Accessibility: Make focusable via keyboard
+            li.setAttribute('role', 'option');
+            
+            const selectItem = () => {
+                state.taxonId = taxon.id;
+                document.getElementById('input-taxon').value = li.textContent;
+                list.classList.remove('show');
+            };
+            
+            li.onclick = selectItem;
+            li.onkeydown = (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    selectItem();
+                }
             };
             list.appendChild(li);
         });
