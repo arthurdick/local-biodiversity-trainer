@@ -76,6 +76,23 @@
         #feedback.correct { background-color: #e8f5e9; color: var(--success); border: 1px solid var(--success); }
         #feedback.incorrect { background-color: #fdeaea; color: var(--error); border: 1px solid var(--error); }
         
+        /* Feedback Taxon Links */
+        .feedback-links {
+            margin-top: 8px;
+            padding-top: 6px;
+            border-top: 1px dashed rgba(0, 0, 0, 0.15);
+            font-size: 0.85em;
+            font-weight: normal;
+        }
+        .feedback-links a {
+            color: inherit;
+            font-weight: bold;
+            text-decoration: underline;
+        }
+        .feedback-links a:hover {
+            opacity: 0.8;
+        }
+        
         .progress { display: flex; justify-content: space-between; color: var(--text-muted); font-size: 14px; margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
 
         /* App Footer */
@@ -189,6 +206,41 @@
         questions: [], currentIndex: 0, score: 0,
         currentPhotoArray: [], currentPhotoIndex: 0, currentMeta: null, isQuestionLoaded: false
     };
+    
+    // --- LOCALSTORAGE PERSISTENCE ---
+    function savePreferences() {
+        const prefs = {
+            placeId: state.placeId,
+            lat: state.lat,
+            lng: state.lng,
+            placeName: document.getElementById('input-place').value,
+            taxonId: state.taxonId,
+            taxonName: document.getElementById('input-taxon').value,
+            difficulty: document.getElementById('input-difficulty').value,
+            questions: document.getElementById('input-questions').value
+        };
+        localStorage.setItem('bio_trainer_prefs', JSON.stringify(prefs));
+    }
+
+    function loadPreferences() {
+        try {
+            const saved = localStorage.getItem('bio_trainer_prefs');
+            if (!saved) return;
+            const prefs = JSON.parse(saved);
+
+            state.placeId = prefs.placeId || null;
+            state.lat = prefs.lat || null;
+            state.lng = prefs.lng || null;
+            state.taxonId = prefs.taxonId || null;
+
+            if (prefs.placeName) document.getElementById('input-place').value = prefs.placeName;
+            if (prefs.taxonName) document.getElementById('input-taxon').value = prefs.taxonName;
+            if (prefs.difficulty) document.getElementById('input-difficulty').value = prefs.difficulty;
+            if (prefs.questions) document.getElementById('input-questions').value = prefs.questions;
+        } catch (e) {
+            console.warn("Could not load saved preferences", e);
+        }
+    }
 
     // --- UTILITIES ---
     function showView(viewId) {
@@ -273,6 +325,9 @@
     // --- GAME START & WEIGHTED RANDOMNESS ---
     document.getElementById('btn-start').addEventListener('click', async () => {
         if (!state.placeId && !state.lat) return alert("Please select a location.");
+        
+        // Save current setup options to LocalStorage
+        savePreferences();
         
         const btn = document.getElementById('btn-start');
         btn.disabled = true; btn.textContent = "Analyzing Regional Ecology...";
@@ -607,22 +662,31 @@
         const primaryCommonNorm = taxon.preferred_common_name ? normalize(taxon.preferred_common_name) : "";
         const sciNorm = normalize(taxon.name);
         const matchedNorm = normalize(matchedNameDisplay);
+        
+        // Links to iNaturalist taxon page and Wikipedia entry
+        const linksHtml = `
+            <div class="feedback-links">
+                📖 Learn more:
+                <a href="https://www.inaturalist.org/taxa/${taxon.id}" target="_blank" rel="noopener">iNaturalist ↗</a>
+                <span style="margin: 0 4px; opacity: 0.5;">•</span>
+                <a href="https://en.wikipedia.org/wiki/${encodeURIComponent(taxon.name)}" target="_blank" rel="noopener">Wikipedia ↗</a>
+            </div>
+        `;
 
         if (isCorrect) {
             state.score++;
             
             // If they matched a valid alias/subspecies that isn't the primary name, show both
             if (matchedNorm && matchedNorm !== primaryCommonNorm && matchedNorm !== sciNorm) {
-                // Capitalize the matched term nicely for display
                 const displayAlias = matchedNameDisplay.replace(/\b\w/g, c => c.toUpperCase());
-                feedback.innerHTML = `✅ Correct! <strong>${displayAlias}</strong><br><span style="font-size: 0.9em; font-weight: normal;">(Recorded broadly as: ${primaryDisplayName})</span>`;
+                feedback.innerHTML = `✅ Correct! <strong>${displayAlias}</strong><br><span style="font-size: 0.9em; font-weight: normal;">(Recorded broadly as: ${primaryDisplayName})</span>${linksHtml}`;
             } else {
-                feedback.innerHTML = `✅ Correct! <strong>${primaryDisplayName}</strong>`;
+                feedback.innerHTML = `✅ Correct! <strong>${primaryDisplayName}</strong>${linksHtml}`;
             }
             feedback.className = 'correct';
             
         } else {
-            feedback.innerHTML = `❌ Not quite.<br>Answer: <strong>${primaryDisplayName}</strong>`;
+            feedback.innerHTML = `❌ Not quite.<br>Answer: <strong>${primaryDisplayName}</strong>${linksHtml}`;
             feedback.className = 'incorrect';
         }
 
@@ -660,6 +724,9 @@
         state.questions = [];
         showView('setup-view');
     });
+    
+    // Call on app initialization
+    loadPreferences();
 
 </script>
 </body>
