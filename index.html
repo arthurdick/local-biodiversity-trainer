@@ -38,6 +38,12 @@
 
         label { display: block; font-weight: bold; margin-bottom: 5px; }
         input[type="text"], select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 16px; }
+        
+        /* Media Checkbox Group */
+        .checkbox-group { display: flex; gap: 20px; margin-top: 8px; }
+        .checkbox-label { display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; }
+        .checkbox-label input { width: 18px; height: 18px; cursor: pointer; }
+
         button { background-color: var(--primary); color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: var(--radius); cursor: pointer; transition: background 0.2s; width: 100%; font-weight: bold; }
         button:hover { background-color: var(--primary-hover); }
         button:disabled { opacity: 0.6; cursor: not-allowed; }
@@ -49,16 +55,33 @@
         .autocomplete-list li:hover { background: var(--bg-color); }
         
         /* Quiz Layout */
-        .quiz-photo-container { text-align: center; margin-bottom: 20px; min-height: 350px; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #111; border-radius: var(--radius); border: 1px solid var(--border); position: relative; padding: 10px; }
+        .quiz-media-container { text-align: center; margin-bottom: 20px; min-height: 350px; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #111; border-radius: var(--radius); border: 1px solid var(--border); position: relative; padding: 15px; }
         
-        .quiz-photo-container img { max-width: 100%; max-height: 350px; border-radius: 4px; object-fit: contain; cursor: zoom-in; transition: opacity 0.2s; }
-        .quiz-photo-container img:hover { opacity: 0.9; }
+        .quiz-media-container img { max-width: 100%; max-height: 320px; border-radius: 4px; object-fit: contain; cursor: zoom-in; transition: opacity 0.2s; }
+        .quiz-media-container img:hover { opacity: 0.9; }
         
-        .photo-controls { display: flex; align-items: center; justify-content: center; gap: 15px; margin-top: 10px; width: 100%; }
-        .photo-controls button { width: auto; padding: 5px 15px; background-color: #444; font-size: 14px; border-radius: 20px; }
-        .photo-controls button:hover { background-color: #666; }
-        .photo-controls button:disabled { opacity: 0.3; cursor: not-allowed; }
-        #photo-counter { font-size: 14px; font-weight: bold; color: #ccc; min-width: 40px; text-align: center; }
+        /* Audio Player Container */
+        .audio-player-wrapper {
+            background: #222;
+            border: 1px solid #444;
+            padding: 20px;
+            border-radius: var(--radius);
+            width: 100%;
+            max-width: 450px;
+            margin: 15px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        .audio-player-wrapper audio { width: 100%; }
+        .audio-icon { font-size: 48px; color: var(--primary); }
+
+        .media-controls { display: flex; align-items: center; justify-content: center; gap: 15px; margin-top: 10px; width: 100%; }
+        .media-controls button { width: auto; padding: 5px 15px; background-color: #444; font-size: 14px; border-radius: 20px; }
+        .media-controls button:hover { background-color: #666; }
+        .media-controls button:disabled { opacity: 0.3; cursor: not-allowed; }
+        #media-counter { font-size: 14px; font-weight: bold; color: #ccc; min-width: 40px; text-align: center; }
         
         /* Metadata Styles */
         .quiz-meta { font-size: 13px; color: #ccc; margin-top: 10px; background-color: #333; padding: 5px 15px; border-radius: 20px; text-align: center; max-width: 90%; }
@@ -200,9 +223,21 @@
             <ul id="list-taxon" class="autocomplete-list"></ul>
         </div>
 
+        <div class="form-group">
+            <label>3. Observation Media Types</label>
+            <div class="checkbox-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="chk-photos" checked> 📷 Photos
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="chk-sounds" checked> 🔊 Audio Sounds
+                </label>
+            </div>
+        </div>
+
         <div class="form-row">
             <div class="form-group">
-                <label>3. Pool Size</label>
+                <label>4. Pool Size</label>
                 <select id="input-difficulty">
                     <option value="15">Top 15 Species</option>
                     <option value="50" selected>Top 50 Species</option>
@@ -211,7 +246,7 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>4. Questions</label>
+                <label>5. Questions</label>
                 <select id="input-questions">
                     <option value="5">5</option>
                     <option value="10" selected>10</option>
@@ -232,16 +267,24 @@
             <span id="quiz-score">Score: 0</span>
         </div>
         
-        <div class="quiz-photo-container">
+        <div class="quiz-media-container">
             <div id="quiz-loading">Fetching random observation...</div>
             <div id="quiz-error" style="display:none;"></div>
             
+            <!-- Photo Element -->
             <img id="quiz-image" src="" alt="Observation photo" style="display:none;" title="Click to view full resolution">
             
-            <div id="photo-controls" class="photo-controls" style="display:none;">
-                <button id="btn-prev-photo">◀</button>
-                <span id="photo-counter">1 / 1</span>
-                <button id="btn-next-photo">▶</button>
+            <!-- Audio Element -->
+            <div id="quiz-audio-container" class="audio-player-wrapper" style="display:none;">
+                <div class="audio-icon">🎧</div>
+                <audio id="quiz-audio-player" controls preload="auto"></audio>
+            </div>
+
+            <!-- Unified Media Controls -->
+            <div id="media-controls" class="media-controls" style="display:none;">
+                <button id="btn-prev-media">◀</button>
+                <span id="media-counter">1 / 1</span>
+                <button id="btn-next-media">▶</button>
             </div>
             
             <!-- Metadata Container -->
@@ -274,7 +317,7 @@
 
     <!-- Required API Attribution Footer -->
     <div class="app-footer">
-        Species data and photos provided by <a href="https://www.inaturalist.org" target="_blank">iNaturalist</a>.<br>
+        Species data, sound clips, and photos provided by <a href="https://www.inaturalist.org" target="_blank">iNaturalist</a>.<br>
         This application is not officially affiliated with iNaturalist.
     </div>
 </div>
@@ -285,8 +328,17 @@
     const state = {
         placeId: null, lat: null, lng: null, taxonId: null,
         questions: [], currentIndex: 0, score: 0,
-        currentPhotoArray: [], currentPhotoIndex: 0, currentMeta: null, isQuestionLoaded: false
+        currentMediaArray: [], currentMediaIndex: 0, currentMeta: null, isQuestionLoaded: false
     };
+
+    function getMediaParams() {
+        const photos = document.getElementById('chk-photos').checked;
+        const sounds = document.getElementById('chk-sounds').checked;
+
+        if (photos && !sounds) return '&photos=true';
+        if (!photos && sounds) return '&sounds=true';
+        return '';
+    }
     
     // --- LOCALSTORAGE PERSISTENCE ---
     function savePreferences() {
@@ -298,7 +350,9 @@
             taxonId: state.taxonId,
             taxonName: document.getElementById('input-taxon').value,
             difficulty: document.getElementById('input-difficulty').value,
-            questions: document.getElementById('input-questions').value
+            questions: document.getElementById('input-questions').value,
+            chkPhotos: document.getElementById('chk-photos').checked,
+            chkSounds: document.getElementById('chk-sounds').checked
         };
         localStorage.setItem('bio_trainer_prefs', JSON.stringify(prefs));
     }
@@ -318,6 +372,8 @@
             if (prefs.taxonName) document.getElementById('input-taxon').value = prefs.taxonName;
             if (prefs.difficulty) document.getElementById('input-difficulty').value = prefs.difficulty;
             if (prefs.questions) document.getElementById('input-questions').value = prefs.questions;
+            if (prefs.chkPhotos !== undefined) document.getElementById('chk-photos').checked = prefs.chkPhotos;
+            if (prefs.chkSounds !== undefined) document.getElementById('chk-sounds').checked = prefs.chkSounds;
         } catch (e) {
             console.warn("Could not load saved preferences", e);
         }
@@ -405,9 +461,15 @@
 
     // --- GAME START & WEIGHTED RANDOMNESS ---
     document.getElementById('btn-start').addEventListener('click', async () => {
+        const photosChecked = document.getElementById('chk-photos').checked;
+        const soundsChecked = document.getElementById('chk-sounds').checked;
+
+        if (!photosChecked && !soundsChecked) {
+            return alert("Please select at least one media type (Photos or Sounds).");
+        }
+
         if (!state.placeId && !state.lat) return alert("Please select a location.");
         
-        // Save current setup options to LocalStorage
         savePreferences();
         
         const btn = document.getElementById('btn-start');
@@ -416,8 +478,7 @@
         const difficulty = document.getElementById('input-difficulty').value;
         const questionLimit = parseInt(document.getElementById('input-questions').value);
 
-        // Fetch Species Pool (photos=true)
-        let poolUrl = `${API_BASE}/observations/species_counts?photos=true&quality_grade=research&per_page=${difficulty}`;
+        let poolUrl = `${API_BASE}/observations/species_counts?quality_grade=research&captive=false&per_page=${difficulty}${getMediaParams()}`;
         if (state.placeId) poolUrl += `&place_id=${state.placeId}`;
         else poolUrl += `&lat=${state.lat}&lng=${state.lng}&radius=10`;
         if (state.taxonId) poolUrl += `&taxon_id=${state.taxonId}`;
@@ -431,7 +492,7 @@
             
             if (!data.results || data.results.length === 0) {
                 btn.disabled = false; btn.textContent = "Load Quiz Pool";
-                return alert("No research-grade observations found here. Try a broader search.");
+                return alert("No research-grade observations found for these settings. Try a broader location or taxon.");
             }
 
             let totalWeights = 0;
@@ -455,7 +516,7 @@
             renderQuizQuestion();
 
         } catch (error) {
-            alert("Error loading data.");
+            alert("Error loading species data.");
         } finally {
             btn.disabled = false; btn.textContent = "Load Quiz Pool";
         }
@@ -471,15 +532,14 @@
 
         const taxon = state.questions[index].taxon;
         
-        let url = `${API_BASE}/observations?taxon_id=${taxon.id}&photos=true&quality_grade=research&per_page=1&order_by=random`;
+        let url = `${API_BASE}/observations?taxon_id=${taxon.id}&quality_grade=research&captive=false&per_page=1&order_by=random${getMediaParams()}`;
         if (state.placeId) url += `&place_id=${state.placeId}`;
         else url += `&lat=${state.lat}&lng=${state.lng}&radius=10`;
         
-        const fields = encodeURIComponent('(observed_on:!t,place_guess:!t,location:!t,photos:(url:!t,attribution:!t))');
+        const fields = encodeURIComponent('(observed_on:!t,place_guess:!t,location:!t,photos:(url:!t,attribution:!t),sounds:(file_url:!t,attribution:!t))');
         url += `&fields=${fields}`;
 
         try {
-            // Force browser to bypass cache for the random pull
             const res = await fetch(url, { cache: 'no-store' });
             const data = await res.json();
             if (data.results && data.results.length > 0) {
@@ -487,6 +547,7 @@
                 state.questions[index].observation = obs;
                 resolver(obs);
                 
+                // Preload the first image if it exists
                 if (obs.photos && obs.photos.length > 0) {
                     const preload = new Image();
                     preload.src = obs.photos[0].url.replace('square', 'medium');
@@ -499,36 +560,58 @@
         }
     }
 
-    // --- PHOTO CAROUSEL LOGIC ---
-    function updatePhotoDisplay() {
-        const photo = state.currentPhotoArray[state.currentPhotoIndex];
+    // --- UNIFIED MEDIA CAROUSEL LOGIC ---
+    function updateMediaDisplay() {
+        if (state.currentMediaArray.length === 0) return;
+        
+        const media = state.currentMediaArray[state.currentMediaIndex];
         const imgElement = document.getElementById('quiz-image');
+        const audioContainer = document.getElementById('quiz-audio-container');
+        const audioPlayer = document.getElementById('quiz-audio-player');
         
-        imgElement.src = photo.mediumUrl;
+        // Pause any playing audio when transitioning
+        audioPlayer.pause();
         
-        // Open the original resolution photo in a new tab when clicked
-        imgElement.onclick = () => window.open(photo.originalUrl, '_blank');
+        if (media.type === 'photo') {
+            imgElement.src = media.mediumUrl;
+            imgElement.onclick = () => window.open(media.originalUrl, '_blank');
+            document.getElementById('quiz-attribution').textContent = `Photo: ${media.attribution}`;
+            
+            audioContainer.style.display = 'none';
+            // Only show the image element if it's already loaded, or rely on img.onload
+            // In case we're switching back to a cached photo:
+            if (imgElement.complete) {
+                imgElement.style.display = 'block';
+            }
+        } else if (media.type === 'sound') {
+            imgElement.style.display = 'none';
+            audioContainer.style.display = 'flex';
+            audioPlayer.src = media.fileUrl;
+            document.getElementById('quiz-attribution').textContent = `Sound: ${media.attribution || 'iNaturalist Contributor'}`;
+        }
         
-        document.getElementById('quiz-attribution').textContent = `Photo: ${photo.attribution}`;
-        document.getElementById('photo-counter').textContent = `${state.currentPhotoIndex + 1} / ${state.currentPhotoArray.length}`;
+        document.getElementById('media-counter').textContent = `${state.currentMediaIndex + 1} / ${state.currentMediaArray.length}`;
         
-        if (state.currentPhotoArray.length > 1) {
-            document.getElementById('btn-prev-photo').disabled = state.currentPhotoIndex === 0;
-            document.getElementById('btn-next-photo').disabled = state.currentPhotoIndex === state.currentPhotoArray.length - 1;
+        if (state.currentMediaArray.length > 1) {
+            document.getElementById('media-controls').style.display = 'flex';
+            document.getElementById('btn-prev-media').disabled = state.currentMediaIndex === 0;
+            document.getElementById('btn-next-media').disabled = state.currentMediaIndex === state.currentMediaArray.length - 1;
+        } else {
+            document.getElementById('media-controls').style.display = 'none';
         }
     }
 
-    document.getElementById('btn-prev-photo').addEventListener('click', () => {
-        if (state.currentPhotoIndex > 0) {
-            state.currentPhotoIndex--;
-            updatePhotoDisplay();
+    document.getElementById('btn-prev-media').addEventListener('click', () => {
+        if (state.currentMediaIndex > 0) {
+            state.currentMediaIndex--;
+            updateMediaDisplay();
         }
     });
 
-    document.getElementById('btn-next-photo').addEventListener('click', () => {
-        if (state.currentPhotoIndex < state.currentPhotoArray.length - 1) {
-            state.currentPhotoIndex++;
-            updatePhotoDisplay();
+    document.getElementById('btn-next-media').addEventListener('click', () => {
+        if (state.currentMediaIndex < state.currentMediaArray.length - 1) {
+            state.currentMediaIndex++;
+            updateMediaDisplay();
         }
     });
 
@@ -538,13 +621,18 @@
         document.getElementById('quiz-counter').textContent = `Question ${state.currentIndex + 1} of ${state.questions.length}`;
         document.getElementById('quiz-score').textContent = `Score: ${state.score}`;
         
+        // Reset Views
         document.getElementById('quiz-image').style.display = 'none';
-        document.getElementById('photo-controls').style.display = 'none';
+        document.getElementById('quiz-audio-container').style.display = 'none';
+        document.getElementById('media-controls').style.display = 'none';
         document.getElementById('quiz-meta').style.display = 'none';
         document.getElementById('quiz-attribution').style.display = 'none';
         document.getElementById('quiz-error').style.display = 'none';
         document.getElementById('quiz-loading').style.display = 'block';
         
+        const audioPlayer = document.getElementById('quiz-audio-player');
+        audioPlayer.pause();
+        audioPlayer.src = "";
         document.getElementById('quiz-image').removeAttribute('src');
         
         const input = document.getElementById('input-answer');
@@ -561,69 +649,92 @@
         let obsData = q.observation;
         if (obsData instanceof Promise) obsData = await obsData;
 
-        // Display error message if the fetch failed
         if (obsData.error) {
-            document.getElementById('quiz-loading').style.display = 'none';
-            const errorDiv = document.getElementById('quiz-error');
-            const taxonName = q.taxon.preferred_common_name || q.taxon.name;
-            errorDiv.innerHTML = `❌ Failed to load an observation for <strong>${taxonName}</strong>.<br><br><span style="color:#aaa;font-weight:normal;">It may lack research-grade photos in this area.</span>`;
-            errorDiv.style.display = 'block';
-            
-            // Mark question as "loaded" so we can prefetch the next, but skip the answer phase
-            state.isQuestionLoaded = true;
-            document.getElementById('btn-next').style.display = 'block';
-            document.getElementById('btn-next').textContent = "Skip to Next ➔";
-            document.getElementById('btn-next').focus();
-            
-            loadObservationForQuestion(state.currentIndex + 1);
-            return; // Exit early
-        }
-        
-        // Handle edge cases where photos are missing
-        if (!obsData.photos || obsData.photos.length === 0) {
-            document.getElementById('quiz-loading').style.display = 'none';
-            const errorDiv = document.getElementById('quiz-error');
-            errorDiv.innerHTML = `❌ This observation is missing photo data.<br><br><span style="color:#aaa;font-weight:normal;">This occasionally happens in the iNaturalist database.</span>`;
-            errorDiv.style.display = 'block';
-            
-            state.isQuestionLoaded = true;
-            document.getElementById('btn-next').style.display = 'block';
-            document.getElementById('btn-next').textContent = "Skip to Next ➔";
-            document.getElementById('btn-next').focus();
-            
-            loadObservationForQuestion(state.currentIndex + 1);
+            handleFetchError(q);
             return;
         }
 
-        // Handle normal case
-        state.currentPhotoArray = obsData.photos.map(p => ({
-            mediumUrl: p.url.replace('square', 'medium'),
-            originalUrl: p.url.replace('square', 'original'),
-            attribution: p.attribution
-        }));
+        const hasPhotos = obsData.photos && obsData.photos.length > 0;
+        const hasSounds = obsData.sounds && obsData.sounds.length > 0;
         
-        // Save the metadata
+        if (!hasPhotos && !hasSounds) {
+            handleFetchError(q, true);
+            return;
+        }
+
         state.currentMeta = {
             date: obsData.observed_on,
             locationText: obsData.place_guess,
-            coordinates: obsData.location // API returns "lat,lng" string
+            coordinates: obsData.location
         };
-        
-        state.currentPhotoIndex = 0;
-        updatePhotoDisplay();
-    }
 
-    // Runs every time a photo finishes loading
-    document.getElementById('quiz-image').onload = () => {
-        document.getElementById('quiz-loading').style.display = 'none';
-        document.getElementById('quiz-image').style.display = 'block';
-        document.getElementById('quiz-attribution').style.display = 'block';
+        // Read user preferences before building the array
+        const wantsPhotos = document.getElementById('chk-photos').checked;
+        const wantsSounds = document.getElementById('chk-sounds').checked;
+
+        // Populate Unified Media Array based strictly on user selection
+        state.currentMediaArray = [];
         
-        if (state.currentPhotoArray.length > 1) {
-            document.getElementById('photo-controls').style.display = 'flex';
+        if (hasPhotos && wantsPhotos) {
+            obsData.photos.forEach(p => {
+                state.currentMediaArray.push({
+                    type: 'photo',
+                    mediumUrl: p.url.replace('square', 'medium'),
+                    originalUrl: p.url.replace('square', 'original'),
+                    attribution: p.attribution
+                });
+            });
         }
         
-        // Format and display metadata
+        if (hasSounds && wantsSounds) {
+            obsData.sounds.forEach(s => {
+                state.currentMediaArray.push({
+                    type: 'sound',
+                    fileUrl: s.file_url,
+                    attribution: s.attribution
+                });
+            });
+        }
+
+        // Failsafe: If filtering resulted in an empty array (should be rare due to API params), skip it
+        if (state.currentMediaArray.length === 0) {
+            handleFetchError(q, true);
+            return;
+        }
+
+        state.currentMediaIndex = 0;
+        updateMediaDisplay();
+
+        // If the first media is a sound, trigger ready immediately (no onload to wait for)
+        if (state.currentMediaArray[0].type === 'sound') {
+            triggerQuestionReady();
+        }
+    }
+
+    function handleFetchError(q, isMediaMissing = false) {
+        document.getElementById('quiz-loading').style.display = 'none';
+        const errorDiv = document.getElementById('quiz-error');
+        
+        if (isMediaMissing) {
+            errorDiv.innerHTML = `❌ Observation missing media data.<br><br><span style="color:#aaa;font-weight:normal;">This occasionally happens in the iNaturalist database.</span>`;
+        } else {
+            const taxonName = q.taxon.preferred_common_name || q.taxon.name;
+            errorDiv.innerHTML = `❌ Failed to load an observation for <strong>${taxonName}</strong>.<br><br><span style="color:#aaa;font-weight:normal;">It may lack observations with the selected media types in this area.</span>`;
+        }
+        
+        errorDiv.style.display = 'block';
+        state.isQuestionLoaded = true;
+        const btnNext = document.getElementById('btn-next');
+        btnNext.style.display = 'block';
+        btnNext.textContent = "Skip to Next ➔";
+        btnNext.focus();
+        loadObservationForQuestion(state.currentIndex + 1);
+    }
+
+    function triggerQuestionReady() {
+        document.getElementById('quiz-loading').style.display = 'none';
+        document.getElementById('quiz-attribution').style.display = 'block';
+        
         if (state.currentMeta) {
             const dateStr = state.currentMeta.date 
                 ? new Date(state.currentMeta.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) 
@@ -635,7 +746,6 @@
             const locText = state.currentMeta.locationText || 'Unknown Location';
             locLink.textContent = `📍 ${locText}`;
             
-            // Try to map by exact coordinates first, fallback to text search
             if (state.currentMeta.coordinates) {
                 locLink.href = `https://www.google.com/maps/search/?api=1&query=${state.currentMeta.coordinates}`;
                 locLink.style.pointerEvents = 'auto';
@@ -644,40 +754,46 @@
                 locLink.style.pointerEvents = 'auto';
             } else {
                 locLink.href = "#";
-                locLink.style.pointerEvents = 'none'; // Disable link if no data
+                locLink.style.pointerEvents = 'none';
             }
             
             document.getElementById('quiz-meta').style.display = 'inline-block';
         }
         
-        // Only trigger the focus and next-fetch once per question
         if (!state.isQuestionLoaded) {
             state.isQuestionLoaded = true;
             document.getElementById('input-answer').disabled = false; 
             document.getElementById('input-answer').focus();
             document.getElementById('btn-submit').style.display = 'block';
             
-            // Kick off prefetch for next question
             loadObservationForQuestion(state.currentIndex + 1);
+        }
+    }
+
+    // Triggered when any image completes loading via updateMediaDisplay()
+    document.getElementById('quiz-image').onload = (e) => {
+        if (state.currentMediaArray[state.currentMediaIndex]?.type === 'photo') {
+            e.target.style.display = 'block';
+            triggerQuestionReady();
         }
     };
     
     document.getElementById('quiz-image').onerror = () => {
-        document.getElementById('quiz-loading').style.display = 'none';
-        document.getElementById('photo-controls').style.display = 'none';
-        
-        const errorDiv = document.getElementById('quiz-error');
-        errorDiv.innerHTML = `❌ Failed to load the image.<br><br><span style="color:#aaa;font-weight:normal;">Please check your internet connection.</span>`;
-        errorDiv.style.display = 'block';
-        
-        // Bypass the answer step and let the user skip
-        state.isQuestionLoaded = true;
-        document.getElementById('btn-next').style.display = 'block';
-        document.getElementById('btn-next').textContent = "Skip to Next ➔";
-        document.getElementById('btn-next').focus();
-        
-        // Kick off prefetch for the next question
-        loadObservationForQuestion(state.currentIndex + 1);
+        if (state.currentMediaArray[state.currentMediaIndex]?.type === 'photo') {
+            document.getElementById('quiz-loading').style.display = 'none';
+            document.getElementById('media-controls').style.display = 'none';
+            
+            const errorDiv = document.getElementById('quiz-error');
+            errorDiv.innerHTML = `❌ Failed to load observation media.<br><br><span style="color:#aaa;font-weight:normal;">Please check your internet connection.</span>`;
+            errorDiv.style.display = 'block';
+            
+            state.isQuestionLoaded = true;
+            document.getElementById('btn-next').style.display = 'block';
+            document.getElementById('btn-next').textContent = "Skip to Next ➔";
+            document.getElementById('btn-next').focus();
+            
+            loadObservationForQuestion(state.currentIndex + 1);
+        }
     };
 
     // --- ANSWER LOGIC ---
@@ -699,7 +815,6 @@
         let isCorrect = false;
         let matchedNameDisplay = "";
 
-        // 1. Fast Local Check
         const normalizedInput = normalize(inputStr);
         const matchSci = normalizedInput === normalize(taxon.name);
         const matchCommon = taxon.preferred_common_name ? (normalizedInput === normalize(taxon.preferred_common_name)) : false;
@@ -708,9 +823,7 @@
             isCorrect = true;
             matchedNameDisplay = matchSci ? taxon.name : taxon.preferred_common_name;
         } else {
-            // 2. Deep Alias & Lineage Check via Autocomplete
             try {
-                // Request matched_term (the exact alias hit) and ancestor_ids (for lineage checking)
                 const fields = encodeURIComponent('(id:!t,name:!t,preferred_common_name:!t,matched_term:!t,ancestor_ids:!t)');
                 const url = `${API_BASE}/taxa/autocomplete?q=${encodeURIComponent(inputStr)}&is_active=true&per_page=30&fields=${fields}`;
                 const searchRes = await fetch(url);
@@ -718,16 +831,12 @@
                 
                 if (searchData.results && searchData.results.length > 0) {
                     for (const result of searchData.results) {
-                        // A. Is this result the exact target, or a valid biological descendant?
                         const isTargetOrDescendant = result.id === targetTaxonId || (result.ancestor_ids && result.ancestor_ids.includes(targetTaxonId));
-                        
-                        // B. Did the user type the FULL matched name?
                         const validNames = [normalize(result.name), normalize(result.preferred_common_name), normalize(result.matched_term)];
                         const isExactNameMatch = validNames.includes(normalizedInput);
                         
                         if (isTargetOrDescendant && isExactNameMatch) {
                             isCorrect = true;
-                            // Grab the specific alias they matched for UI display
                             matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;
                             break;
                         }
@@ -738,18 +847,17 @@
             }
         }
         
-        // Store answer data on the question object for review screen
         q.userAnswer = inputStr;
         q.isCorrect = isCorrect;
-        q.photoUrl = state.currentPhotoArray[state.currentPhotoIndex]?.mediumUrl || '';
         
-        // 3. Update UI with Results
+        // Grab a thumbnail specifically for the review grid (defaulting to empty if it's audio only)
+        q.thumbnailUrl = state.currentMediaArray.find(m => m.type === 'photo')?.mediumUrl || '';
+        
         const primaryDisplayName = taxon.preferred_common_name ? `${taxon.preferred_common_name} (${taxon.name})` : taxon.name;
         const primaryCommonNorm = taxon.preferred_common_name ? normalize(taxon.preferred_common_name) : "";
         const sciNorm = normalize(taxon.name);
         const matchedNorm = normalize(matchedNameDisplay);
         
-        // Links to iNaturalist taxon page and Wikipedia entry
         const linksHtml = `
             <div class="feedback-links">
                 📖 Learn more:
@@ -761,8 +869,6 @@
 
         if (isCorrect) {
             state.score++;
-            
-            // If they matched a valid alias/subspecies that isn't the primary name, show both
             if (matchedNorm && matchedNorm !== primaryCommonNorm && matchedNorm !== sciNorm) {
                 const displayAlias = matchedNameDisplay.replace(/\b\w/g, c => c.toUpperCase());
                 feedback.innerHTML = `✅ Correct! <strong>${displayAlias}</strong><br><span style="font-size: 0.9em; font-weight: normal;">(Recorded broadly as: ${primaryDisplayName})</span>${linksHtml}`;
@@ -770,7 +876,6 @@
                 feedback.innerHTML = `✅ Correct! <strong>${primaryDisplayName}</strong>${linksHtml}`;
             }
             feedback.className = 'correct';
-            
         } else {
             feedback.innerHTML = `❌ Not quite.<br>Answer: <strong>${primaryDisplayName}</strong>${linksHtml}`;
             feedback.className = 'incorrect';
@@ -797,11 +902,10 @@
         e.target.textContent = "Next Observation ➔";
         
         const currentQ = state.questions[state.currentIndex];
-        // Default to skipped if user clicked Next/Skip without submitting an answer
         if (currentQ.isCorrect === undefined) {
             currentQ.isCorrect = false;
             currentQ.userAnswer = "(Skipped)";
-            currentQ.photoUrl = state.currentPhotoArray[state.currentPhotoIndex]?.mediumUrl || '';
+            currentQ.thumbnailUrl = state.currentMediaArray.find(m => m.type === 'photo')?.mediumUrl || '';
         }
 
         state.currentIndex++;
@@ -835,12 +939,12 @@
                 const taxon = q.taxon;
                 const primaryCommon = taxon.preferred_common_name || '';
                 const sciName = taxon.name;
-                const imgUrl = q.photoUrl || '';
+                const imgUrl = q.thumbnailUrl || '';
                 const userGuess = q.userAnswer || '(Skipped)';
 
                 html += `
                     <div class="missed-card">
-                        ${imgUrl ? `<img src="${imgUrl}" alt="${primaryCommon || sciName}">` : '<div style="height:130px;background:#333;display:flex;align-items:center;justify-content:center;color:#888;">No Photo</div>'}
+                        ${imgUrl ? `<img src="${imgUrl}" alt="${primaryCommon || sciName}">` : '<div style="height:130px;background:#333;display:flex;align-items:center;justify-content:center;color:#888;">🔊 Audio Observation</div>'}
                         <div class="missed-card-body">
                             <div>
                                 <div class="missed-card-name">${primaryCommon || sciName}</div>
@@ -868,7 +972,6 @@
         showView('setup-view');
     });
     
-    // Call on app initialization
     loadPreferences();
 
 </script>
