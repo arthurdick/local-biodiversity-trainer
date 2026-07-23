@@ -1,7 +1,46 @@
-import { state } from './state.js';
+import { getState, setState, updateQuestion, resetState } from './state.js';
 import * as api from './api.js';
 import * as engine from './quizEngine.js';
 import * as ui from './ui.js';
+
+// --- RUNTIME CACHE ---
+const pendingFetches = new Map();
+
+// --- STATE SELECTORS (Derived Data) ---
+function selectCurrentMedia(currentState) {
+    const q = currentState.questions[currentState.currentIndex];
+    const obs = q?.observation;
+    if (!obs || obs.error) return [];
+    
+    const media = [];
+    if (currentState.config.wantsPhotos && obs.photos) {
+        obs.photos.forEach(p => media.push({
+            type: 'photo',
+            mediumUrl: p.url.replace('square', 'medium'),
+            originalUrl: p.url.replace('square', 'original'),
+            attribution: p.attribution
+        }));
+    }
+    
+    if (currentState.config.wantsSounds && obs.sounds) {
+        obs.sounds.forEach(s => media.push({
+            type: 'sound',
+            fileUrl: s.file_url,
+            attribution: s.attribution
+        }));
+    }
+    return media;
+}
+
+function selectCurrentMeta(currentState) {
+    const obs = currentState.questions[currentState.currentIndex]?.observation;
+    if (!obs || obs.error) return null;
+    return {
+        date: obs.observed_on,
+        locationText: obs.place_guess,
+        coordinates: obs.location
+    };
+}
 
 // --- UTILITIES & STORAGE ---
 function debounce(func, timeout = 1000) {
@@ -9,26 +48,23 @@ function debounce(func, timeout = 1000) {
     return (...args) => { clearTimeout(timer); timer = setTimeout(() => { func.apply(this, args); }, timeout); };
 }
 
-function getMediaParams() {
-    const photos = document.getElementById('chk-photos').checked;
-    const sounds = document.getElementById('chk-sounds').checked;
-    if (photos && !sounds) return '&photos=true';
-    if (!photos && sounds) return '&sounds=true';
+function getMediaParams(config) {
+    if (config.wantsPhotos && !config.wantsSounds) return '&photos=true';
+    if (!config.wantsPhotos && config.wantsSounds) return '&sounds=true';
     return '';
 }
 
-function getMonthParams() {
-    const checkboxes = document.querySelectorAll('#month-filters input:checked');
-    if (checkboxes.length === 12 || checkboxes.length === 0) return '';
-    const months = Array.from(checkboxes).map(cb => cb.value).join(',');
-    return `&month=${months}`;
+function getMonthParams(config) {
+    if (config.months.length === 12 || config.months.length === 0) return '';
+    return `&month=${config.months.join(',')}`;
 }
 
 function savePreferences() {
+    const s = getState();
     const prefs = {
-        placeId: state.placeId, lat: state.lat, lng: state.lng,
+        placeId: s.placeId, lat: s.lat, lng: s.lng,
         placeName: document.getElementById('input-place').value,
-        taxonId: state.taxonId, taxonName: document.getElementById('input-taxon').value,
+        taxonId: s.taxonId, taxonName: s.taxonName,
         difficulty: document.getElementById('input-difficulty').value,
         questions: document.getElementById('input-questions').value,
         chkPhotos: document.getElementById('chk-photos').checked,
@@ -45,8 +81,13 @@ function loadPreferences() {
         if (!saved) return;
         const prefs = JSON.parse(saved);
 
-        state.placeId = prefs.placeId || null; state.lat = prefs.lat || null;
-        state.lng = prefs.lng || null; state.taxonId = prefs.taxonId || null;
+        setState({
+            placeId: prefs.placeId || null,
+            lat: prefs.lat || null,
+            lng: prefs.lng || null,
+            taxonId: prefs.taxonId || null,
+            taxonName: prefs.taxonName || null
+        });
 
         if (prefs.placeName) document.getElementById('input-place').value = prefs.placeName;
         if (prefs.taxonName) document.getElementById('input-taxon').value = prefs.taxonName;
@@ -67,10 +108,10 @@ function loadPreferences() {
 
 // --- SETUP & VALIDATION ---
 const placeValidation = ui.setupInlineValidation('input-place', 'location', 
-    () => !!state.placeId, () => state.lat !== null
+    () => !!getState().placeId, () => getState().lat !== null
 );
 const taxonValidation = ui.setupInlineValidation('input-taxon', 'valid target taxon', 
-    () => !!state.taxonId, () => false
+    () => !!getState().taxonId, () => false
 );
 
 document.addEventListener('click', (e) => {
@@ -81,7 +122,8 @@ document.addEventListener('click', (e) => {
 
 document.getElementById('clear-place').addEventListener('click', () => {
     const input = document.getElementById('input-place');
-    input.value = ''; state.placeId = null; state.lat = null; state.lng = null;
+    input.value = '';
+    setState({ placeId: null, lat: null, lng: null });
     ui.toggleClearButton('input-place', 'clear-place');
     ui.toggleList('list-place', false);
     placeValidation.clearError(); input.focus();
@@ -89,7 +131,8 @@ document.getElementById('clear-place').addEventListener('click', () => {
 
 document.getElementById('clear-taxon').addEventListener('click', () => {
     const input = document.getElementById('input-taxon');
-    input.value = ''; state.taxonId = null;
+    input.value = '';
+    setState({ taxonId: null, taxonName: null });
     ui.toggleClearButton('input-taxon', 'clear-taxon');
     ui.toggleList('list-taxon', false);
     taxonValidation.clearError(); input.focus();
@@ -106,12 +149,11 @@ document.getElementById('input-place').addEventListener('input', debounce(async 
     const query = e.target.value;
     const list = document.getElementById('list-place');
     list.innerHTML = '';
-    state.placeId = null;
+    setState({ placeId: null });
     e.target.removeAttribute('aria-activedescendant');
     
     if (query.length < 3) return ui.toggleList('list-place', false);
 
-    // Cancel any pending fetch for places
     if (placeAbortController) placeAbortController.abort();
     placeAbortController = new AbortController();
 
@@ -123,18 +165,18 @@ document.getElementById('input-place').addEventListener('input', debounce(async 
             li.id = `opt-place-${index}`;
             const displayName = place.display_name || place.name;
             li.textContent = displayName; li.tabIndex = -1; li.setAttribute('role', 'option');
+            
             li.addEventListener('mouseenter', () => {
                 const list = li.parentElement;
                 const input = document.getElementById(list.id.replace('list', 'input'));
-                
                 list.querySelectorAll('li').forEach(item => item.classList.remove('active'));
-                
                 li.classList.add('active');
                 input.setAttribute('aria-activedescendant', li.id);
+                list.dataset.activeIndex = index;
             });
             
             const selectItem = () => {
-                state.placeId = place.id; state.lat = null; state.lng = null;
+                setState({ placeId: place.id, lat: null, lng: null });
                 document.getElementById('input-place').value = displayName;
                 ui.toggleList('list-place', false); ui.toggleClearButton('input-place', 'clear-place');
                 placeValidation.clearError(); document.getElementById('input-place').focus();
@@ -144,7 +186,6 @@ document.getElementById('input-place').addEventListener('input', debounce(async 
             list.appendChild(li);
         });
     } catch(err) {
-        // Ignore aborted requests, log others
         if (err.name === 'AbortError') return;
         console.warn("Location search offline");
     }
@@ -159,12 +200,11 @@ document.getElementById('input-taxon').addEventListener('input', debounce(async 
     const query = e.target.value;
     const list = document.getElementById('list-taxon');
     list.innerHTML = '';
-    state.taxonId = null;
+    setState({ taxonId: null, taxonName: null });
     e.target.removeAttribute('aria-activedescendant');
     
     if (query.length < 3) return ui.toggleList('list-taxon', false);
 
-    // Cancel any pending fetch for taxa
     if (taxonAbortController) taxonAbortController.abort();
     taxonAbortController = new AbortController();
 
@@ -176,18 +216,18 @@ document.getElementById('input-taxon').addEventListener('input', debounce(async 
             li.id = `opt-taxon-${index}`;
             const common = taxon.preferred_common_name ? `${taxon.preferred_common_name} ` : '';
             li.textContent = `${common}(${taxon.name})`; li.tabIndex = -1; li.setAttribute('role', 'option');
+            
             li.addEventListener('mouseenter', () => {
                 const list = li.parentElement;
                 const input = document.getElementById(list.id.replace('list', 'input'));
-                
                 list.querySelectorAll('li').forEach(item => item.classList.remove('active'));
-                
                 li.classList.add('active');
                 input.setAttribute('aria-activedescendant', li.id);
+                list.dataset.activeIndex = index;
             });
             
             const selectItem = () => {
-                state.taxonId = taxon.id;
+                setState({ taxonId: taxon.id, taxonName: taxon.preferred_common_name || taxon.name });
                 document.getElementById('input-taxon').value = li.textContent;
                 ui.toggleList('list-taxon', false); ui.toggleClearButton('input-taxon', 'clear-taxon');
                 taxonValidation.clearError(); document.getElementById('input-taxon').focus();
@@ -197,7 +237,6 @@ document.getElementById('input-taxon').addEventListener('input', debounce(async 
             list.appendChild(li);
         });
     } catch(err) {
-        // Ignore aborted requests, log others
         if (err.name === 'AbortError') return;
         console.warn("Taxon search offline");
     }
@@ -212,7 +251,7 @@ document.getElementById('btn-gps').addEventListener('click', () => {
 
     navigator.geolocation.getCurrentPosition(
         (pos) => {
-            state.lat = pos.coords.latitude; state.lng = pos.coords.longitude; state.placeId = null;
+            setState({ lat: pos.coords.latitude, lng: pos.coords.longitude, placeId: null });
             document.getElementById('input-place').value = `📍 GPS Coordinates Captured`;
             ui.toggleClearButton('input-place', 'clear-place'); placeValidation.clearError();
             btn.textContent = originalText; btn.disabled = false;
@@ -229,31 +268,47 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     ui.clearGeneralError();
     let hasError = false;
+    
+    const s = getState();
 
-    if (!state.placeId && !state.lat) { placeValidation.showError("⚠️ Please search and select a location, or use GPS."); hasError = true; }
-    if (document.getElementById('input-taxon').value.trim() !== '' && !state.taxonId) {
+    if (!s.placeId && !s.lat) { placeValidation.showError("⚠️ Please search and select a location, or use GPS."); hasError = true; }
+    if (document.getElementById('input-taxon').value.trim() !== '' && !s.taxonId) {
         taxonValidation.showError("⚠️ Please select a valid target taxon from the list, or clear this field."); hasError = true;
     }
     if (hasError) return;
 
-    if (!document.getElementById('chk-photos').checked && !document.getElementById('chk-sounds').checked) {
+    const wantsPhotos = document.getElementById('chk-photos').checked;
+    const wantsSounds = document.getElementById('chk-sounds').checked;
+    const months = Array.from(document.querySelectorAll('#month-filters input:checked')).map(cb => cb.value);
+
+    if (!wantsPhotos && !wantsSounds) {
         ui.showGeneralError("Please select at least one media type (Photos or Sounds)."); return;
     }
-    if (document.querySelectorAll('#month-filters input:checked').length === 0) {
+    if (months.length === 0) {
         ui.showGeneralError("Please select at least one month for seasonality."); return;
     }
-
-    savePreferences();
-    const btn = document.getElementById('btn-start');
-    btn.disabled = true; btn.textContent = "Analyzing Regional Ecology...";
 
     const difficulty = document.getElementById('input-difficulty').value;
     const questionLimit = parseInt(document.getElementById('input-questions').value);
     const preventDuplicates = document.getElementById('chk-unique').checked;
 
+    // Snapshot user preferences directly into state config
+    setState({
+        config: { wantsPhotos, wantsSounds, months, difficulty, preventDuplicates }
+    });
+
+    savePreferences();
+    const btn = document.getElementById('btn-start');
+    btn.disabled = true; btn.textContent = "Analyzing Regional Ecology...";
+
+    const updatedState = getState();
+
     if (difficulty === 'all') {
-        state.questions = Array.from({ length: questionLimit }, () => ({ taxon: null, observation: null, observationPromise: null }));
-        state.currentIndex = 0; state.score = 0;
+        setState({
+            questions: Array.from({ length: questionLimit }, () => ({ taxon: null, observation: null })),
+            currentIndex: 0,
+            score: 0
+        });
         
         loadObservationForQuestion(0);
         ui.showView('quiz-view');
@@ -263,10 +318,10 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
         return;
     }
 
-    let poolUrl = `https://api.inaturalist.org/v2/observations/species_counts?quality_grade=research&captive=false&per_page=${difficulty}${getMediaParams()}${getMonthParams()}`;
-    if (state.placeId) poolUrl += `&place_id=${state.placeId}`;
-    else poolUrl += `&lat=${state.lat}&lng=${state.lng}&radius=10`;
-    if (state.taxonId) poolUrl += `&taxon_id=${state.taxonId}`;
+    let poolUrl = `https://api.inaturalist.org/v2/observations/species_counts?quality_grade=research&captive=false&per_page=${difficulty}${getMediaParams(updatedState.config)}${getMonthParams(updatedState.config)}`;
+    if (updatedState.placeId) poolUrl += `&place_id=${updatedState.placeId}`;
+    else poolUrl += `&lat=${updatedState.lat}&lng=${updatedState.lng}&radius=10`;
+    if (updatedState.taxonId) poolUrl += `&taxon_id=${updatedState.taxonId}`;
     poolUrl += `&fields=${encodeURIComponent('(count:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,ancestor_ids:!t))')}`;
 
     try {
@@ -277,8 +332,11 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
             return;
         }
 
-        state.questions = engine.generateWeightedPool(data.results, questionLimit, preventDuplicates);
-        state.currentIndex = 0; state.score = 0;
+        setState({
+            questions: engine.generateWeightedPool(data.results, questionLimit, preventDuplicates),
+            currentIndex: 0,
+            score: 0
+        });
         
         loadObservationForQuestion(0);
         ui.showView('quiz-view');
@@ -290,162 +348,163 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     }
 });
 
-// --- JIT PREFETCH WITH TIMEOUT ---
+// --- JIT PREFETCH WITH CACHE ---
 async function loadObservationForQuestion(index) {
-    if (index >= state.questions.length || state.questions[index].observationPromise) return;
-
-    let resolver;
-    state.questions[index].observationPromise = new Promise(r => resolver = r);
+    const s = getState();
+    if (index >= s.questions.length) return;
+    
+    // Check state first
+    if (s.questions[index].observation) return s.questions[index].observation;
+    
+    // Check runtime cache for pending fetch
+    if (pendingFetches.has(index)) return pendingFetches.get(index);
 
     if (!navigator.onLine) {
-        state.questions[index].observation = { error: true };
-        resolver({ error: true });
-        return;
+        const errorData = { error: true };
+        updateQuestion(index, { observation: errorData });
+        return errorData;
     }
 
-    const q = state.questions[index];
-    const difficulty = document.getElementById('input-difficulty').value;
-    
-    let url = `https://api.inaturalist.org/v2/observations?quality_grade=research&captive=false&per_page=1&order_by=random${getMediaParams()}${getMonthParams()}`;
-    if (state.placeId) url += `&place_id=${state.placeId}`;
-    else url += `&lat=${state.lat}&lng=${state.lng}&radius=10`;
+    const fetchPromise = (async () => {
+        const q = getState().questions[index]; // Fetch fresh copy
+        const currentConfig = getState().config;
+        
+        let url = `https://api.inaturalist.org/v2/observations?quality_grade=research&captive=false&per_page=1&order_by=random${getMediaParams(currentConfig)}${getMonthParams(currentConfig)}`;
+        if (s.placeId) url += `&place_id=${s.placeId}`;
+        else url += `&lat=${s.lat}&lng=${s.lng}&radius=10`;
 
-    if (difficulty === 'all') {
-        url += `&rank=species,subspecies`;
-        if (state.taxonId) url += `&taxon_id=${state.taxonId}`;
-        if (document.getElementById('chk-unique').checked) {
-            const seenIds = state.questions.map(quest => quest.taxon?.id).filter(id => id !== undefined);
-            if (seenIds.length > 0) url += `&without_taxon_id=${seenIds.join(',')}`;
-        }
-    } else {
-        url += `&taxon_id=${q.taxon.id}`;
-    }
-    
-    url += `&fields=${encodeURIComponent('(observed_on:!t,place_guess:!t,location:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,ancestor_ids:!t),photos:(url:!t,attribution:!t),sounds:(file_url:!t,attribution:!t))')}`;
-
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-        const data = await api.fetchObservation(url, controller.signal);
-        clearTimeout(timeoutId);
-
-        if (data.results && data.results.length > 0) {
-            const obs = data.results[0];
-            if (difficulty === 'all') state.questions[index].taxon = obs.taxon;
-            
-            state.questions[index].observation = obs;
-            resolver(obs);
-            
-            if (obs.photos && obs.photos.length > 0) {
-                const preload = new Image();
-                preload.src = obs.photos[0].url.replace('square', 'medium');
+        if (currentConfig.difficulty === 'all') {
+            url += `&rank=species,subspecies`;
+            if (s.taxonId) url += `&taxon_id=${s.taxonId}`;
+            if (currentConfig.preventDuplicates) {
+                const seenIds = getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined);
+                if (seenIds.length > 0) url += `&without_taxon_id=${seenIds.join(',')}`;
             }
         } else {
-            // Flag that the API explicitly returned 0 results
-            state.questions[index].observation = { error: true, emptyPool: true };
-            resolver({ error: true, emptyPool: true });
+            url += `&taxon_id=${q.taxon.id}`;
         }
-    } catch(e) {
-        state.questions[index].observation = { error: true };
-        resolver({ error: true });
-    }
+        
+        url += `&fields=${encodeURIComponent('(observed_on:!t,place_guess:!t,location:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,ancestor_ids:!t),photos:(url:!t,attribution:!t),sounds:(file_url:!t,attribution:!t))')}`;
+
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            const data = await api.fetchObservation(url, controller.signal);
+            clearTimeout(timeoutId);
+
+            if (data.results && data.results.length > 0) {
+                const obs = data.results[0];
+                const updates = { observation: obs };
+                if (currentConfig.difficulty === 'all') updates.taxon = obs.taxon;
+                
+                updateQuestion(index, updates);
+                
+                if (obs.photos && obs.photos.length > 0) {
+                    const preload = new Image();
+                    preload.src = obs.photos[0].url.replace('square', 'medium');
+                }
+                return obs;
+            } else {
+                const emptyData = { error: true, emptyPool: true };
+                updateQuestion(index, { observation: emptyData });
+                return emptyData;
+            }
+        } catch(e) {
+            const errorData = { error: true };
+            updateQuestion(index, { observation: errorData });
+            return errorData;
+        } finally {
+            pendingFetches.delete(index);
+        }
+    })();
+
+    pendingFetches.set(index, fetchPromise);
+    return fetchPromise;
 }
 
 // --- MEDIA NAVIGATION ---
 document.getElementById('btn-prev-media').addEventListener('click', () => {
-    if (state.currentMediaIndex > 0) { state.currentMediaIndex--; ui.updateMediaDisplay(state.currentMediaArray, state.currentMediaIndex); }
+    const s = getState();
+    if (s.currentMediaIndex > 0) {
+        setState({ currentMediaIndex: s.currentMediaIndex - 1 });
+        const updatedState = getState();
+        ui.updateMediaDisplay(selectCurrentMedia(updatedState), updatedState.currentMediaIndex);
+    }
 });
 document.getElementById('btn-next-media').addEventListener('click', () => {
-    if (state.currentMediaIndex < state.currentMediaArray.length - 1) { state.currentMediaIndex++; ui.updateMediaDisplay(state.currentMediaArray, state.currentMediaIndex); }
+    const s = getState();
+    const mediaArray = selectCurrentMedia(s);
+    if (s.currentMediaIndex < mediaArray.length - 1) {
+        setState({ currentMediaIndex: s.currentMediaIndex + 1 });
+        const updatedState = getState();
+        ui.updateMediaDisplay(selectCurrentMedia(updatedState), updatedState.currentMediaIndex);
+    }
 });
 
 // --- GAME LOOP ---
 async function renderQuizQuestion() {
-    state.isQuestionLoaded = false;
-    state.currentMediaArray = [];
-    state.currentMediaIndex = 0;
-
-    ui.resetQuizUI(state.currentIndex, state.questions.length, state.score);
-
-    const q = state.questions[state.currentIndex];
-    if (!q.observationPromise) loadObservationForQuestion(state.currentIndex);
+    setState({ isQuestionLoaded: false, currentMediaIndex: 0 });
     
-    await q.observationPromise;
-    const obsData = q.observation;
+    let s = getState();
+    ui.resetQuizUI(s.currentIndex, s.questions.length, s.score);
+
+    const q = s.questions[s.currentIndex];
+    
+    // Will pull from cache if running or resolve directly
+    const obsData = await loadObservationForQuestion(s.currentIndex);
+
+    s = getState(); // refresh after await
 
     if (obsData.error) { 
-        const difficulty = document.getElementById('input-difficulty').value;
-        const preventDuplicates = document.getElementById('chk-unique').checked;
-        
-        // If the pool is exhausted in Expert Mode, truncate the quiz and end gracefully
-        if (obsData.emptyPool && difficulty === 'all' && preventDuplicates) {
-            state.questions = state.questions.slice(0, state.currentIndex);
-            ui.renderResultsView(state.questions, state.score);
+        if (obsData.emptyPool && s.config.difficulty === 'all' && s.config.preventDuplicates) {
+            setState({ questions: s.questions.slice(0, s.currentIndex) });
+            s = getState();
+            ui.renderResultsView(s.questions, s.score);
             return;
         }
-        
         handleFetchErrorFallback(q); 
         return; 
     }
 
-    const hasPhotos = obsData.photos && obsData.photos.length > 0;
-    const hasSounds = obsData.sounds && obsData.sounds.length > 0;
+    const currentMediaArray = selectCurrentMedia(s);
     
-    if (!hasPhotos && !hasSounds) { handleFetchErrorFallback(q, true); return; }
+    if (currentMediaArray.length === 0) { handleFetchErrorFallback(q, true); return; }
 
-    state.currentMeta = { date: obsData.observed_on, locationText: obsData.place_guess, coordinates: obsData.location };
+    ui.updateMediaDisplay(currentMediaArray, s.currentMediaIndex);
 
-    const wantsPhotos = document.getElementById('chk-photos').checked;
-    const wantsSounds = document.getElementById('chk-sounds').checked;
-    
-    if (hasPhotos && wantsPhotos) {
-        obsData.photos.forEach(p => state.currentMediaArray.push({
-            type: 'photo', mediumUrl: p.url.replace('square', 'medium'),
-            originalUrl: p.url.replace('square', 'original'), attribution: p.attribution
-        }));
-    }
-    
-    if (hasSounds && wantsSounds) {
-        obsData.sounds.forEach(s => state.currentMediaArray.push({
-            type: 'sound', fileUrl: s.file_url, attribution: s.attribution
-        }));
-    }
-
-    if (state.currentMediaArray.length === 0) { handleFetchErrorFallback(q, true); return; }
-
-    state.currentMediaIndex = 0;
-    ui.updateMediaDisplay(state.currentMediaArray, state.currentMediaIndex);
-
-    if (state.currentMediaArray[0].type === 'sound') triggerQuestionReady();
+    if (currentMediaArray[0].type === 'sound') triggerQuestionReady();
 }
 
 function handleFetchErrorFallback(q, isMediaMissing = false) {
     let taxonName = "Random Species";
     if (q.taxon) taxonName = q.taxon.preferred_common_name || q.taxon.name;
-    else if (state.taxonId) taxonName = document.getElementById('input-taxon').value || "Target Taxon";
+    else if (getState().taxonName) taxonName = getState().taxonName;
     
     ui.renderFetchError(taxonName, isMediaMissing);
-    state.isQuestionLoaded = true;
-    loadObservationForQuestion(state.currentIndex + 1);
+    setState({ isQuestionLoaded: true });
+    loadObservationForQuestion(getState().currentIndex + 1);
 }
 
 function triggerQuestionReady() {
     document.getElementById('quiz-loading').style.display = 'none';
     document.getElementById('quiz-attribution').style.display = 'block';
     
-    ui.renderQuestionMeta(state.currentMeta);
+    const s = getState();
+    ui.renderQuestionMeta(selectCurrentMeta(s));
     
-    if (!state.isQuestionLoaded) {
-        state.isQuestionLoaded = true;
+    if (!s.isQuestionLoaded) {
+        setState({ isQuestionLoaded: true });
         document.getElementById('input-answer').disabled = false; 
         document.getElementById('input-answer').focus();
         document.getElementById('btn-submit').style.display = 'block';
-        loadObservationForQuestion(state.currentIndex + 1);
+        loadObservationForQuestion(s.currentIndex + 1);
     }
 }
 
 document.getElementById('quiz-image').onload = (e) => {
-    if (state.currentMediaArray[state.currentMediaIndex]?.type === 'photo') {
+    const s = getState();
+    const mediaArray = selectCurrentMedia(s);
+    if (mediaArray[s.currentMediaIndex]?.type === 'photo') {
         document.getElementById('btn-zoom-image').style.display = 'flex';
         e.target.style.display = 'block';
         triggerQuestionReady();
@@ -453,20 +512,24 @@ document.getElementById('quiz-image').onload = (e) => {
 };
 
 document.getElementById('quiz-image').onerror = () => {
-    if (state.currentMediaArray[state.currentMediaIndex]?.type === 'photo') {
+    const s = getState();
+    const mediaArray = selectCurrentMedia(s);
+    if (mediaArray[s.currentMediaIndex]?.type === 'photo') {
         document.getElementById('media-controls').style.display = 'none';
         ui.renderFetchError("", false);
-        state.isQuestionLoaded = true;
-        loadObservationForQuestion(state.currentIndex + 1);
+        setState({ isQuestionLoaded: true });
+        loadObservationForQuestion(s.currentIndex + 1);
     }
 };
 
 document.getElementById('quiz-audio-player').onerror = () => {
-    if (state.currentMediaArray[state.currentMediaIndex]?.type === 'sound') {
+    const s = getState();
+    const mediaArray = selectCurrentMedia(s);
+    if (mediaArray[s.currentMediaIndex]?.type === 'sound') {
         document.getElementById('media-controls').style.display = 'none';
         ui.renderFetchError("", false);
-        state.isQuestionLoaded = true;
-        loadObservationForQuestion(state.currentIndex + 1);
+        setState({ isQuestionLoaded: true });
+        loadObservationForQuestion(s.currentIndex + 1);
     }
 };
 
@@ -475,7 +538,8 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
     const inputStr = document.getElementById('input-answer').value.trim();
     if (!inputStr) return;
 
-    const q = state.questions[state.currentIndex];
+    let s = getState();
+    const q = s.questions[s.currentIndex];
     const taxon = q.taxon;
     const btnSubmit = document.getElementById('btn-submit');
     document.getElementById('input-answer').disabled = true;
@@ -509,17 +573,20 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
         } catch (error) { console.warn("API check failed. Relying on local strict match."); }
     }
     
-    q.userAnswer = inputStr;
-    q.isCorrect = isCorrect;
-    q.thumbnailUrl = engine.getQuestionThumbnail(q, state.currentMediaArray);
+    updateQuestion(s.currentIndex, {
+        userAnswer: inputStr,
+        isCorrect: isCorrect,
+        thumbnailUrl: engine.getQuestionThumbnail(q, selectCurrentMedia(s))
+    });
     
-    if (isCorrect) state.score++;
+    if (isCorrect) setState({ score: s.score + 1 });
 
+    const updatedScore = getState().score;
     const primaryCommonNorm = taxon.preferred_common_name ? engine.normalize(taxon.preferred_common_name) : "";
     const sciNorm = engine.normalize(taxon.name);
     const matchedNorm = engine.normalize(matchedNameDisplay);
 
-    ui.renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm, primaryCommonNorm, sciNorm, state.score);
+    ui.renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm, primaryCommonNorm, sciNorm, updatedScore);
 });
 
 document.getElementById('input-answer').addEventListener('keypress', (e) => {
@@ -527,25 +594,31 @@ document.getElementById('input-answer').addEventListener('keypress', (e) => {
 });
 
 document.getElementById('btn-next').addEventListener('click', (e) => {
-    // 1. Prevent out-of-bounds clicks if the UI gets stuck
-    if (state.currentIndex >= state.questions.length) return; 
+    let s = getState();
+    if (s.currentIndex >= s.questions.length) return;
 
     e.target.textContent = "Next Observation ➔";
-    const currentQ = state.questions[state.currentIndex];
+    const currentQ = s.questions[s.currentIndex];
     
     if (currentQ.isCorrect === undefined) {
-        currentQ.isCorrect = false;
-        currentQ.userAnswer = "(Skipped)";
-        currentQ.thumbnailUrl = engine.getQuestionThumbnail(currentQ, state.currentMediaArray);
+        updateQuestion(s.currentIndex, {
+            isCorrect: false,
+            userAnswer: "(Skipped)",
+            thumbnailUrl: engine.getQuestionThumbnail(currentQ, selectCurrentMedia(s))
+        });
     }
     
-    state.currentIndex++;
-    if (state.currentIndex >= state.questions.length) ui.renderResultsView(state.questions, state.score);
+    s = getState();
+    setState({ currentIndex: s.currentIndex + 1 });
+    s = getState();
+    
+    if (s.currentIndex >= s.questions.length) ui.renderResultsView(s.questions, s.score);
     else renderQuizQuestion();
 });
 
 document.getElementById('btn-restart').addEventListener('click', () => {
-    state.questions = [];
+    resetState();
+    loadPreferences();
     ui.showView('setup-view');
 });
 

@@ -40,7 +40,7 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
                 }
             }
 
-            questions.push({ taxon: availablePool[selectedIndex].taxon, observation: null, observationPromise: null });
+            questions.push({ taxon: availablePool[selectedIndex].taxon, observation: null });
             availablePool.splice(selectedIndex, 1);
         }
     } else {
@@ -53,7 +53,7 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
         for (let i = 0; i < questionLimit; i++) {
             const roll = Math.random() * totalWeights;
             const selected = weightedPool.find(item => roll <= item.threshold);
-            questions.push({ taxon: selected.taxon, observation: null, observationPromise: null });
+            questions.push({ taxon: selected.taxon, observation: null });
         }
     }
     return questions;

@@ -18,8 +18,9 @@ export function toggleList(listId, show) {
     } else {
         list.classList.remove('show');
         input.setAttribute('aria-expanded', 'false');
-        input.removeAttribute('aria-activedescendant'); // Clear active descendant
-        list.querySelectorAll('li').forEach(li => li.classList.remove('active')); // Clear active visuals
+        input.removeAttribute('aria-activedescendant');
+        list.querySelectorAll('li').forEach(li => li.classList.remove('active'));
+        list.dataset.activeIndex = '-1';
     }
 }
 
@@ -33,16 +34,19 @@ export function handleAutocompleteKeydown(e, listId) {
     const items = Array.from(list.querySelectorAll('li'));
     if (items.length === 0) return;
 
-    let currentIndex = items.findIndex(item => item.classList.contains('active'));
+    let currentIndex = parseInt(list.dataset.activeIndex ?? '-1', 10);
+    if (currentIndex === -1) {
+        currentIndex = items.findIndex(item => item.classList.contains('active'));
+    }
 
     if (e.key === 'ArrowDown') {
         e.preventDefault();
         let nextIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
-        updateActiveItem(items, nextIndex, input);
+        updateActiveItem(items, nextIndex, input, list);
     } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         let prevIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
-        updateActiveItem(items, prevIndex, input);
+        updateActiveItem(items, prevIndex, input, list);
     } else if (e.key === 'Enter' && currentIndex !== -1) {
         e.preventDefault();
         items[currentIndex].click();
@@ -52,15 +56,13 @@ export function handleAutocompleteKeydown(e, listId) {
     }
 }
 
-function updateActiveItem(items, activeIndex, input) {
-    // Clear previous active states
+function updateActiveItem(items, activeIndex, input, list) {
     items.forEach(item => item.classList.remove('active'));
-    
-    // Set new active state and update ARIA
     const activeItem = items[activeIndex];
     activeItem.classList.add('active');
     input.setAttribute('aria-activedescendant', activeItem.id);
     activeItem.scrollIntoView({ block: 'nearest' });
+    list.dataset.activeIndex = activeIndex;
 }
 
 export function toggleClearButton(inputId, btnId) {
@@ -336,7 +338,6 @@ export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm
 }
 
 export function renderResultsView(questions, score) {
-    // Explicitly release any audio from the final question before switching views
     const audioPlayer = document.getElementById('quiz-audio-player');
     if (audioPlayer) {
         audioPlayer.pause();
@@ -371,7 +372,6 @@ export function renderResultsView(questions, score) {
         gridDiv.className = 'missed-grid';
 
         missedQuestions.forEach(q => {
-            // Provide a fallback object if taxon is null due to a fetch error
             const taxon = q.taxon || { name: 'Data Unavailable', id: '' };
             const primaryCommon = taxon.preferred_common_name || 'Fetch Failed';
             const sciName = taxon.name;
@@ -427,7 +427,6 @@ export function renderResultsView(questions, score) {
             const linksDiv = document.createElement('div');
             linksDiv.className = 'missed-card-links';
             
-            // Only generate the iNaturalist link if we have a valid taxon ID
             if (taxon.id) {
                 const inatLink = document.createElement('a');
                 inatLink.href = `https://www.inaturalist.org/taxa/${encodeURIComponent(taxon.id)}`;
