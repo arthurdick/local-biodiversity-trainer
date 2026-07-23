@@ -1,15 +1,15 @@
 const API_BASE = 'https://api.inaturalist.org/v2';
 
-export const fetchPlaces = async (query) => {
+export const fetchPlaces = async (query, signal) => {
     const fields = encodeURIComponent('(id:!t,name:!t,display_name:!t)');
-    const res = await fetch(`${API_BASE}/places?q=${query}&fields=${fields}`);
+    const res = await fetch(`${API_BASE}/places?q=${query}&fields=${fields}`, { signal });
     if (!res.ok) throw new Error('Failed to fetch places');
     return res.json();
 };
 
-export const fetchTaxaAutocomplete = async (query) => {
+export const fetchTaxaAutocomplete = async (query, signal) => {
     const fields = encodeURIComponent('(id:!t,name:!t,preferred_common_name:!t)');
-    const res = await fetch(`${API_BASE}/taxa/autocomplete?q=${query}&fields=${fields}`);
+    const res = await fetch(`${API_BASE}/taxa/autocomplete?q=${query}&fields=${fields}`, { signal });
     if (!res.ok) throw new Error('Failed to fetch taxa');
     return res.json();
 };

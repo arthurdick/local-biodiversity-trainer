@@ -99,15 +99,24 @@ document.getElementById('btn-months-all').addEventListener('click', () => docume
 document.getElementById('btn-months-none').addEventListener('click', () => document.querySelectorAll('#month-filters input').forEach(cb => cb.checked = false));
 
 // --- AUTOCOMPLETE LOGIC ---
+let placeAbortController = null;
+
 document.getElementById('input-place').addEventListener('input', debounce(async (e) => {
     ui.toggleClearButton('input-place', 'clear-place');
-    const query = e.target.value; const list = document.getElementById('list-place');
-    list.innerHTML = ''; state.placeId = null;
+    const query = e.target.value;
+    const list = document.getElementById('list-place');
+    list.innerHTML = '';
+    state.placeId = null;
     e.target.removeAttribute('aria-activedescendant');
+    
     if (query.length < 3) return ui.toggleList('list-place', false);
 
+    // Cancel any pending fetch for places
+    if (placeAbortController) placeAbortController.abort();
+    placeAbortController = new AbortController();
+
     try {
-        const data = await api.fetchPlaces(query);
+        const data = await api.fetchPlaces(query, placeAbortController.signal);
         if (data.results.length) ui.toggleList('list-place', true);
         data.results.forEach((place, index) => {
             const li = document.createElement('li');
@@ -118,10 +127,8 @@ document.getElementById('input-place').addEventListener('input', debounce(async 
                 const list = li.parentElement;
                 const input = document.getElementById(list.id.replace('list', 'input'));
                 
-                // Clear previous active states
                 list.querySelectorAll('li').forEach(item => item.classList.remove('active'));
                 
-                // Set the hovered item as active
                 li.classList.add('active');
                 input.setAttribute('aria-activedescendant', li.id);
             });
@@ -136,20 +143,33 @@ document.getElementById('input-place').addEventListener('input', debounce(async 
             li.onkeydown = (event) => { if (event.key === 'Enter') { event.preventDefault(); selectItem(); } };
             list.appendChild(li);
         });
-    } catch(err) { console.warn("Location search offline"); }
+    } catch(err) {
+        // Ignore aborted requests, log others
+        if (err.name === 'AbortError') return;
+        console.warn("Location search offline");
+    }
 }));
 
 document.getElementById('input-place').addEventListener('keydown', (e) => ui.handleAutocompleteKeydown(e, 'list-place'));
 
+let taxonAbortController = null;
+
 document.getElementById('input-taxon').addEventListener('input', debounce(async (e) => {
     ui.toggleClearButton('input-taxon', 'clear-taxon');
-    const query = e.target.value; const list = document.getElementById('list-taxon');
-    list.innerHTML = ''; state.taxonId = null;
+    const query = e.target.value;
+    const list = document.getElementById('list-taxon');
+    list.innerHTML = '';
+    state.taxonId = null;
     e.target.removeAttribute('aria-activedescendant');
+    
     if (query.length < 3) return ui.toggleList('list-taxon', false);
 
+    // Cancel any pending fetch for taxa
+    if (taxonAbortController) taxonAbortController.abort();
+    taxonAbortController = new AbortController();
+
     try {
-        const data = await api.fetchTaxaAutocomplete(query);
+        const data = await api.fetchTaxaAutocomplete(query, taxonAbortController.signal);
         if (data.results.length) ui.toggleList('list-taxon', true);
         data.results.forEach((taxon, index) => {
             const li = document.createElement('li');
@@ -160,10 +180,8 @@ document.getElementById('input-taxon').addEventListener('input', debounce(async 
                 const list = li.parentElement;
                 const input = document.getElementById(list.id.replace('list', 'input'));
                 
-                // Clear previous active states
                 list.querySelectorAll('li').forEach(item => item.classList.remove('active'));
                 
-                // Set the hovered item as active
                 li.classList.add('active');
                 input.setAttribute('aria-activedescendant', li.id);
             });
@@ -178,7 +196,11 @@ document.getElementById('input-taxon').addEventListener('input', debounce(async 
             li.onkeydown = (event) => { if (event.key === 'Enter') { event.preventDefault(); selectItem(); } };
             list.appendChild(li);
         });
-    } catch(err) { console.warn("Taxon search offline"); }
+    } catch(err) {
+        // Ignore aborted requests, log others
+        if (err.name === 'AbortError') return;
+        console.warn("Taxon search offline");
+    }
 }));
 
 document.getElementById('input-taxon').addEventListener('keydown', (e) => ui.handleAutocompleteKeydown(e, 'list-taxon'));
