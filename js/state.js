@@ -23,20 +23,23 @@ const initialState = {
     isQuestionLoaded: false
 };
 
-let state = { ...initialState };
+let state = structuredClone(initialState);
 const listeners = new Set();
 
 /**
- * Retrieves a shallow copy of the current state.
+ * Retrieves a deep copy of the current state.
  */
-export const getState = () => ({ ...state });
+export const getState = () => structuredClone(state);
 
 /**
  * Updates top-level state properties and triggers listeners.
  */
 export const setState = (updates) => {
     state = { ...state, ...updates };
-    listeners.forEach(listener => listener(state));
+    
+    // Pass a deep copy to listeners to prevent accidental mutation downstream
+    const stateSnapshot = structuredClone(state);
+    listeners.forEach(listener => listener(stateSnapshot));
 };
 
 /**
@@ -52,8 +55,10 @@ export const updateQuestion = (index, updates) => {
  * Resets the state back to its initial configuration.
  */
 export const resetState = () => {
-    state = { ...initialState };
-    listeners.forEach(listener => listener(state));
+    state = structuredClone(initialState);
+    
+    const stateSnapshot = structuredClone(state);
+    listeners.forEach(listener => listener(stateSnapshot));
 };
 
 /**
