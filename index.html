@@ -497,7 +497,7 @@
         wrapper.appendChild(errorEl);
 
         function showError(message) {
-            errorEl.innerHTML = message;
+            errorEl.textContent = message;
             errorEl.style.display = 'block';
             input.style.borderColor = 'var(--error)';
             input.style.borderWidth = '2px';
@@ -542,7 +542,7 @@
 
     function showGeneralError(msg) {
         const errEl = document.getElementById('form-error-message');
-        errEl.innerHTML = `⚠️ ${msg}`;
+        errEl.textContent = `⚠️ ${msg}`;
         errEl.style.display = 'block';
     }
 
@@ -830,9 +830,9 @@
 
     document.getElementById('btn-gps').addEventListener('click', () => {
         const btn = document.getElementById('btn-gps');
-        const originalText = btn.innerHTML;
+        const originalText = btn.textContent;
         
-        btn.innerHTML = "⏳ Locating...";
+        btn.textContent = "⏳ Locating...";
         btn.disabled = true;
 
         navigator.geolocation.getCurrentPosition(
@@ -845,13 +845,13 @@
                 toggleClearButton('input-place', 'clear-place');
                 placeValidation.clearError();
                 
-                btn.innerHTML = originalText;
+                btn.textContent = originalText;
                 btn.disabled = false;
             },
             () => {
-                btn.innerHTML = "❌ Could not get location";
+                btn.textContent = "❌ Could not get location";
                 setTimeout(() => {
-                    btn.innerHTML = originalText;
+                    btn.textContent = originalText;
                     btn.disabled = false;
                 }, 5000);
             }
@@ -1185,12 +1185,30 @@
     function handleFetchError(q, isMediaMissing = false) {
         document.getElementById('quiz-loading').style.display = 'none';
         const errorDiv = document.getElementById('quiz-error');
+        errorDiv.innerHTML = '';
         
         if (isMediaMissing) {
-            errorDiv.innerHTML = `❌ Observation missing media data.<br><br><span style="color:#aaa;font-weight:normal;">This occasionally happens in the iNaturalist database.</span>`;
+            errorDiv.textContent = '❌ Observation missing media data.';
+            errorDiv.appendChild(document.createElement('br'));
+            errorDiv.appendChild(document.createElement('br'));
+            const span = document.createElement('span');
+            span.style.color = '#aaa';
+            span.style.fontWeight = 'normal';
+            span.textContent = 'This occasionally happens in the iNaturalist database.';
+            errorDiv.appendChild(span);
         } else {
             const taxonName = q.taxon.preferred_common_name || q.taxon.name;
-            errorDiv.innerHTML = `❌ Failed to load observation for <strong>${taxonName}</strong>.<br><br><span style="color:#aaa;font-weight:normal;">Please check your internet connection or filters.</span>`;
+            errorDiv.textContent = '❌ Failed to load observation for ';
+            const strong = document.createElement('strong');
+            strong.textContent = taxonName;
+            errorDiv.appendChild(strong);
+            errorDiv.appendChild(document.createElement('br'));
+            errorDiv.appendChild(document.createElement('br'));
+            const span = document.createElement('span');
+            span.style.color = '#aaa';
+            span.style.fontWeight = 'normal';
+            span.textContent = 'Please check your internet connection or filters.';
+            errorDiv.appendChild(span);
         }
         
         errorDiv.style.display = 'block';
@@ -1255,7 +1273,16 @@
             document.getElementById('media-controls').style.display = 'none';
             
             const errorDiv = document.getElementById('quiz-error');
-            errorDiv.innerHTML = `❌ Failed to load observation media.<br><br><span style="color:#aaa;font-weight:normal;">Please check your internet connection.</span>`;
+            errorDiv.innerHTML = '';
+            errorDiv.textContent = '❌ Failed to load observation media.';
+            errorDiv.appendChild(document.createElement('br'));
+            errorDiv.appendChild(document.createElement('br'));
+            const span = document.createElement('span');
+            span.style.color = '#aaa';
+            span.style.fontWeight = 'normal';
+            span.textContent = 'Please check your internet connection.';
+            errorDiv.appendChild(span);
+            
             errorDiv.style.display = 'block';
             
             state.isQuestionLoaded = true;
@@ -1274,7 +1301,16 @@
             document.getElementById('media-controls').style.display = 'none';
             
             const errorDiv = document.getElementById('quiz-error');
-            errorDiv.innerHTML = `❌ Failed to load observation audio clip.<br><br><span style="color:#aaa;font-weight:normal;">Please check your internet connection.</span>`;
+            errorDiv.innerHTML = '';
+            errorDiv.textContent = '❌ Failed to load observation audio clip.';
+            errorDiv.appendChild(document.createElement('br'));
+            errorDiv.appendChild(document.createElement('br'));
+            const span = document.createElement('span');
+            span.style.color = '#aaa';
+            span.style.fontWeight = 'normal';
+            span.textContent = 'Please check your internet connection.';
+            errorDiv.appendChild(span);
+            
             errorDiv.style.display = 'block';
             
             state.isQuestionLoaded = true;
@@ -1358,28 +1394,66 @@
             imgElement.alt = `Observation of ${primaryDisplayName}`;
         }
 
-        const linksHtml = `
-            <div class="feedback-links">
-                📖 Learn more:
-                <a href="https://www.inaturalist.org/taxa/${taxon.id}" target="_blank" rel="noopener">iNaturalist ↗</a>
-                <span style="margin: 0 4px; opacity: 0.5;">•</span>
-                <a href="https://en.wikipedia.org/wiki/${encodeURIComponent(taxon.name)}" target="_blank" rel="noopener">Wikipedia ↗</a>
-            </div>
-        `;
+        // Clear feedback box contents
+        feedback.innerHTML = '';
+
+        const linksDiv = document.createElement('div');
+        linksDiv.className = 'feedback-links';
+        linksDiv.textContent = '📖 Learn more: ';
+
+        const inatLink = document.createElement('a');
+        inatLink.href = `https://www.inaturalist.org/taxa/${encodeURIComponent(taxon.id)}`;
+        inatLink.target = '_blank';
+        inatLink.rel = 'noopener';
+        inatLink.textContent = 'iNaturalist ↗';
+        linksDiv.appendChild(inatLink);
+
+        const sep = document.createElement('span');
+        sep.style.margin = '0 4px';
+        sep.style.opacity = '0.5';
+        sep.textContent = '•';
+        linksDiv.appendChild(sep);
+
+        const wikiLink = document.createElement('a');
+        wikiLink.href = `https://en.wikipedia.org/wiki/${encodeURIComponent(taxon.name)}`;
+        wikiLink.target = '_blank';
+        wikiLink.rel = 'noopener';
+        wikiLink.textContent = 'Wikipedia ↗';
+        linksDiv.appendChild(wikiLink);
 
         if (isCorrect) {
             state.score++;
+            feedback.className = 'correct';
+            feedback.textContent = '✅ Correct! ';
+            
+            const strong = document.createElement('strong');
             if (matchedNorm && matchedNorm !== primaryCommonNorm && matchedNorm !== sciNorm) {
                 const displayAlias = matchedNameDisplay.replace(/\b\w/g, c => c.toUpperCase());
-                feedback.innerHTML = `✅ Correct! <strong>${displayAlias}</strong><br><span style="font-size: 0.9em; font-weight: normal;">(Recorded broadly as: ${primaryDisplayName})</span>${linksHtml}`;
+                strong.textContent = displayAlias;
+                feedback.appendChild(strong);
+                feedback.appendChild(document.createElement('br'));
+                
+                const span = document.createElement('span');
+                span.style.fontSize = '0.9em';
+                span.style.fontWeight = 'normal';
+                span.textContent = `(Recorded broadly as: ${primaryDisplayName})`;
+                feedback.appendChild(span);
             } else {
-                feedback.innerHTML = `✅ Correct! <strong>${primaryDisplayName}</strong>${linksHtml}`;
+                strong.textContent = primaryDisplayName;
+                feedback.appendChild(strong);
             }
-            feedback.className = 'correct';
         } else {
-            feedback.innerHTML = `❌ Not quite.<br>Answer: <strong>${primaryDisplayName}</strong>${linksHtml}`;
             feedback.className = 'incorrect';
+            feedback.textContent = '❌ Not quite.';
+            feedback.appendChild(document.createElement('br'));
+            feedback.appendChild(document.createTextNode('Answer: '));
+            
+            const strong = document.createElement('strong');
+            strong.textContent = primaryDisplayName;
+            feedback.appendChild(strong);
         }
+        
+        feedback.appendChild(linksDiv);
 
         document.getElementById('quiz-score').textContent = `Score: ${state.score}`;
         feedback.style.display = 'block';
@@ -1421,19 +1495,28 @@
         document.getElementById('final-score').textContent = `${state.score} / ${state.questions.length}`;
         
         const reviewContainer = document.getElementById('review-container');
+        reviewContainer.innerHTML = '';
         const missedQuestions = state.questions.filter(q => !q.isCorrect);
 
         if (missedQuestions.length === 0) {
-            reviewContainer.innerHTML = `
-                <div style="text-align: center; padding: 20px; background: #e8f5e9; color: var(--success); border-radius: var(--radius); margin-bottom: 20px; font-weight: bold;">
-                    🎉 Perfect score! You identified every species correctly!
-                </div>
-            `;
+            const perfectDiv = document.createElement('div');
+            perfectDiv.style.textAlign = 'center';
+            perfectDiv.style.padding = '20px';
+            perfectDiv.style.background = '#e8f5e9';
+            perfectDiv.style.color = 'var(--success)';
+            perfectDiv.style.borderRadius = 'var(--radius)';
+            perfectDiv.style.marginBottom = '20px';
+            perfectDiv.style.fontWeight = 'bold';
+            perfectDiv.textContent = '🎉 Perfect score! You identified every species correctly!';
+            reviewContainer.appendChild(perfectDiv);
         } else {
-            let html = `
-                <div class="missed-title">Review Missed Species (${missedQuestions.length})</div>
-                <div class="missed-grid">
-            `;
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'missed-title';
+            titleDiv.textContent = `Review Missed Species (${missedQuestions.length})`;
+            reviewContainer.appendChild(titleDiv);
+            
+            const gridDiv = document.createElement('div');
+            gridDiv.className = 'missed-grid';
 
             missedQuestions.forEach(q => {
                 const taxon = q.taxon;
@@ -1442,38 +1525,78 @@
                 const imgUrl = q.thumbnailUrl || '';
                 const userGuess = q.userAnswer || '(Skipped)';
 
-                // Check if observation explicitly has audio sounds
                 const isAudioObservation = q.observation && q.observation.sounds && q.observation.sounds.length > 0;
 
-                let mediaContent = '';
+                const card = document.createElement('div');
+                card.className = 'missed-card';
+
                 if (imgUrl) {
-                    mediaContent = `<img src="${imgUrl}" alt="${primaryCommon || sciName}">`;
-                } else if (isAudioObservation) {
-                    mediaContent = '<div style="height:130px;background:#333;display:flex;align-items:center;justify-content:center;color:#888;">🔊 Audio Observation</div>';
+                    const img = document.createElement('img');
+                    img.src = imgUrl;
+                    img.alt = primaryCommon || sciName;
+                    card.appendChild(img);
                 } else {
-                    mediaContent = '<div style="height:130px;background:#333;display:flex;align-items:center;justify-content:center;color:#888;">⚠️ Skipped / No Image</div>';
+                    const mediaPlaceholder = document.createElement('div');
+                    mediaPlaceholder.style.height = '130px';
+                    mediaPlaceholder.style.background = '#333';
+                    mediaPlaceholder.style.display = 'flex';
+                    mediaPlaceholder.style.alignItems = 'center';
+                    mediaPlaceholder.style.justifyContent = 'center';
+                    mediaPlaceholder.style.color = '#888';
+                    mediaPlaceholder.textContent = isAudioObservation ? '🔊 Audio Observation' : '⚠️ Skipped / No Image';
+                    card.appendChild(mediaPlaceholder);
                 }
+                
+                const cardBody = document.createElement('div');
+                cardBody.className = 'missed-card-body';
+                
+                const infoDiv = document.createElement('div');
+                
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'missed-card-name';
+                nameDiv.textContent = primaryCommon || sciName;
+                infoDiv.appendChild(nameDiv);
+                
+                if (primaryCommon) {
+                    const sciDiv = document.createElement('div');
+                    sciDiv.className = 'missed-card-sci';
+                    sciDiv.textContent = sciName;
+                    infoDiv.appendChild(sciDiv);
+                }
+                
+                const guessDiv = document.createElement('div');
+                guessDiv.className = 'missed-card-guess';
+                guessDiv.textContent = 'Your answer: ';
+                const guessStrong = document.createElement('strong');
+                guessStrong.textContent = userGuess;
+                guessDiv.appendChild(guessStrong);
+                infoDiv.appendChild(guessDiv);
 
-                html += `
-                    <div class="missed-card">
-                        ${mediaContent}
-                        <div class="missed-card-body">
-                            <div>
-                                <div class="missed-card-name">${primaryCommon || sciName}</div>
-                                ${primaryCommon ? `<div class="missed-card-sci">${sciName}</div>` : ''}
-                                <div class="missed-card-guess">Your answer: <strong>${userGuess}</strong></div>
-                            </div>
-                            <div class="missed-card-links">
-                                <a href="https://www.inaturalist.org/taxa/${taxon.id}" target="_blank" rel="noopener">iNaturalist ↗</a>
-                                <a href="https://en.wikipedia.org/wiki/${encodeURIComponent(sciName)}" target="_blank" rel="noopener">Wikipedia ↗</a>
-                            </div>
-                        </div>
-                    </div>
-                `;
+                cardBody.appendChild(infoDiv);
+                
+                const linksDiv = document.createElement('div');
+                linksDiv.className = 'missed-card-links';
+                
+                const inatLink = document.createElement('a');
+                inatLink.href = `https://www.inaturalist.org/taxa/${encodeURIComponent(taxon.id)}`;
+                inatLink.target = '_blank';
+                inatLink.rel = 'noopener';
+                inatLink.textContent = 'iNaturalist ↗';
+                linksDiv.appendChild(inatLink);
+                
+                const wikiLink = document.createElement('a');
+                wikiLink.href = `https://en.wikipedia.org/wiki/${encodeURIComponent(sciName)}`;
+                wikiLink.target = '_blank';
+                wikiLink.rel = 'noopener';
+                wikiLink.textContent = 'Wikipedia ↗';
+                linksDiv.appendChild(wikiLink);
+                
+                cardBody.appendChild(linksDiv);
+                card.appendChild(cardBody);
+                gridDiv.appendChild(card);
             });
-
-            html += `</div>`;
-            reviewContainer.innerHTML = html;
+            
+            reviewContainer.appendChild(gridDiv);
         }
 
         showView('results-view');
