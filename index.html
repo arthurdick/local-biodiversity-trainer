@@ -20,7 +20,7 @@
                     <label for="input-place">1. Location</label>
                     <button id="btn-gps" type="button" style="margin-bottom: 10px; background-color: #555;">📍 Use My Exact Location (GPS)</button>
                     <div class="input-relative-wrapper">
-                        <input type="text" id="input-place" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="list-place" placeholder="...or search a city, park, or country" autocomplete="off">
+                        <input type="text" id="input-place" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="list-place" aria-haspopup="listbox" placeholder="...or search a city, park, or country" autocomplete="off">
                         <button type="button" id="clear-place" class="btn-clear" aria-label="Clear location input" title="Clear location">&times;</button>
                     </div>
                     <ul id="list-place" class="autocomplete-list" role="listbox"></ul>
@@ -29,7 +29,7 @@
                 <div class="form-group z-mid autocomplete-wrapper">
                     <label for="input-taxon">2. Target Taxon (Optional)</label>
                     <div class="input-relative-wrapper">
-                        <input type="text" id="input-taxon" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="list-taxon" placeholder="e.g., Birds, Fungi, Owls..." autocomplete="off">
+                        <input type="text" id="input-taxon" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="list-taxon" aria-haspopup="listbox" placeholder="e.g., Birds, Fungi, Owls..." autocomplete="off">
                         <button type="button" id="clear-taxon" class="btn-clear" aria-label="Clear target taxon input" title="Clear taxon">&times;</button>
                     </div>
                     <ul id="list-taxon" class="autocomplete-list" role="listbox"></ul>
