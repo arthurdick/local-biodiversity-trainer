@@ -252,7 +252,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     const preventDuplicates = document.getElementById('chk-unique').checked;
 
     if (difficulty === 'all') {
-        state.questions = Array.from({ length: questionLimit }, () => ({ taxon: null, observation: null }));
+        state.questions = Array.from({ length: questionLimit }, () => ({ taxon: null, observation: null, observationPromise: null }));
         state.currentIndex = 0; state.score = 0;
         
         loadObservationForQuestion(0);
@@ -292,12 +292,16 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
 
 // --- JIT PREFETCH WITH TIMEOUT ---
 async function loadObservationForQuestion(index) {
-    if (index >= state.questions.length || state.questions[index].observation !== null) return;
+    if (index >= state.questions.length || state.questions[index].observationPromise) return;
 
     let resolver;
-    state.questions[index].observation = new Promise(r => resolver = r);
+    state.questions[index].observationPromise = new Promise(r => resolver = r);
 
-    if (!navigator.onLine) { resolver({ error: true }); return; }
+    if (!navigator.onLine) {
+        state.questions[index].observation = { error: true };
+        resolver({ error: true });
+        return;
+    }
 
     const q = state.questions[index];
     const difficulty = document.getElementById('input-difficulty').value;
@@ -328,6 +332,7 @@ async function loadObservationForQuestion(index) {
         if (data.results && data.results.length > 0) {
             const obs = data.results[0];
             if (difficulty === 'all') state.questions[index].taxon = obs.taxon;
+            
             state.questions[index].observation = obs;
             resolver(obs);
             
@@ -335,8 +340,14 @@ async function loadObservationForQuestion(index) {
                 const preload = new Image();
                 preload.src = obs.photos[0].url.replace('square', 'medium');
             }
-        } else { resolver({ error: true }); }
-    } catch(e) { resolver({ error: true }); }
+        } else {
+            state.questions[index].observation = { error: true };
+            resolver({ error: true });
+        }
+    } catch(e) {
+        state.questions[index].observation = { error: true };
+        resolver({ error: true });
+    }
 }
 
 // --- MEDIA NAVIGATION ---
@@ -356,10 +367,10 @@ async function renderQuizQuestion() {
     ui.resetQuizUI(state.currentIndex, state.questions.length, state.score);
 
     const q = state.questions[state.currentIndex];
-    if (!q.observation) loadObservationForQuestion(state.currentIndex);
+    if (!q.observationPromise) loadObservationForQuestion(state.currentIndex);
     
-    let obsData = q.observation;
-    if (obsData instanceof Promise) obsData = await obsData;
+    await q.observationPromise;
+    const obsData = q.observation;
 
     if (obsData.error) { handleFetchErrorFallback(q); return; }
 
