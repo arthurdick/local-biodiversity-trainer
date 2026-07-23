@@ -27,7 +27,7 @@ export const fetchObservation = async (url, signal) => {
 };
 
 export const checkTaxonSearch = async (inputStr, signal) => {
-    const fields = encodeURIComponent('(id:!t,name:!t,preferred_common_name:!t,matched_term:!t,ancestor_ids:!t)');
+    const fields = encodeURIComponent('(id:!t,name:!t,preferred_common_name:!t,matched_term:!t,ancestor_ids:!t,rank:!t)');
     const url = `${API_BASE}/taxa/autocomplete?q=${encodeURIComponent(inputStr)}&is_active=true&per_page=30&fields=${fields}`;
     const res = await fetch(url, { signal });
     if (!res.ok) throw new Error('Failed to fetch search validation');

@@ -267,7 +267,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     if (state.placeId) poolUrl += `&place_id=${state.placeId}`;
     else poolUrl += `&lat=${state.lat}&lng=${state.lng}&radius=10`;
     if (state.taxonId) poolUrl += `&taxon_id=${state.taxonId}`;
-    poolUrl += `&fields=${encodeURIComponent('(count:!t,taxon:(id:!t,name:!t,preferred_common_name:!t))')}`;
+    poolUrl += `&fields=${encodeURIComponent('(count:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,ancestor_ids:!t))')}`;
 
     try {
         const data = await api.fetchSpeciesPool(poolUrl);
@@ -317,7 +317,7 @@ async function loadObservationForQuestion(index) {
         url += `&taxon_id=${q.taxon.id}`;
     }
     
-    url += `&fields=${encodeURIComponent('(observed_on:!t,place_guess:!t,location:!t,taxon:(id:!t,name:!t,preferred_common_name:!t),photos:(url:!t,attribution:!t),sounds:(file_url:!t,attribution:!t))')}`;
+    url += `&fields=${encodeURIComponent('(observed_on:!t,place_guess:!t,location:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,ancestor_ids:!t),photos:(url:!t,attribution:!t),sounds:(file_url:!t,attribution:!t))')}`;
 
     try {
         const controller = new AbortController();
@@ -467,10 +467,14 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
             
             if (searchData.results && searchData.results.length > 0) {
                 for (const result of searchData.results) {
-                    const isTargetOrDescendant = result.id === taxon.id || (result.ancestor_ids && result.ancestor_ids.includes(taxon.id));
+                    const isExactMatch = result.id === taxon.id;
+                    const isGuessChildOfTarget = result.ancestor_ids && result.ancestor_ids.includes(taxon.id);
+                    const isGuessParentOfTarget = taxon.ancestor_ids && taxon.ancestor_ids.includes(result.id) && result.rank === 'species';
+                    
+                    const isTaxonomicallyValid = isExactMatch || isGuessChildOfTarget || isGuessParentOfTarget;
                     const validNames = [engine.normalize(result.name), engine.normalize(result.preferred_common_name), engine.normalize(result.matched_term)];
                     
-                    if (isTargetOrDescendant && validNames.includes(normalizedInput)) {
+                    if (isTaxonomicallyValid && validNames.includes(normalizedInput)) {
                         isCorrect = true;
                         matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;
                         break;
