@@ -120,129 +120,109 @@ document.addEventListener('click', (e) => {
     }
 });
 
-document.getElementById('clear-place').addEventListener('click', () => {
-    const input = document.getElementById('input-place');
-    input.value = '';
-    setState({ placeId: null, lat: null, lng: null });
-    ui.toggleClearButton('input-place', 'clear-place');
-    ui.toggleList('list-place', false);
-    placeValidation.clearError(); input.focus();
-});
-
-document.getElementById('clear-taxon').addEventListener('click', () => {
-    const input = document.getElementById('input-taxon');
-    input.value = '';
-    setState({ taxonId: null, taxonName: null });
-    ui.toggleClearButton('input-taxon', 'clear-taxon');
-    ui.toggleList('list-taxon', false);
-    taxonValidation.clearError(); input.focus();
-});
-
 document.getElementById('btn-months-all').addEventListener('click', () => document.querySelectorAll('#month-filters input').forEach(cb => cb.checked = true));
 document.getElementById('btn-months-none').addEventListener('click', () => document.querySelectorAll('#month-filters input').forEach(cb => cb.checked = false));
 
 // --- AUTOCOMPLETE LOGIC ---
-let placeAbortController = null;
+function setupAutocomplete(config) {
+    let abortController = null;
+    const inputEl = document.getElementById(config.inputId);
+    const clearBtnEl = document.getElementById(config.clearBtnId);
 
-document.getElementById('input-place').addEventListener('input', debounce(async (e) => {
-    ui.toggleClearButton('input-place', 'clear-place');
-    const query = e.target.value;
-    const list = document.getElementById('list-place');
-    list.innerHTML = '';
-    setState({ placeId: null });
-    e.target.removeAttribute('aria-activedescendant');
-    
-    if (query.length < 3) return ui.toggleList('list-place', false);
+    // Input event for fetching
+    inputEl.addEventListener('input', debounce(async (e) => {
+        ui.toggleClearButton(config.inputId, config.clearBtnId);
+        const query = e.target.value;
+        const listEl = document.getElementById(config.listId);
+        
+        // Safer and faster than innerHTML = ''
+        listEl.replaceChildren();
+        
+        setState(config.onClearState());
+        e.target.removeAttribute('aria-activedescendant');
+        
+        if (query.length < 3) return ui.toggleList(config.listId, false);
 
-    if (placeAbortController) placeAbortController.abort();
-    placeAbortController = new AbortController();
+        if (abortController) abortController.abort();
+        abortController = new AbortController();
 
-    try {
-        const data = await api.fetchPlaces(query, placeAbortController.signal);
-        if (data.results.length) ui.toggleList('list-place', true);
-        data.results.forEach((place, index) => {
-            const li = document.createElement('li');
-            li.id = `opt-place-${index}`;
-            const displayName = place.display_name || place.name;
-            li.textContent = displayName; li.tabIndex = -1; li.setAttribute('role', 'option');
+        try {
+            const data = await config.fetchData(query, abortController.signal);
+            if (data.results.length) ui.toggleList(config.listId, true);
             
-            li.addEventListener('mouseenter', () => {
-                const list = li.parentElement;
-                const input = document.getElementById(list.id.replace('list', 'input'));
-                list.querySelectorAll('li').forEach(item => item.classList.remove('active'));
-                li.classList.add('active');
-                input.setAttribute('aria-activedescendant', li.id);
-                list.dataset.activeIndex = index;
+            data.results.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.id = `opt-${config.inputId.replace('input-', '')}-${index}`;
+                li.textContent = config.renderText(item);
+                li.tabIndex = -1;
+                li.setAttribute('role', 'option');
+                
+                li.addEventListener('mouseenter', () => {
+                    const list = li.parentElement;
+                    list.querySelectorAll('li').forEach(el => el.classList.remove('active'));
+                    li.classList.add('active');
+                    inputEl.setAttribute('aria-activedescendant', li.id);
+                    list.dataset.activeIndex = index;
+                });
+                
+                const selectItem = () => {
+                    setState(config.onSelectState(item));
+                    inputEl.value = li.textContent;
+                    ui.toggleList(config.listId, false);
+                    ui.toggleClearButton(config.inputId, config.clearBtnId);
+                    config.validationObj.clearError();
+                    inputEl.focus();
+                };
+                
+                li.onclick = selectItem;
+                li.onkeydown = (event) => { if (event.key === 'Enter') { event.preventDefault(); selectItem(); } };
+                listEl.appendChild(li);
             });
-            
-            const selectItem = () => {
-                setState({ placeId: place.id, lat: null, lng: null });
-                document.getElementById('input-place').value = displayName;
-                ui.toggleList('list-place', false); ui.toggleClearButton('input-place', 'clear-place');
-                placeValidation.clearError(); document.getElementById('input-place').focus();
-            };
-            li.onclick = selectItem;
-            li.onkeydown = (event) => { if (event.key === 'Enter') { event.preventDefault(); selectItem(); } };
-            list.appendChild(li);
-        });
-    } catch(err) {
-        if (err.name === 'AbortError') return;
-        console.warn("Location search offline");
-    }
-}));
+        } catch(err) {
+            if (err.name === 'AbortError') return;
+            console.warn(`${config.inputId} search offline`);
+        }
+    }));
 
-document.getElementById('input-place').addEventListener('keydown', (e) => ui.handleAutocompleteKeydown(e, 'list-place'));
+    // Keyboard navigation
+    inputEl.addEventListener('keydown', (e) => ui.handleAutocompleteKeydown(e, config.listId));
 
-let taxonAbortController = null;
+    // Clear button functionality
+    clearBtnEl.addEventListener('click', () => {
+        inputEl.value = '';
+        setState(config.onClearState());
+        ui.toggleClearButton(config.inputId, config.clearBtnId);
+        ui.toggleList(config.listId, false);
+        config.validationObj.clearError();
+        inputEl.focus();
+    });
+}
 
-document.getElementById('input-taxon').addEventListener('input', debounce(async (e) => {
-    ui.toggleClearButton('input-taxon', 'clear-taxon');
-    const query = e.target.value;
-    const list = document.getElementById('list-taxon');
-    list.innerHTML = '';
-    setState({ taxonId: null, taxonName: null });
-    e.target.removeAttribute('aria-activedescendant');
-    
-    if (query.length < 3) return ui.toggleList('list-taxon', false);
+// Initialize Autocompletes
+setupAutocomplete({
+    inputId: 'input-place',
+    listId: 'list-place',
+    clearBtnId: 'clear-place',
+    fetchData: api.fetchPlaces,
+    renderText: (place) => place.display_name || place.name,
+    onClearState: () => ({ placeId: null, lat: null, lng: null }),
+    onSelectState: (place) => ({ placeId: place.id, lat: null, lng: null }),
+    validationObj: placeValidation
+});
 
-    if (taxonAbortController) taxonAbortController.abort();
-    taxonAbortController = new AbortController();
-
-    try {
-        const data = await api.fetchTaxaAutocomplete(query, taxonAbortController.signal);
-        if (data.results.length) ui.toggleList('list-taxon', true);
-        data.results.forEach((taxon, index) => {
-            const li = document.createElement('li');
-            li.id = `opt-taxon-${index}`;
-            const common = taxon.preferred_common_name ? `${taxon.preferred_common_name} ` : '';
-            li.textContent = `${common}(${taxon.name})`; li.tabIndex = -1; li.setAttribute('role', 'option');
-            
-            li.addEventListener('mouseenter', () => {
-                const list = li.parentElement;
-                const input = document.getElementById(list.id.replace('list', 'input'));
-                list.querySelectorAll('li').forEach(item => item.classList.remove('active'));
-                li.classList.add('active');
-                input.setAttribute('aria-activedescendant', li.id);
-                list.dataset.activeIndex = index;
-            });
-            
-            const selectItem = () => {
-                setState({ taxonId: taxon.id, taxonName: taxon.preferred_common_name || taxon.name });
-                document.getElementById('input-taxon').value = li.textContent;
-                ui.toggleList('list-taxon', false); ui.toggleClearButton('input-taxon', 'clear-taxon');
-                taxonValidation.clearError(); document.getElementById('input-taxon').focus();
-            };
-            li.onclick = selectItem;
-            li.onkeydown = (event) => { if (event.key === 'Enter') { event.preventDefault(); selectItem(); } };
-            list.appendChild(li);
-        });
-    } catch(err) {
-        if (err.name === 'AbortError') return;
-        console.warn("Taxon search offline");
-    }
-}));
-
-document.getElementById('input-taxon').addEventListener('keydown', (e) => ui.handleAutocompleteKeydown(e, 'list-taxon'));
+setupAutocomplete({
+    inputId: 'input-taxon',
+    listId: 'list-taxon',
+    clearBtnId: 'clear-taxon',
+    fetchData: api.fetchTaxaAutocomplete,
+    renderText: (taxon) => {
+        const common = taxon.preferred_common_name ? `${taxon.preferred_common_name} ` : '';
+        return `${common}(${taxon.name})`;
+    },
+    onClearState: () => ({ taxonId: null, taxonName: null }),
+    onSelectState: (taxon) => ({ taxonId: taxon.id, taxonName: taxon.preferred_common_name || taxon.name }),
+    validationObj: taxonValidation
+});
 
 document.getElementById('btn-gps').addEventListener('click', () => {
     const btn = document.getElementById('btn-gps');
