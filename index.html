@@ -375,10 +375,11 @@
                     <div class="form-group">
                         <label for="input-difficulty">5. Pool Size</label>
                         <select id="input-difficulty">
-                            <option value="15">Top 15 Species</option>
-                            <option value="50" selected>Top 50 Species</option>
-                            <option value="125">Top 125 Species</option>
-                            <option value="500">Expert (Top 500)</option>
+                            <option value="15">Beginner (Top 15 Most Common)</option>
+                            <option value="50" selected>Easy (Top 50 Species)</option>
+                            <option value="125">Medium (Top 125 Species)</option>
+                            <option value="500">Hard (Top 500 Species)</option>
+                            <option value="all">Expert (All Observations)</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -907,6 +908,24 @@
         const questionLimit = parseInt(document.getElementById('input-questions').value);
         const preventDuplicates = document.getElementById('chk-unique').checked;
 
+        // Skip species_counts fetch completely if in 'all' mode
+        if (difficulty === 'all') {
+            state.questions = [];
+            for (let i = 0; i < questionLimit; i++) {
+                state.questions.push({ taxon: null, observation: null });
+            }
+            state.currentIndex = 0;
+            state.score = 0;
+            
+            loadObservationForQuestion(0);
+            showView('quiz-view');
+            renderQuizQuestion();
+            
+            btn.disabled = false;
+            btn.textContent = "Load Quiz Pool";
+            return;
+        }
+
         let poolUrl = `${API_BASE}/observations/species_counts?quality_grade=research&captive=false&per_page=${difficulty}${getMediaParams()}${getMonthParams()}`;
         if (state.placeId) poolUrl += `&place_id=${state.placeId}`;
         else poolUrl += `&lat=${state.lat}&lng=${state.lng}&radius=10`;
@@ -996,13 +1015,39 @@
             return;
         }
 
-        const taxon = state.questions[index].taxon;
+        const q = state.questions[index];
+        const difficulty = document.getElementById('input-difficulty').value;
+        const preventDuplicates = document.getElementById('chk-unique').checked;
         
-        let url = `${API_BASE}/observations?taxon_id=${taxon.id}&quality_grade=research&captive=false&per_page=1&order_by=random${getMediaParams()}${getMonthParams()}`;
+        let url = `${API_BASE}/observations?quality_grade=research&captive=false&per_page=1&order_by=random${getMediaParams()}${getMonthParams()}`;
+        
         if (state.placeId) url += `&place_id=${state.placeId}`;
         else url += `&lat=${state.lat}&lng=${state.lng}&radius=10`;
+
+        if (difficulty === 'all') {
+            // Force strict rank validation so users don't get generic Genus guesses
+            url += `&rank=species,subspecies`;
+            
+            if (state.taxonId) {
+                url += `&taxon_id=${state.taxonId}`;
+            }
+            
+            if (preventDuplicates) {
+                const seenTaxonIds = state.questions
+                    .map(quest => quest.taxon?.id)
+                    .filter(id => id !== undefined);
+                    
+                if (seenTaxonIds.length > 0) {
+                    url += `&without_taxon_id=${seenTaxonIds.join(',')}`;
+                }
+            }
+        } else {
+            // Standard mode uses the pre-rolled taxon pool
+            url += `&taxon_id=${q.taxon.id}`;
+        }
         
-        const fields = encodeURIComponent('(observed_on:!t,place_guess:!t,location:!t,photos:(url:!t,attribution:!t),sounds:(file_url:!t,attribution:!t))');
+        // Ensure taxon is explicitly fetched so we can assign it dynamically in 'all' mode
+        const fields = encodeURIComponent('(observed_on:!t,place_guess:!t,location:!t,taxon:(id:!t,name:!t,preferred_common_name:!t),photos:(url:!t,attribution:!t),sounds:(file_url:!t,attribution:!t))');
         url += `&fields=${fields}`;
 
         try {
@@ -1017,6 +1062,12 @@
             const data = await res.json();
             if (data.results && data.results.length > 0) {
                 const obs = data.results[0];
+                
+                if (difficulty === 'all') {
+                    // Populate the empty question slot with the generated taxon data
+                    state.questions[index].taxon = obs.taxon;
+                }
+                
                 state.questions[index].observation = obs;
                 resolver(obs);
                 
@@ -1203,7 +1254,13 @@
             span.textContent = 'This occasionally happens in the iNaturalist database.';
             errorDiv.appendChild(span);
         } else {
-            const taxonName = q.taxon.preferred_common_name || q.taxon.name;
+            let taxonName = "Random Species";
+            if (q.taxon) {
+                taxonName = q.taxon.preferred_common_name || q.taxon.name;
+            } else if (state.taxonId) {
+                taxonName = document.getElementById('input-taxon').value || "Target Taxon";
+            }
+
             errorDiv.textContent = '❌ Failed to load observation for ';
             const strong = document.createElement('strong');
             strong.textContent = taxonName;
