@@ -392,6 +392,12 @@
                     </div>
                 </div>
 
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chk-unique" checked> Prevent duplicate species in quiz
+                    </label>
+                </div>
+
                 <div id="form-error-message" class="inline-error"></div>
                 <button type="submit" id="btn-start">Load Quiz Pool</button>
             </form>
@@ -610,6 +616,7 @@
             questions: document.getElementById('input-questions').value,
             chkPhotos: document.getElementById('chk-photos').checked,
             chkSounds: document.getElementById('chk-sounds').checked,
+            chkUnique: document.getElementById('chk-unique').checked,
             months: Array.from(document.querySelectorAll('#month-filters input:checked')).map(cb => cb.value)
         };
         localStorage.setItem('bio_trainer_prefs', JSON.stringify(prefs));
@@ -632,6 +639,7 @@
             if (prefs.questions) document.getElementById('input-questions').value = prefs.questions;
             if (prefs.chkPhotos !== undefined) document.getElementById('chk-photos').checked = prefs.chkPhotos;
             if (prefs.chkSounds !== undefined) document.getElementById('chk-sounds').checked = prefs.chkSounds;
+            if (prefs.chkUnique !== undefined) document.getElementById('chk-unique').checked = prefs.chkUnique;
             if (prefs.months) {
                 document.querySelectorAll('#month-filters input').forEach(cb => {
                     cb.checked = prefs.months.includes(cb.value);
@@ -891,6 +899,7 @@
 
         const difficulty = document.getElementById('input-difficulty').value;
         const questionLimit = parseInt(document.getElementById('input-questions').value);
+        const preventDuplicates = document.getElementById('chk-unique').checked;
 
         let poolUrl = `${API_BASE}/observations/species_counts?quality_grade=research&captive=false&per_page=${difficulty}${getMediaParams()}${getMonthParams()}`;
         if (state.placeId) poolUrl += `&place_id=${state.placeId}`;
@@ -911,17 +920,45 @@
                 return;
             }
 
-            let totalWeights = 0;
-            const weightedPool = data.results.map(r => {
-                totalWeights += r.count;
-                return { taxon: r.taxon, threshold: totalWeights };
-            });
-
             state.questions = [];
-            for (let i = 0; i < questionLimit; i++) {
-                const roll = Math.random() * totalWeights;
-                const selected = weightedPool.find(item => roll <= item.threshold);
-                state.questions.push({ taxon: selected.taxon, observation: null });
+
+            if (preventDuplicates) {
+                // Weighted Sampling Without Replacement
+                let availablePool = data.results.map(r => ({ taxon: r.taxon, count: r.count }));
+                const limit = Math.min(questionLimit, availablePool.length);
+
+                for (let i = 0; i < limit; i++) {
+                    const totalWeight = availablePool.reduce((sum, item) => sum + item.count, 0);
+                    if (totalWeight <= 0) break;
+
+                    const roll = Math.random() * totalWeight;
+                    let runningWeight = 0;
+                    let selectedIndex = 0;
+
+                    for (let j = 0; j < availablePool.length; j++) {
+                        runningWeight += availablePool[j].count;
+                        if (roll <= runningWeight) {
+                            selectedIndex = j;
+                            break;
+                        }
+                    }
+
+                    state.questions.push({ taxon: availablePool[selectedIndex].taxon, observation: null });
+                    availablePool.splice(selectedIndex, 1);
+                }
+            } else {
+                // Weighted Sampling With Replacement
+                let totalWeights = 0;
+                const weightedPool = data.results.map(r => {
+                    totalWeights += r.count;
+                    return { taxon: r.taxon, threshold: totalWeights };
+                });
+
+                for (let i = 0; i < questionLimit; i++) {
+                    const roll = Math.random() * totalWeights;
+                    const selected = weightedPool.find(item => roll <= item.threshold);
+                    state.questions.push({ taxon: selected.taxon, observation: null });
+                }
             }
 
             state.currentIndex = 0;
