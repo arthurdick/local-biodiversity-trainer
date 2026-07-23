@@ -341,8 +341,9 @@ async function loadObservationForQuestion(index) {
                 preload.src = obs.photos[0].url.replace('square', 'medium');
             }
         } else {
-            state.questions[index].observation = { error: true };
-            resolver({ error: true });
+            // Flag that the API explicitly returned 0 results
+            state.questions[index].observation = { error: true, emptyPool: true };
+            resolver({ error: true, emptyPool: true });
         }
     } catch(e) {
         state.questions[index].observation = { error: true };
@@ -372,7 +373,20 @@ async function renderQuizQuestion() {
     await q.observationPromise;
     const obsData = q.observation;
 
-    if (obsData.error) { handleFetchErrorFallback(q); return; }
+    if (obsData.error) { 
+        const difficulty = document.getElementById('input-difficulty').value;
+        const preventDuplicates = document.getElementById('chk-unique').checked;
+        
+        // If the pool is exhausted in Expert Mode, truncate the quiz and end gracefully
+        if (obsData.emptyPool && difficulty === 'all' && preventDuplicates) {
+            state.questions = state.questions.slice(0, state.currentIndex);
+            ui.renderResultsView(state.questions, state.score);
+            return;
+        }
+        
+        handleFetchErrorFallback(q); 
+        return; 
+    }
 
     const hasPhotos = obsData.photos && obsData.photos.length > 0;
     const hasSounds = obsData.sounds && obsData.sounds.length > 0;
@@ -513,13 +527,18 @@ document.getElementById('input-answer').addEventListener('keypress', (e) => {
 });
 
 document.getElementById('btn-next').addEventListener('click', (e) => {
+    // 1. Prevent out-of-bounds clicks if the UI gets stuck
+    if (state.currentIndex >= state.questions.length) return; 
+
     e.target.textContent = "Next Observation ➔";
     const currentQ = state.questions[state.currentIndex];
+    
     if (currentQ.isCorrect === undefined) {
         currentQ.isCorrect = false;
         currentQ.userAnswer = "(Skipped)";
         currentQ.thumbnailUrl = engine.getQuestionThumbnail(currentQ, state.currentMediaArray);
     }
+    
     state.currentIndex++;
     if (state.currentIndex >= state.questions.length) ui.renderResultsView(state.questions, state.score);
     else renderQuizQuestion();

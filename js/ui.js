@@ -371,8 +371,9 @@ export function renderResultsView(questions, score) {
         gridDiv.className = 'missed-grid';
 
         missedQuestions.forEach(q => {
-            const taxon = q.taxon;
-            const primaryCommon = taxon.preferred_common_name || '';
+            // Provide a fallback object if taxon is null due to a fetch error
+            const taxon = q.taxon || { name: 'Data Unavailable', id: '' };
+            const primaryCommon = taxon.preferred_common_name || 'Fetch Failed';
             const sciName = taxon.name;
             const imgUrl = q.thumbnailUrl || '';
             const userGuess = q.userAnswer || '(Skipped)';
@@ -426,12 +427,15 @@ export function renderResultsView(questions, score) {
             const linksDiv = document.createElement('div');
             linksDiv.className = 'missed-card-links';
             
-            const inatLink = document.createElement('a');
-            inatLink.href = `https://www.inaturalist.org/taxa/${encodeURIComponent(taxon.id)}`;
-            inatLink.target = '_blank';
-            inatLink.rel = 'noopener';
-            inatLink.textContent = 'iNaturalist ↗';
-            linksDiv.appendChild(inatLink);
+            // Only generate the iNaturalist link if we have a valid taxon ID
+            if (taxon.id) {
+                const inatLink = document.createElement('a');
+                inatLink.href = `https://www.inaturalist.org/taxa/${encodeURIComponent(taxon.id)}`;
+                inatLink.target = '_blank';
+                inatLink.rel = 'noopener';
+                inatLink.textContent = 'iNaturalist ↗';
+                linksDiv.appendChild(inatLink);
+            }
             
             const wikiLink = document.createElement('a');
             wikiLink.href = `https://en.wikipedia.org/wiki/${encodeURIComponent(sciName)}`;
