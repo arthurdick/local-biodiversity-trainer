@@ -103,15 +103,28 @@ document.getElementById('input-place').addEventListener('input', debounce(async 
     ui.toggleClearButton('input-place', 'clear-place');
     const query = e.target.value; const list = document.getElementById('list-place');
     list.innerHTML = ''; state.placeId = null;
+    e.target.removeAttribute('aria-activedescendant');
     if (query.length < 3) return ui.toggleList('list-place', false);
 
     try {
         const data = await api.fetchPlaces(query);
         if (data.results.length) ui.toggleList('list-place', true);
-        data.results.forEach(place => {
+        data.results.forEach((place, index) => {
             const li = document.createElement('li');
+            li.id = `opt-place-${index}`;
             const displayName = place.display_name || place.name;
             li.textContent = displayName; li.tabIndex = -1; li.setAttribute('role', 'option');
+            li.addEventListener('mouseenter', () => {
+                const list = li.parentElement;
+                const input = document.getElementById(list.id.replace('list', 'input'));
+                
+                // Clear previous active states
+                list.querySelectorAll('li').forEach(item => item.classList.remove('active'));
+                
+                // Set the hovered item as active
+                li.classList.add('active');
+                input.setAttribute('aria-activedescendant', li.id);
+            });
             
             const selectItem = () => {
                 state.placeId = place.id; state.lat = null; state.lng = null;
@@ -126,27 +139,34 @@ document.getElementById('input-place').addEventListener('input', debounce(async 
     } catch(err) { console.warn("Location search offline"); }
 }));
 
-document.getElementById('input-place').addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowDown') {
-        e.preventDefault(); const list = document.getElementById('list-place');
-        if (list.classList.contains('show') && list.firstChild) list.firstChild.focus();
-    }
-});
-document.getElementById('list-place').addEventListener('keydown', (e) => ui.handleListKeydown(e, 'list-place'));
+document.getElementById('input-place').addEventListener('keydown', (e) => ui.handleAutocompleteKeydown(e, 'list-place'));
 
 document.getElementById('input-taxon').addEventListener('input', debounce(async (e) => {
     ui.toggleClearButton('input-taxon', 'clear-taxon');
     const query = e.target.value; const list = document.getElementById('list-taxon');
-    list.innerHTML = ''; state.taxonId = null; 
+    list.innerHTML = ''; state.taxonId = null;
+    e.target.removeAttribute('aria-activedescendant');
     if (query.length < 3) return ui.toggleList('list-taxon', false);
 
     try {
         const data = await api.fetchTaxaAutocomplete(query);
         if (data.results.length) ui.toggleList('list-taxon', true);
-        data.results.forEach(taxon => {
+        data.results.forEach((taxon, index) => {
             const li = document.createElement('li');
+            li.id = `opt-taxon-${index}`;
             const common = taxon.preferred_common_name ? `${taxon.preferred_common_name} ` : '';
             li.textContent = `${common}(${taxon.name})`; li.tabIndex = -1; li.setAttribute('role', 'option');
+            li.addEventListener('mouseenter', () => {
+                const list = li.parentElement;
+                const input = document.getElementById(list.id.replace('list', 'input'));
+                
+                // Clear previous active states
+                list.querySelectorAll('li').forEach(item => item.classList.remove('active'));
+                
+                // Set the hovered item as active
+                li.classList.add('active');
+                input.setAttribute('aria-activedescendant', li.id);
+            });
             
             const selectItem = () => {
                 state.taxonId = taxon.id;
@@ -161,13 +181,7 @@ document.getElementById('input-taxon').addEventListener('input', debounce(async 
     } catch(err) { console.warn("Taxon search offline"); }
 }));
 
-document.getElementById('input-taxon').addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowDown') {
-        e.preventDefault(); const list = document.getElementById('list-taxon');
-        if (list.classList.contains('show') && list.firstChild) list.firstChild.focus();
-    }
-});
-document.getElementById('list-taxon').addEventListener('keydown', (e) => ui.handleListKeydown(e, 'list-taxon'));
+document.getElementById('input-taxon').addEventListener('keydown', (e) => ui.handleAutocompleteKeydown(e, 'list-taxon'));
 
 document.getElementById('btn-gps').addEventListener('click', () => {
     const btn = document.getElementById('btn-gps');

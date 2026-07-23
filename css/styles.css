@@ -75,8 +75,11 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 .autocomplete-list { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border); border-radius: 0 0 var(--radius) var(--radius); max-height: 200px; overflow-y: auto; margin: 0; padding: 0; list-style: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: none; }
 .autocomplete-list.show { display: block; }
 .autocomplete-list li { padding: 10px; cursor: pointer; border-bottom: 1px solid var(--border); }
-.autocomplete-list li:focus { background: var(--bg-color); outline: 2px solid var(--primary); outline-offset: -2px; }
-.autocomplete-list li:hover { background: var(--bg-color); }
+.autocomplete-list li.active { 
+    background: var(--bg-color); 
+    outline: 2px solid var(--primary); 
+    outline-offset: -2px; 
+}
 
 .quiz-media-container { text-align: center; margin-bottom: 20px; min-height: 350px; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #111; border-radius: var(--radius); border: 1px solid var(--border); position: relative; padding: 15px; }
 

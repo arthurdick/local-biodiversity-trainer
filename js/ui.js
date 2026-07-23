@@ -18,31 +18,49 @@ export function toggleList(listId, show) {
     } else {
         list.classList.remove('show');
         input.setAttribute('aria-expanded', 'false');
+        input.removeAttribute('aria-activedescendant'); // Clear active descendant
+        list.querySelectorAll('li').forEach(li => li.classList.remove('active')); // Clear active visuals
     }
 }
 
-export function handleListKeydown(e, listId) {
+export function handleAutocompleteKeydown(e, listId) {
     const list = document.getElementById(listId);
+    const inputId = listId.replace('list', 'input');
+    const input = document.getElementById(inputId);
+    
     if (!list.classList.contains('show')) return;
     
     const items = Array.from(list.querySelectorAll('li'));
     if (items.length === 0) return;
 
-    let currentIndex = items.findIndex(item => item === document.activeElement);
+    let currentIndex = items.findIndex(item => item.classList.contains('active'));
 
     if (e.key === 'ArrowDown') {
         e.preventDefault();
         let nextIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
-        items[nextIndex].focus();
+        updateActiveItem(items, nextIndex, input);
     } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         let prevIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
-        items[prevIndex].focus();
+        updateActiveItem(items, prevIndex, input);
+    } else if (e.key === 'Enter' && currentIndex !== -1) {
+        e.preventDefault();
+        items[currentIndex].click();
     } else if (e.key === 'Escape') {
         e.preventDefault();
         toggleList(listId, false);
-        document.getElementById(listId.replace('list', 'input')).focus();
     }
+}
+
+function updateActiveItem(items, activeIndex, input) {
+    // Clear previous active states
+    items.forEach(item => item.classList.remove('active'));
+    
+    // Set new active state and update ARIA
+    const activeItem = items[activeIndex];
+    activeItem.classList.add('active');
+    input.setAttribute('aria-activedescendant', activeItem.id);
+    activeItem.scrollIntoView({ block: 'nearest' });
 }
 
 export function toggleClearButton(inputId, btnId) {
