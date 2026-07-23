@@ -19,7 +19,10 @@ export function toggleList(listId, show) {
         list.classList.remove('show');
         input.setAttribute('aria-expanded', 'false');
         input.removeAttribute('aria-activedescendant');
-        list.querySelectorAll('li').forEach(li => li.classList.remove('active'));
+        list.querySelectorAll('li').forEach(li => {
+            li.classList.remove('active');
+            li.setAttribute('aria-selected', 'false');
+        });
         list.dataset.activeIndex = '-1';
     }
 }
@@ -57,9 +60,15 @@ export function handleAutocompleteKeydown(e, listId) {
 }
 
 function updateActiveItem(items, activeIndex, input, list) {
-    items.forEach(item => item.classList.remove('active'));
+    items.forEach(item => {
+        item.classList.remove('active');
+        item.setAttribute('aria-selected', 'false');
+    });
+    
     const activeItem = items[activeIndex];
     activeItem.classList.add('active');
+    activeItem.setAttribute('aria-selected', 'true');
+    
     input.setAttribute('aria-activedescendant', activeItem.id);
     activeItem.scrollIntoView({ block: 'nearest' });
     list.dataset.activeIndex = activeIndex;

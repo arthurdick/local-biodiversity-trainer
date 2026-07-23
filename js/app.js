@@ -156,11 +156,19 @@ function setupAutocomplete(config) {
                 li.textContent = config.renderText(item);
                 li.tabIndex = -1;
                 li.setAttribute('role', 'option');
+                li.setAttribute('aria-selected', 'false');
                 
                 li.addEventListener('mouseenter', () => {
                     const list = li.parentElement;
-                    list.querySelectorAll('li').forEach(el => el.classList.remove('active'));
+                    
+                    list.querySelectorAll('li').forEach(el => {
+                        el.classList.remove('active');
+                        el.setAttribute('aria-selected', 'false');
+                    });
+                    
                     li.classList.add('active');
+                    li.setAttribute('aria-selected', 'true');
+                    
                     inputEl.setAttribute('aria-activedescendant', li.id);
                     list.dataset.activeIndex = index;
                 });
