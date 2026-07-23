@@ -30,6 +30,31 @@ An interactive web application designed to help users test and improve their ide
 
 ---
 
+## 🛠️ Local Development
+
+Because this project relies on **ES Modules** (`type="module"`), standard browser security rules (CORS) prevent loading the JavaScript files directly via the `file://` protocol. The app must be served over a local HTTP server.
+
+### Quick Start with Python
+
+Python comes pre-installed on most macOS and Linux systems. You can spin up a lightweight, zero-dependency local server directly from your terminal:
+
+1. **Navigate to the project root:**
+```bash
+cd /path/to/local-biodiversity-trainer
+
+```
+
+2. **Start the HTTP server:**
+```bash
+python3 -m http.server 8000
+
+```
+
+3. **Open in your browser:**
+Go to [http://localhost:8000](http://localhost:8000) to test the app.
+
+---
+
 ## Data Attribution
 
 Species data, sound clips, and photos are provided by [iNaturalist](https://www.inaturalist.org). This application is an independent open-source project and is not officially affiliated with iNaturalist.
