@@ -472,6 +472,15 @@
         currentMediaArray: [], currentMediaIndex: 0, currentMeta: null, isQuestionLoaded: false
     };
 
+    function getQuestionThumbnail(q) {
+        const photoMedia = state.currentMediaArray.find(m => m.type === 'photo');
+        if (photoMedia) return photoMedia.mediumUrl;
+        if (q.observation && q.observation.photos && q.observation.photos.length > 0) {
+            return q.observation.photos[0].url.replace('square', 'medium');
+        }
+        return '';
+    }
+
     // --- INLINE VALIDATION ---
     function applyInlineValidation(inputId, stateKey, entityName) {
         const input = document.getElementById(inputId);
@@ -505,18 +514,15 @@
 
         input.addEventListener('input', clearError);
 
-        // Reopen dropdown if the input is focused while in an uncommitted/error state
         input.addEventListener('focus', () => {
             const hasGps = inputId === 'input-place' && state.lat !== null;
             if (input.value.trim() !== '' && !state[stateKey] && !hasGps) {
                 const listId = inputId.replace('input', 'list');
                 const list = document.getElementById(listId);
                 
-                // If the previous options are still present, display them immediately
                 if (list && list.children.length > 0) {
                     toggleList(listId, true);
                 } else {
-                    // Otherwise, trigger the input event to fetch new results based on the text
                     input.dispatchEvent(new Event('input'));
                 }
             }
@@ -583,7 +589,6 @@
         return `&month=${months}`;
     }
 
-    // Month Select All / Select None handlers
     document.getElementById('btn-months-all').addEventListener('click', () => {
         document.querySelectorAll('#month-filters input').forEach(cb => cb.checked = true);
     });
@@ -645,7 +650,6 @@
         const view = document.getElementById(viewId);
         view.classList.add('active');
         
-        // Focus heading for screen readers to announce view change
         const focusTarget = view.querySelector('[tabindex="-1"]');
         if (focusTarget) {
             focusTarget.focus();
@@ -714,37 +718,41 @@
         list.innerHTML = ''; state.placeId = null;
         if (query.length < 3) return toggleList('list-place', false);
 
-        const fields = encodeURIComponent('(id:!t,name:!t,display_name:!t)');
-        const res = await fetch(`${API_BASE}/places?q=${query}&fields=${fields}`);
-        const data = await res.json();
-        
-        if (data.results.length) toggleList('list-place', true);
-        data.results.forEach(place => {
-            const li = document.createElement('li');
-            const displayName = place.display_name || place.name;
-            li.textContent = displayName;
-            li.tabIndex = -1; // Keep out of tab flow, force arrow key usage
-            li.setAttribute('role', 'option');
+        try {
+            const fields = encodeURIComponent('(id:!t,name:!t,display_name:!t)');
+            const res = await fetch(`${API_BASE}/places?q=${query}&fields=${fields}`);
+            const data = await res.json();
             
-            const selectItem = () => {
-                state.placeId = place.id; state.lat = null; state.lng = null;
-                document.getElementById('input-place').value = displayName;
-                toggleList('list-place', false);
-                toggleClearButton('input-place', 'clear-place');
-                placeValidation.clearError();
-                document.getElementById('input-place').focus();
-            };
-            
-            li.onclick = selectItem;
-            li.onkeydown = (event) => {
-                if (event.key === 'Enter') {
-                    event.preventDefault();
-                    selectItem();
-                }
-            };
-            
-            list.appendChild(li);
-        });
+            if (data.results.length) toggleList('list-place', true);
+            data.results.forEach(place => {
+                const li = document.createElement('li');
+                const displayName = place.display_name || place.name;
+                li.textContent = displayName;
+                li.tabIndex = -1;
+                li.setAttribute('role', 'option');
+                
+                const selectItem = () => {
+                    state.placeId = place.id; state.lat = null; state.lng = null;
+                    document.getElementById('input-place').value = displayName;
+                    toggleList('list-place', false);
+                    toggleClearButton('input-place', 'clear-place');
+                    placeValidation.clearError();
+                    document.getElementById('input-place').focus();
+                };
+                
+                li.onclick = selectItem;
+                li.onkeydown = (event) => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        selectItem();
+                    }
+                };
+                
+                list.appendChild(li);
+            });
+        } catch(err) {
+            console.warn("Location search offline");
+        }
     }));
 
     document.getElementById('input-place').addEventListener('keydown', (e) => {
@@ -765,36 +773,40 @@
         list.innerHTML = ''; state.taxonId = null; 
         if (query.length < 3) return toggleList('list-taxon', false);
 
-        const fields = encodeURIComponent('(id:!t,name:!t,preferred_common_name:!t)');
-        const res = await fetch(`${API_BASE}/taxa/autocomplete?q=${query}&fields=${fields}`);
-        const data = await res.json();
-        
-        if (data.results.length) toggleList('list-taxon', true);
-        data.results.forEach(taxon => {
-            const li = document.createElement('li');
-            const common = taxon.preferred_common_name ? `${taxon.preferred_common_name} ` : '';
-            li.textContent = `${common}(${taxon.name})`;
-            li.tabIndex = -1;
-            li.setAttribute('role', 'option');
+        try {
+            const fields = encodeURIComponent('(id:!t,name:!t,preferred_common_name:!t)');
+            const res = await fetch(`${API_BASE}/taxa/autocomplete?q=${query}&fields=${fields}`);
+            const data = await res.json();
             
-            const selectItem = () => {
-                state.taxonId = taxon.id;
-                document.getElementById('input-taxon').value = li.textContent;
-                toggleList('list-taxon', false);
-                toggleClearButton('input-taxon', 'clear-taxon');
-                taxonValidation.clearError();
-                document.getElementById('input-taxon').focus();
-            };
-            
-            li.onclick = selectItem;
-            li.onkeydown = (event) => {
-                if (event.key === 'Enter') {
-                    event.preventDefault();
-                    selectItem();
-                }
-            };
-            list.appendChild(li);
-        });
+            if (data.results.length) toggleList('list-taxon', true);
+            data.results.forEach(taxon => {
+                const li = document.createElement('li');
+                const common = taxon.preferred_common_name ? `${taxon.preferred_common_name} ` : '';
+                li.textContent = `${common}(${taxon.name})`;
+                li.tabIndex = -1;
+                li.setAttribute('role', 'option');
+                
+                const selectItem = () => {
+                    state.taxonId = taxon.id;
+                    document.getElementById('input-taxon').value = li.textContent;
+                    toggleList('list-taxon', false);
+                    toggleClearButton('input-taxon', 'clear-taxon');
+                    taxonValidation.clearError();
+                    document.getElementById('input-taxon').focus();
+                };
+                
+                li.onclick = selectItem;
+                li.onkeydown = (event) => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        selectItem();
+                    }
+                };
+                list.appendChild(li);
+            });
+        } catch(err) {
+            console.warn("Taxon search offline");
+        }
     }));
 
     document.getElementById('input-taxon').addEventListener('keydown', (e) => {
@@ -833,7 +845,7 @@
                 setTimeout(() => {
                     btn.innerHTML = originalText;
                     btn.disabled = false;
-                }, 3000);
+                }, 5000);
             }
         );
     });
@@ -927,13 +939,19 @@
         }
     });
 
-    // --- JIT PREFETCH WITH CACHE BUSTING ---
+    // --- JIT PREFETCH WITH TIMEOUT & OFFLINE GUARD ---
     async function loadObservationForQuestion(index) {
         if (index >= state.questions.length) return;
         if (state.questions[index].observation !== null) return;
 
         let resolver;
         state.questions[index].observation = new Promise(r => resolver = r);
+
+        // Fast fail if device is explicitly offline
+        if (!navigator.onLine) {
+            resolver({ error: true });
+            return;
+        }
 
         const taxon = state.questions[index].taxon;
         
@@ -945,14 +963,20 @@
         url += `&fields=${fields}`;
 
         try {
-            const res = await fetch(url, { cache: 'no-store' });
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+            const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
+            clearTimeout(timeoutId);
+
+            if (!res.ok) throw new Error('Fetch failed');
+
             const data = await res.json();
             if (data.results && data.results.length > 0) {
                 const obs = data.results[0];
                 state.questions[index].observation = obs;
                 resolver(obs);
                 
-                // Preload the first image if it exists
                 if (obs.photos && obs.photos.length > 0) {
                     const preload = new Image();
                     preload.src = obs.photos[0].url.replace('square', 'medium');
@@ -975,18 +999,15 @@
         const audioContainer = document.getElementById('quiz-audio-container');
         const audioPlayer = document.getElementById('quiz-audio-player');
         
-        // Pause any playing audio when transitioning
         audioPlayer.pause();
         
         if (media.type === 'photo') {
             imgElement.src = media.mediumUrl;
             
-            // Accessible Zoom Wrap Click Listener
             zoomBtn.onclick = () => window.open(media.originalUrl, '_blank');
             document.getElementById('quiz-attribution').textContent = `Photo: ${media.attribution}`;
             
             audioContainer.style.display = 'none';
-            // Only show the image element if it's already loaded, or rely on img.onload
             if (imgElement.complete) {
                 zoomBtn.style.display = 'flex';
                 imgElement.style.display = 'block';
@@ -1027,6 +1048,11 @@
     // --- GAME LOOP ---
     async function renderQuizQuestion() {
         state.isQuestionLoaded = false;
+        
+        // Reset currentMediaArray to prevent media leakage
+        state.currentMediaArray = [];
+        state.currentMediaIndex = 0;
+
         document.getElementById('quiz-counter').textContent = `Question ${state.currentIndex + 1} of ${state.questions.length}`;
         document.getElementById('quiz-score').textContent = `Score: ${state.score}`;
         
@@ -1080,11 +1106,9 @@
             coordinates: obsData.location
         };
 
-        // Read user preferences before building the array
         const wantsPhotos = document.getElementById('chk-photos').checked;
         const wantsSounds = document.getElementById('chk-sounds').checked;
 
-        // Populate Unified Media Array based strictly on user selection
         state.currentMediaArray = [];
         
         if (hasPhotos && wantsPhotos) {
@@ -1108,7 +1132,6 @@
             });
         }
 
-        // Failsafe: If filtering resulted in an empty array, skip it
         if (state.currentMediaArray.length === 0) {
             handleFetchError(q, true);
             return;
@@ -1117,7 +1140,6 @@
         state.currentMediaIndex = 0;
         updateMediaDisplay();
 
-        // If the first media is a sound, trigger ready immediately
         if (state.currentMediaArray[0].type === 'sound') {
             triggerQuestionReady();
         }
@@ -1131,7 +1153,7 @@
             errorDiv.innerHTML = `❌ Observation missing media data.<br><br><span style="color:#aaa;font-weight:normal;">This occasionally happens in the iNaturalist database.</span>`;
         } else {
             const taxonName = q.taxon.preferred_common_name || q.taxon.name;
-            errorDiv.innerHTML = `❌ Failed to load an observation for <strong>${taxonName}</strong>.<br><br><span style="color:#aaa;font-weight:normal;">It may lack observations matching your selected media types or seasonal filters.</span>`;
+            errorDiv.innerHTML = `❌ Failed to load observation for <strong>${taxonName}</strong>.<br><br><span style="color:#aaa;font-weight:normal;">Please check your internet connection or filters.</span>`;
         }
         
         errorDiv.style.display = 'block';
@@ -1182,7 +1204,6 @@
         }
     }
 
-    // Triggered when any image completes loading via updateMediaDisplay()
     document.getElementById('quiz-image').onload = (e) => {
         if (state.currentMediaArray[state.currentMediaIndex]?.type === 'photo') {
             document.getElementById('btn-zoom-image').style.display = 'flex';
@@ -1198,6 +1219,25 @@
             
             const errorDiv = document.getElementById('quiz-error');
             errorDiv.innerHTML = `❌ Failed to load observation media.<br><br><span style="color:#aaa;font-weight:normal;">Please check your internet connection.</span>`;
+            errorDiv.style.display = 'block';
+            
+            state.isQuestionLoaded = true;
+            document.getElementById('btn-next').style.display = 'block';
+            document.getElementById('btn-next').textContent = "Skip to Next ➔";
+            document.getElementById('btn-next').focus();
+            
+            loadObservationForQuestion(state.currentIndex + 1);
+        }
+    };
+
+    // Audio Error Handling Safeguard
+    document.getElementById('quiz-audio-player').onerror = () => {
+        if (state.currentMediaArray[state.currentMediaIndex]?.type === 'sound') {
+            document.getElementById('quiz-loading').style.display = 'none';
+            document.getElementById('media-controls').style.display = 'none';
+            
+            const errorDiv = document.getElementById('quiz-error');
+            errorDiv.innerHTML = `❌ Failed to load observation audio clip.<br><br><span style="color:#aaa;font-weight:normal;">Please check your internet connection.</span>`;
             errorDiv.style.display = 'block';
             
             state.isQuestionLoaded = true;
@@ -1235,36 +1275,41 @@
         if (matchSci || matchCommon) {
             isCorrect = true;
             matchedNameDisplay = matchSci ? taxon.name : taxon.preferred_common_name;
-        } else {
+        } else if (navigator.onLine) {
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+
                 const fields = encodeURIComponent('(id:!t,name:!t,preferred_common_name:!t,matched_term:!t,ancestor_ids:!t)');
                 const url = `${API_BASE}/taxa/autocomplete?q=${encodeURIComponent(inputStr)}&is_active=true&per_page=30&fields=${fields}`;
-                const searchRes = await fetch(url);
-                const searchData = await searchRes.json();
+                const searchRes = await fetch(url, { signal: controller.signal });
+                clearTimeout(timeoutId);
                 
-                if (searchData.results && searchData.results.length > 0) {
-                    for (const result of searchData.results) {
-                        const isTargetOrDescendant = result.id === targetTaxonId || (result.ancestor_ids && result.ancestor_ids.includes(targetTaxonId));
-                        const validNames = [normalize(result.name), normalize(result.preferred_common_name), normalize(result.matched_term)];
-                        const isExactNameMatch = validNames.includes(normalizedInput);
-                        
-                        if (isTargetOrDescendant && isExactNameMatch) {
-                            isCorrect = true;
-                            matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;
-                            break;
+                if (searchRes.ok) {
+                    const searchData = await searchRes.json();
+                    if (searchData.results && searchData.results.length > 0) {
+                        for (const result of searchData.results) {
+                            const isTargetOrDescendant = result.id === targetTaxonId || (result.ancestor_ids && result.ancestor_ids.includes(targetTaxonId));
+                            const validNames = [normalize(result.name), normalize(result.preferred_common_name), normalize(result.matched_term)];
+                            const isExactNameMatch = validNames.includes(normalizedInput);
+                            
+                            if (isTargetOrDescendant && isExactNameMatch) {
+                                isCorrect = true;
+                                matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;
+                                break;
+                            }
                         }
                     }
                 }
             } catch (error) {
-                console.warn("API check failed. Relying on local strict match.");
+                console.warn("API check failed or timed out. Relying on local strict match.");
             }
         }
         
         q.userAnswer = inputStr;
         q.isCorrect = isCorrect;
         
-        // Grab a thumbnail specifically for the review grid
-        q.thumbnailUrl = state.currentMediaArray.find(m => m.type === 'photo')?.mediumUrl || '';
+        q.thumbnailUrl = getQuestionThumbnail(q);
         
         const primaryDisplayName = taxon.preferred_common_name ? `${taxon.preferred_common_name} (${taxon.name})` : taxon.name;
         const primaryCommonNorm = taxon.preferred_common_name ? normalize(taxon.preferred_common_name) : "";
@@ -1323,7 +1368,7 @@
         if (currentQ.isCorrect === undefined) {
             currentQ.isCorrect = false;
             currentQ.userAnswer = "(Skipped)";
-            currentQ.thumbnailUrl = state.currentMediaArray.find(m => m.type === 'photo')?.mediumUrl || '';
+            currentQ.thumbnailUrl = getQuestionThumbnail(currentQ);
         }
 
         state.currentIndex++;
@@ -1360,9 +1405,21 @@
                 const imgUrl = q.thumbnailUrl || '';
                 const userGuess = q.userAnswer || '(Skipped)';
 
+                // Check if observation explicitly has audio sounds
+                const isAudioObservation = q.observation && q.observation.sounds && q.observation.sounds.length > 0;
+
+                let mediaContent = '';
+                if (imgUrl) {
+                    mediaContent = `<img src="${imgUrl}" alt="${primaryCommon || sciName}">`;
+                } else if (isAudioObservation) {
+                    mediaContent = '<div style="height:130px;background:#333;display:flex;align-items:center;justify-content:center;color:#888;">🔊 Audio Observation</div>';
+                } else {
+                    mediaContent = '<div style="height:130px;background:#333;display:flex;align-items:center;justify-content:center;color:#888;">⚠️ Skipped / No Image</div>';
+                }
+
                 html += `
                     <div class="missed-card">
-                        ${imgUrl ? `<img src="${imgUrl}" alt="${primaryCommon || sciName}">` : '<div style="height:130px;background:#333;display:flex;align-items:center;justify-content:center;color:#888;">🔊 Audio Observation</div>'}
+                        ${mediaContent}
                         <div class="missed-card-body">
                             <div>
                                 <div class="missed-card-name">${primaryCommon || sciName}</div>
@@ -1391,7 +1448,6 @@
     });
     
     loadPreferences();
-
 </script>
 </body>
 </html>
