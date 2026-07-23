@@ -59,6 +59,25 @@ function getMonthParams(config) {
     return `&month=${config.months.join(',')}`;
 }
 
+/**
+ * Calculates a dynamic network timeout based on the user's connection speed.
+ */
+function getDynamicNetworkTimeout(defaultTimeout = 10000) {
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (!connection) return defaultTimeout;
+
+    switch (connection.effectiveType) {
+        case 'slow-2g':
+        case '2g':
+            return 30000; // 30 seconds for very slow connections
+        case '3g':
+            return 20000; // 20 seconds for 3G
+        case '4g':
+        default:
+            return defaultTimeout;
+    }
+}
+
 function savePreferences() {
     const s = getState();
     const prefs = {
@@ -376,7 +395,8 @@ async function loadObservationForQuestion(index) {
 
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            const timeoutMs = getDynamicNetworkTimeout();
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
             const data = await api.fetchObservation(url, controller.signal);
             clearTimeout(timeoutId);
 
@@ -538,7 +558,8 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
     if (!isCorrect && navigator.onLine) {
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            const timeoutMs = getDynamicNetworkTimeout();
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
             const searchData = await api.checkTaxonSearch(inputStr, controller.signal);
             clearTimeout(timeoutId);
             
