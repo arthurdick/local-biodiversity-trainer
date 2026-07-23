@@ -132,6 +132,8 @@ export function updateMediaDisplay(currentMediaArray, currentMediaIndex) {
     const audioPlayer = document.getElementById('quiz-audio-player');
     
     audioPlayer.pause();
+    audioPlayer.removeAttribute('src');
+    audioPlayer.load();
     
     if (media.type === 'photo') {
         imgElement.src = media.mediumUrl;
@@ -179,7 +181,9 @@ export function resetQuizUI(currentIndex, totalQuestions, score) {
     
     const audioPlayer = document.getElementById('quiz-audio-player');
     audioPlayer.pause();
-    audioPlayer.src = "";
+    audioPlayer.removeAttribute('src');
+    audioPlayer.load();
+    
     document.getElementById('quiz-image').removeAttribute('src');
     
     const input = document.getElementById('input-answer');
@@ -332,6 +336,14 @@ export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm
 }
 
 export function renderResultsView(questions, score) {
+    // Explicitly release any audio from the final question before switching views
+    const audioPlayer = document.getElementById('quiz-audio-player');
+    if (audioPlayer) {
+        audioPlayer.pause();
+        audioPlayer.removeAttribute('src');
+        audioPlayer.load();
+    }
+
     document.getElementById('final-score').textContent = `${score} / ${questions.length}`;
     const reviewContainer = document.getElementById('review-container');
     reviewContainer.innerHTML = '';
