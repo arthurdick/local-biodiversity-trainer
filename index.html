@@ -8,8 +8,8 @@
         :root {
             --bg-color: #f4f7f6;
             --surface: #ffffff;
-            --primary: #74ac00;
-            --primary-hover: #5d8a00;
+            --primary: #5a8500;
+            --primary-hover: #456600;
             --text-main: #333333;
             --text-muted: #666666;
             --error: #d9534f;
@@ -26,6 +26,12 @@
         
         .view { display: none; }
         .view.active { display: block; }
+        
+        /* Visually hidden class for screen readers */
+        .visually-hidden {
+            position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+            clip: rect(0, 0, 0, 0); border: 0;
+        }
 
         /* Form Controls */
         .form-group { margin-bottom: 20px; }
@@ -141,7 +147,10 @@
         /* Quiz Layout */
         .quiz-media-container { text-align: center; margin-bottom: 20px; min-height: 350px; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #111; border-radius: var(--radius); border: 1px solid var(--border); position: relative; padding: 15px; }
         
-        .quiz-media-container img { max-width: 100%; max-height: 320px; border-radius: 4px; object-fit: contain; cursor: zoom-in; transition: opacity 0.2s; }
+        #btn-zoom-image { display: none; background: transparent; border: none; padding: 0; width: 100%; align-items: center; justify-content: center; cursor: zoom-in; outline-offset: 4px; border-radius: 4px; }
+        #btn-zoom-image:focus-visible { outline: 2px solid var(--primary); }
+        
+        .quiz-media-container img { max-width: 100%; max-height: 320px; border-radius: 4px; object-fit: contain; transition: opacity 0.2s; margin: 0 auto; }
         .quiz-media-container img:hover { opacity: 0.9; }
         
         /* Audio Player Container */
@@ -289,149 +298,156 @@
 <body>
 
 <div id="app">
-    <!-- Setup View -->
-    <div id="setup-view" class="view active">
-        <h1>Biodiversity Trainer</h1>
-        <p>Learn local species weighted by real-world frequencies.</p>
+    <main>
+        <!-- Setup View -->
+        <div id="setup-view" class="view active">
+            <h1 id="setup-heading" tabindex="-1" style="outline: none;">Biodiversity Trainer</h1>
+            <p>Learn local species weighted by real-world frequencies.</p>
 
-        <div class="form-group z-high autocomplete-wrapper">
-            <label for="input-place">1. Location</label>
-            <button id="btn-gps" type="button" style="margin-bottom: 10px; background-color: #555;">📍 Use My Exact Location (GPS)</button>
-            <div class="input-relative-wrapper">
-                <input type="text" id="input-place" placeholder="...or search a city, park, or country" autocomplete="off">
-                <button type="button" id="clear-place" class="btn-clear" aria-label="Clear location input" title="Clear location">&times;</button>
-            </div>
-            <ul id="list-place" class="autocomplete-list" role="listbox"></ul>
+            <form id="setup-form">
+                <div class="form-group z-high autocomplete-wrapper">
+                    <label for="input-place">1. Location</label>
+                    <button id="btn-gps" type="button" style="margin-bottom: 10px; background-color: #555;">📍 Use My Exact Location (GPS)</button>
+                    <div class="input-relative-wrapper">
+                        <input type="text" id="input-place" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="list-place" placeholder="...or search a city, park, or country" autocomplete="off">
+                        <button type="button" id="clear-place" class="btn-clear" aria-label="Clear location input" title="Clear location">&times;</button>
+                    </div>
+                    <ul id="list-place" class="autocomplete-list" role="listbox"></ul>
+                </div>
+
+                <div class="form-group z-mid autocomplete-wrapper">
+                    <label for="input-taxon">2. Target Taxon (Optional)</label>
+                    <div class="input-relative-wrapper">
+                        <input type="text" id="input-taxon" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="list-taxon" placeholder="e.g., Birds, Fungi, Owls..." autocomplete="off">
+                        <button type="button" id="clear-taxon" class="btn-clear" aria-label="Clear target taxon input" title="Clear taxon">&times;</button>
+                    </div>
+                    <ul id="list-taxon" class="autocomplete-list" role="listbox"></ul>
+                </div>
+
+                <fieldset class="form-group fieldset-reset">
+                    <legend class="group-label">3. Observation Media Types</legend>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="chk-photos" checked> 📷 Photos
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="chk-sounds" checked> 🔊 Audio Sounds
+                        </label>
+                    </div>
+                </fieldset>
+
+                <fieldset class="form-group fieldset-reset">
+                    <legend class="group-label">4. Seasonality (Months)</legend>
+                    <div class="month-grid" id="month-filters">
+                        <label class="checkbox-label"><input type="checkbox" value="1" aria-label="January" checked> Jan</label>
+                        <label class="checkbox-label"><input type="checkbox" value="2" aria-label="February" checked> Feb</label>
+                        <label class="checkbox-label"><input type="checkbox" value="3" aria-label="March" checked> Mar</label>
+                        <label class="checkbox-label"><input type="checkbox" value="4" aria-label="April" checked> Apr</label>
+                        <label class="checkbox-label"><input type="checkbox" value="5" aria-label="May" checked> May</label>
+                        <label class="checkbox-label"><input type="checkbox" value="6" aria-label="June" checked> Jun</label>
+                        <label class="checkbox-label"><input type="checkbox" value="7" aria-label="July" checked> Jul</label>
+                        <label class="checkbox-label"><input type="checkbox" value="8" aria-label="August" checked> Aug</label>
+                        <label class="checkbox-label"><input type="checkbox" value="9" aria-label="September" checked> Sep</label>
+                        <label class="checkbox-label"><input type="checkbox" value="10" aria-label="October" checked> Oct</label>
+                        <label class="checkbox-label"><input type="checkbox" value="11" aria-label="November" checked> Nov</label>
+                        <label class="checkbox-label"><input type="checkbox" value="12" aria-label="December" checked> Dec</label>
+                    </div>
+                    <div class="month-actions">
+                        <button type="button" id="btn-months-all" class="text-link-btn">Select All</button>
+                        <button type="button" id="btn-months-none" class="text-link-btn">Select None</button>
+                    </div>
+                </fieldset>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="input-difficulty">5. Pool Size</label>
+                        <select id="input-difficulty">
+                            <option value="15">Top 15 Species</option>
+                            <option value="50" selected>Top 50 Species</option>
+                            <option value="125">Top 125 Species</option>
+                            <option value="500">Expert (Top 500)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="input-questions">6. Questions</label>
+                        <select id="input-questions">
+                            <option value="5">5</option>
+                            <option value="10" selected>10</option>
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit" id="btn-start">Load Quiz Pool</button>
+                <p id="setup-status" style="text-align:center; color: var(--text-muted);"></p>
+            </form>
         </div>
 
-        <div class="form-group z-mid autocomplete-wrapper">
-            <label for="input-taxon">2. Target Taxon (Optional)</label>
-            <div class="input-relative-wrapper">
-                <input type="text" id="input-taxon" placeholder="e.g., Birds, Fungi, Owls..." autocomplete="off">
-                <button type="button" id="clear-taxon" class="btn-clear" aria-label="Clear target taxon input" title="Clear taxon">&times;</button>
-            </div>
-            <ul id="list-taxon" class="autocomplete-list" role="listbox"></ul>
-        </div>
-
-        <div class="form-group">
-            <label>3. Observation Media Types</label>
-            <div class="checkbox-group">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="chk-photos" checked> 📷 Photos
-                </label>
-                <label class="checkbox-label">
-                    <input type="checkbox" id="chk-sounds" checked> 🔊 Audio Sounds
-                </label>
-            </div>
-        </div>
-
-        <fieldset class="form-group fieldset-reset">
-            <legend class="group-label">4. Seasonality (Months)</legend>
-            <div class="month-grid" id="month-filters">
-                <label class="checkbox-label"><input type="checkbox" value="1" aria-label="January" checked> Jan</label>
-                <label class="checkbox-label"><input type="checkbox" value="2" aria-label="February" checked> Feb</label>
-                <label class="checkbox-label"><input type="checkbox" value="3" aria-label="March" checked> Mar</label>
-                <label class="checkbox-label"><input type="checkbox" value="4" aria-label="April" checked> Apr</label>
-                <label class="checkbox-label"><input type="checkbox" value="5" aria-label="May" checked> May</label>
-                <label class="checkbox-label"><input type="checkbox" value="6" aria-label="June" checked> Jun</label>
-                <label class="checkbox-label"><input type="checkbox" value="7" aria-label="July" checked> Jul</label>
-                <label class="checkbox-label"><input type="checkbox" value="8" aria-label="August" checked> Aug</label>
-                <label class="checkbox-label"><input type="checkbox" value="9" aria-label="September" checked> Sep</label>
-                <label class="checkbox-label"><input type="checkbox" value="10" aria-label="October" checked> Oct</label>
-                <label class="checkbox-label"><input type="checkbox" value="11" aria-label="November" checked> Nov</label>
-                <label class="checkbox-label"><input type="checkbox" value="12" aria-label="December" checked> Dec</label>
-            </div>
-            <div class="month-actions">
-                <button type="button" id="btn-months-all" class="text-link-btn">Select All</button>
-                <button type="button" id="btn-months-none" class="text-link-btn">Select None</button>
-            </div>
-        </fieldset>
-
-        <div class="form-row">
-            <div class="form-group">
-                <label for="input-difficulty">5. Pool Size</label>
-                <select id="input-difficulty">
-                    <option value="15">Top 15 Species</option>
-                    <option value="50" selected>Top 50 Species</option>
-                    <option value="125">Top 125 Species</option>
-                    <option value="500">Expert (Top 500)</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="input-questions">6. Questions</label>
-                <select id="input-questions">
-                    <option value="5">5</option>
-                    <option value="10" selected>10</option>
-                    <option value="20">20</option>
-                    <option value="50">50</option>
-                </select>
-            </div>
-        </div>
-
-        <button id="btn-start">Load Quiz Pool</button>
-        <p id="setup-status" style="text-align:center; color: var(--text-muted);"></p>
-    </div>
-
-    <!-- Quiz View -->
-    <div id="quiz-view" class="view">
-        <div class="progress" aria-live="polite">
-            <span id="quiz-counter">Question 1 of 10</span>
-            <span id="quiz-score">Score: 0</span>
-        </div>
-        
-        <div class="quiz-media-container">
-            <div id="quiz-loading" aria-live="assertive">Fetching random observation...</div>
-            <div id="quiz-error" style="display:none;" aria-live="assertive"></div>
-            
-            <!-- Photo Element -->
-            <img id="quiz-image" src="" alt="Observation photo" style="display:none;" title="Click to view full resolution">
-            
-            <!-- Audio Element -->
-            <div id="quiz-audio-container" class="audio-player-wrapper" style="display:none;">
-                <div class="audio-icon" aria-hidden="true">🎧</div>
-                <audio id="quiz-audio-player" controls preload="auto"></audio>
-            </div>
-
-            <!-- Unified Media Controls -->
-            <div id="media-controls" class="media-controls" style="display:none;">
-                <button id="btn-prev-media" aria-label="Previous Media">◀</button>
-                <span id="media-counter" aria-live="polite">1 / 1</span>
-                <button id="btn-next-media" aria-label="Next Media">▶</button>
+        <!-- Quiz View -->
+        <div id="quiz-view" class="view">
+            <h2 id="quiz-heading" class="visually-hidden" tabindex="-1" style="outline: none;">Quiz Active</h2>
+            <div class="progress" aria-live="polite">
+                <span id="quiz-counter">Question 1 of 10</span>
+                <span id="quiz-score">Score: 0</span>
             </div>
             
-            <!-- Metadata Container -->
-            <div id="quiz-meta" class="quiz-meta" style="display:none;">
-                <span id="meta-date"></span> <span class="divider">•</span> <a id="meta-location" target="_blank" href="#"></a>
+            <div class="quiz-media-container">
+                <div id="quiz-loading" aria-live="assertive">Fetching random observation...</div>
+                <div id="quiz-error" style="display:none;" aria-live="assertive"></div>
+                
+                <!-- Accessible Button Wrapper for Image Zoom -->
+                <button type="button" id="btn-zoom-image" aria-label="View full resolution image" title="Click to view full resolution">
+                    <img id="quiz-image" src="" alt="Observation photo" style="display:none;">
+                </button>
+                
+                <!-- Audio Element -->
+                <div id="quiz-audio-container" class="audio-player-wrapper" style="display:none;">
+                    <div class="audio-icon" aria-hidden="true">🎧</div>
+                    <audio id="quiz-audio-player" controls preload="auto"></audio>
+                </div>
+
+                <!-- Unified Media Controls -->
+                <div id="media-controls" class="media-controls" style="display:none;">
+                    <button type="button" id="btn-prev-media" aria-label="Previous Media">◀</button>
+                    <span id="media-counter" aria-live="polite">1 / 1</span>
+                    <button type="button" id="btn-next-media" aria-label="Next Media">▶</button>
+                </div>
+                
+                <!-- Metadata Container -->
+                <div id="quiz-meta" class="quiz-meta" style="display:none;">
+                    <span id="meta-date"></span> <span class="divider">•</span> <a id="meta-location" target="_blank" href="#"></a>
+                </div>
+                
+                <span id="quiz-attribution" class="attribution" style="display:none;"></span>
             </div>
+
+            <div class="form-group" id="answer-form">
+                <label for="input-answer">What is this?</label>
+                <input type="text" id="input-answer" placeholder="Common or scientific name..." autocomplete="off">
+                <button type="button" id="btn-submit" style="margin-top: 10px;">Check Answer</button>
+            </div>
+
+            <div id="feedback" aria-live="polite"></div>
+            <button type="button" id="btn-next" style="display:none; margin-top: 15px;">Next Observation ➔</button>
+        </div>
+
+        <!-- Results View -->
+        <div id="results-view" class="view">
+            <h1 id="results-heading" tabindex="-1" style="text-align: center; outline: none;">Quiz Complete!</h1>
+            <h2 style="text-align: center; font-size: 2.5em; margin-bottom: 20px;" id="final-score"></h2>
             
-            <span id="quiz-attribution" class="attribution" style="display:none;"></span>
+            <div id="review-container"></div>
+            
+            <button type="button" id="btn-restart">Play Again</button>
         </div>
-
-        <div class="form-group" id="answer-form">
-            <label for="input-answer">What is this?</label>
-            <input type="text" id="input-answer" placeholder="Common or scientific name..." autocomplete="off">
-            <button id="btn-submit" style="margin-top: 10px;">Check Answer</button>
-        </div>
-
-        <div id="feedback" aria-live="polite"></div>
-        <button id="btn-next" style="display:none; margin-top: 15px;">Next Observation ➔</button>
-    </div>
-
-    <!-- Results View -->
-    <div id="results-view" class="view">
-        <h1 style="text-align: center;">Quiz Complete!</h1>
-        <h2 style="text-align: center; font-size: 2.5em; margin-bottom: 20px;" id="final-score"></h2>
-        
-        <div id="review-container"></div>
-        
-        <button id="btn-restart">Play Again</button>
-    </div>
+    </main>
 
     <!-- Required API Attribution Footer -->
-    <div class="app-footer">
+    <footer class="app-footer">
         Species data, sound clips, and photos provided by <a href="https://www.inaturalist.org" target="_blank">iNaturalist</a>.<br>
         This application is not officially affiliated with iNaturalist.
-    </div>
+    </footer>
 </div>
 
 <script>
@@ -458,6 +474,7 @@
         state.lng = null;
         document.getElementById('setup-status').textContent = "";
         toggleClearButton('input-place', 'clear-place');
+        toggleList('list-place', false);
         input.focus();
     });
 
@@ -466,6 +483,7 @@
         input.value = '';
         state.taxonId = null;
         toggleClearButton('input-taxon', 'clear-taxon');
+        toggleList('list-taxon', false);
         input.focus();
     });
 
@@ -544,7 +562,14 @@
     // --- UTILITIES ---
     function showView(viewId) {
         document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
-        document.getElementById(viewId).classList.add('active');
+        const view = document.getElementById(viewId);
+        view.classList.add('active');
+        
+        // Focus heading for screen readers to announce view change
+        const focusTarget = view.querySelector('[tabindex="-1"]');
+        if (focusTarget) {
+            focusTarget.focus();
+        }
     }
 
     function debounce(func, timeout = 1000) {
@@ -559,35 +584,74 @@
 
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.autocomplete-wrapper')) {
-            document.querySelectorAll('.autocomplete-list').forEach(list => list.classList.remove('show'));
+            document.querySelectorAll('.autocomplete-list').forEach(list => toggleList(list.id, false));
         }
     });
 
-    // --- AUTOCOMPLETE ---
+    // --- AUTOCOMPLETE / COMBOBOX ACCESSIBILITY ---
+    function toggleList(listId, show) {
+        const list = document.getElementById(listId);
+        const inputId = listId.replace('list', 'input');
+        const input = document.getElementById(inputId);
+        
+        if (show) {
+            list.classList.add('show');
+            input.setAttribute('aria-expanded', 'true');
+        } else {
+            list.classList.remove('show');
+            input.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    function handleListKeydown(e, listId) {
+        const list = document.getElementById(listId);
+        if (!list.classList.contains('show')) return;
+        
+        const items = Array.from(list.querySelectorAll('li'));
+        if (items.length === 0) return;
+
+        let currentIndex = items.findIndex(item => item === document.activeElement);
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            let nextIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
+            items[nextIndex].focus();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            let prevIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
+            items[prevIndex].focus();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            toggleList(listId, false);
+            document.getElementById(listId.replace('list', 'input')).focus();
+        }
+    }
+
     document.getElementById('input-place').addEventListener('input', debounce(async (e) => {
         toggleClearButton('input-place', 'clear-place');
         const query = e.target.value;
         const list = document.getElementById('list-place');
         list.innerHTML = ''; state.placeId = null;
-        if (query.length < 3) return list.classList.remove('show');
+        if (query.length < 3) return toggleList('list-place', false);
 
         const fields = encodeURIComponent('(id:!t,name:!t,display_name:!t)');
         const res = await fetch(`${API_BASE}/places?q=${query}&fields=${fields}`);
         const data = await res.json();
         
-        if (data.results.length) list.classList.add('show');
+        if (data.results.length) toggleList('list-place', true);
         data.results.forEach(place => {
             const li = document.createElement('li');
             const displayName = place.display_name || place.name;
             li.textContent = displayName;
-            li.tabIndex = 0; // Accessibility: Make focusable via keyboard
+            li.tabIndex = -1; // Keep out of tab flow, force arrow key usage
             li.setAttribute('role', 'option');
             
             const selectItem = () => {
                 state.placeId = place.id; state.lat = null; state.lng = null;
                 document.getElementById('input-place').value = displayName;
-                list.classList.remove('show');
+                toggleList('list-place', false);
                 toggleClearButton('input-place', 'clear-place');
+                document.getElementById('input-place').focus();
             };
             
             li.onclick = selectItem;
@@ -601,31 +665,43 @@
             list.appendChild(li);
         });
     }));
+
+    document.getElementById('input-place').addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            const list = document.getElementById('list-place');
+            if (list.classList.contains('show') && list.firstChild) {
+                list.firstChild.focus();
+            }
+        }
+    });
+    document.getElementById('list-place').addEventListener('keydown', (e) => handleListKeydown(e, 'list-place'));
 
     document.getElementById('input-taxon').addEventListener('input', debounce(async (e) => {
         toggleClearButton('input-taxon', 'clear-taxon');
         const query = e.target.value;
         const list = document.getElementById('list-taxon');
         list.innerHTML = ''; state.taxonId = null; 
-        if (query.length < 3) return list.classList.remove('show');
+        if (query.length < 3) return toggleList('list-taxon', false);
 
         const fields = encodeURIComponent('(id:!t,name:!t,preferred_common_name:!t)');
         const res = await fetch(`${API_BASE}/taxa/autocomplete?q=${query}&fields=${fields}`);
         const data = await res.json();
         
-        if (data.results.length) list.classList.add('show');
+        if (data.results.length) toggleList('list-taxon', true);
         data.results.forEach(taxon => {
             const li = document.createElement('li');
             const common = taxon.preferred_common_name ? `${taxon.preferred_common_name} ` : '';
             li.textContent = `${common}(${taxon.name})`;
-            li.tabIndex = 0; // Accessibility: Make focusable via keyboard
+            li.tabIndex = -1;
             li.setAttribute('role', 'option');
             
             const selectItem = () => {
                 state.taxonId = taxon.id;
                 document.getElementById('input-taxon').value = li.textContent;
-                list.classList.remove('show');
+                toggleList('list-taxon', false);
                 toggleClearButton('input-taxon', 'clear-taxon');
+                document.getElementById('input-taxon').focus();
             };
             
             li.onclick = selectItem;
@@ -638,6 +714,17 @@
             list.appendChild(li);
         });
     }));
+
+    document.getElementById('input-taxon').addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            const list = document.getElementById('list-taxon');
+            if (list.classList.contains('show') && list.firstChild) {
+                list.firstChild.focus();
+            }
+        }
+    });
+    document.getElementById('list-taxon').addEventListener('keydown', (e) => handleListKeydown(e, 'list-taxon'));
 
     document.getElementById('btn-gps').addEventListener('click', () => {
         document.getElementById('setup-status').textContent = "Locating...";
@@ -653,7 +740,9 @@
     });
 
     // --- GAME START & WEIGHTED RANDOMNESS ---
-    document.getElementById('btn-start').addEventListener('click', async () => {
+    document.getElementById('setup-form').addEventListener('submit', async (e) => {
+        e.preventDefault(); // Prevent standard form submission
+
         const photosChecked = document.getElementById('chk-photos').checked;
         const soundsChecked = document.getElementById('chk-sounds').checked;
 
@@ -763,6 +852,7 @@
         
         const media = state.currentMediaArray[state.currentMediaIndex];
         const imgElement = document.getElementById('quiz-image');
+        const zoomBtn = document.getElementById('btn-zoom-image');
         const audioContainer = document.getElementById('quiz-audio-container');
         const audioPlayer = document.getElementById('quiz-audio-player');
         
@@ -771,15 +861,19 @@
         
         if (media.type === 'photo') {
             imgElement.src = media.mediumUrl;
-            imgElement.onclick = () => window.open(media.originalUrl, '_blank');
+            
+            // Accessible Zoom Wrap Click Listener
+            zoomBtn.onclick = () => window.open(media.originalUrl, '_blank');
             document.getElementById('quiz-attribution').textContent = `Photo: ${media.attribution}`;
             
             audioContainer.style.display = 'none';
             // Only show the image element if it's already loaded, or rely on img.onload
             if (imgElement.complete) {
+                zoomBtn.style.display = 'flex';
                 imgElement.style.display = 'block';
             }
         } else if (media.type === 'sound') {
+            zoomBtn.style.display = 'none';
             imgElement.style.display = 'none';
             audioContainer.style.display = 'flex';
             audioPlayer.src = media.fileUrl;
@@ -818,7 +912,10 @@
         document.getElementById('quiz-score').textContent = `Score: ${state.score}`;
         
         // Reset Views
+        document.getElementById('btn-zoom-image').style.display = 'none';
         document.getElementById('quiz-image').style.display = 'none';
+        document.getElementById('quiz-image').alt = "Observation photo";
+        
         document.getElementById('quiz-audio-container').style.display = 'none';
         document.getElementById('media-controls').style.display = 'none';
         document.getElementById('quiz-meta').style.display = 'none';
@@ -969,6 +1066,7 @@
     // Triggered when any image completes loading via updateMediaDisplay()
     document.getElementById('quiz-image').onload = (e) => {
         if (state.currentMediaArray[state.currentMediaIndex]?.type === 'photo') {
+            document.getElementById('btn-zoom-image').style.display = 'flex';
             e.target.style.display = 'block';
             triggerQuestionReady();
         }
@@ -1054,6 +1152,11 @@
         const sciNorm = normalize(taxon.name);
         const matchedNorm = normalize(matchedNameDisplay);
         
+        const imgElement = document.getElementById('quiz-image');
+        if (imgElement && imgElement.src) {
+            imgElement.alt = `Observation of ${primaryDisplayName}`;
+        }
+
         const linksHtml = `
             <div class="feedback-links">
                 📖 Learn more:
