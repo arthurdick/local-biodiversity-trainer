@@ -5,6 +5,7 @@ import * as ui from './ui.js';
 
 // --- RUNTIME CACHE ---
 const pendingFetches = new Map();
+const activeControllers = new Map();
 
 // --- STATE SELECTORS (Derived Data) ---
 function selectCurrentMedia(currentState) {
@@ -365,6 +366,10 @@ async function loadObservationForQuestion(index) {
         return errorData;
     }
 
+    // Instantiate and track the AbortController outside the promise
+    const controller = new AbortController();
+    activeControllers.set(index, controller);
+
     const fetchPromise = (async () => {
         const q = getState().questions[index]; // Fetch fresh copy
         const currentConfig = getState().config;
@@ -374,7 +379,6 @@ async function loadObservationForQuestion(index) {
             : [];
 
         try {
-            const controller = new AbortController();
             const timeoutMs = getDynamicNetworkTimeout();
             const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -411,10 +415,15 @@ async function loadObservationForQuestion(index) {
             }
         } catch(e) {
             const errorData = { error: true };
-            updateQuestion(index, { observation: errorData });
+            
+            // Only update state if it wasn't an intentional abort from a restart
+            if (e.name !== 'AbortError') {
+                updateQuestion(index, { observation: errorData });
+            }
             return errorData;
         } finally {
             pendingFetches.delete(index);
+            activeControllers.delete(index);
         }
     })();
 
@@ -682,6 +691,10 @@ document.getElementById('btn-next').addEventListener('click', (e) => {
 });
 
 document.getElementById('btn-restart').addEventListener('click', () => {
+    activeControllers.forEach(controller => controller.abort());
+    activeControllers.clear();
+    pendingFetches.clear();
+
     resetState();
     loadPreferences();
     ui.showView('setup-view');
