@@ -44,7 +44,7 @@ function selectCurrentMeta(currentState) {
 }
 
 // --- UTILITIES & STORAGE ---
-function debounce(func, timeout = 1000) {
+function debounce(func, timeout = 250) {
     let timer;
     return (...args) => { clearTimeout(timer); timer = setTimeout(() => { func.apply(this, args); }, timeout); };
 }
