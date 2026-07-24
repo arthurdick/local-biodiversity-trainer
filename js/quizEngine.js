@@ -25,8 +25,9 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
         let availablePool = dataResults.map(r => ({ taxon: r.taxon, count: r.count }));
         const limit = Math.min(questionLimit, availablePool.length);
 
+        let totalWeight = availablePool.reduce((sum, item) => sum + item.count, 0);
+
         for (let i = 0; i < limit; i++) {
-            const totalWeight = availablePool.reduce((sum, item) => sum + item.count, 0);
             if (totalWeight <= 0) break;
 
             const roll = Math.random() * totalWeight;
@@ -40,7 +41,10 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
                 }
             }
 
-            questions.push({ taxon: availablePool[selectedIndex].taxon, observation: null });
+            const selectedItem = availablePool[selectedIndex];
+            questions.push({ taxon: selectedItem.taxon, observation: null });
+            
+            totalWeight -= selectedItem.count;
             availablePool.splice(selectedIndex, 1);
         }
     } else {
