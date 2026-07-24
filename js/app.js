@@ -542,17 +542,19 @@ function triggerQuestionReady() {
 document.getElementById('quiz-image').onload = (e) => {
     const s = getState();
     const mediaArray = selectCurrentMedia(s);
-    if (mediaArray[s.currentMediaIndex]?.type === 'photo') {
+    const currentMedia = mediaArray[s.currentMediaIndex];
+    if (currentMedia?.type === 'photo' && e.target.src === new URL(currentMedia.mediumUrl, window.location.href).href) {
         document.getElementById('btn-zoom-image').style.display = 'flex';
         e.target.style.display = 'block';
         triggerQuestionReady();
     }
 };
 
-document.getElementById('quiz-image').onerror = () => {
+document.getElementById('quiz-image').onerror = (e) => {
     const s = getState();
     const mediaArray = selectCurrentMedia(s);
-    if (mediaArray[s.currentMediaIndex]?.type === 'photo') {
+    const currentMedia = mediaArray[s.currentMediaIndex];
+    if (currentMedia?.type === 'photo' && e.target.src === new URL(currentMedia.mediumUrl, window.location.href).href) {
         document.getElementById('media-controls').style.display = 'none';
         ui.renderFetchError("", false);
         setState({ isQuestionLoaded: true });
@@ -576,10 +578,23 @@ const zoomModal = document.getElementById('zoom-modal');
 const zoomImg = document.getElementById('zoom-modal-img');
 const zoomScroll = document.getElementById('zoom-modal-scroll');
 
+zoomImg.onload = () => {
+    zoomImg.style.display = 'inline-block';
+};
+
+zoomImg.onerror = () => {
+    zoomImg.style.display = 'none';
+};
+
 const closeModal = () => {
     zoomModal.close();
-    zoomImg.classList.remove('zoomed-in');
 };
+
+zoomModal.addEventListener('close', () => {
+    zoomImg.classList.remove('zoomed-in');
+    zoomImg.style.display = 'none';
+    zoomImg.removeAttribute('src');
+});
 
 document.getElementById('btn-close-modal').addEventListener('click', closeModal);
 

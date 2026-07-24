@@ -153,22 +153,34 @@ export function updateMediaDisplay(currentMediaArray, currentMediaIndex) {
     audioPlayer.load();
     
     if (media.type === 'photo') {
+        zoomBtn.style.display = 'flex';
+        imgElement.style.display = 'none';
+        imgElement.removeAttribute('src');
+        
         imgElement.src = media.mediumUrl;
         zoomBtn.onclick = () => {
             const modal = document.getElementById('zoom-modal');
-            document.getElementById('zoom-modal-img').src = media.originalUrl;
+            const zoomImg = document.getElementById('zoom-modal-img');
+            zoomImg.style.display = 'none';
+            zoomImg.removeAttribute('src');
+            zoomImg.src = media.originalUrl;
+            if (zoomImg.complete && zoomImg.naturalWidth !== 0) {
+                zoomImg.style.display = 'inline-block';
+            }
             modal.showModal();
         };
         document.getElementById('quiz-attribution').textContent = `Photo: ${media.attribution}`;
         
         audioContainer.style.display = 'none';
-        if (imgElement.complete) {
+        const absoluteMediumUrl = new URL(media.mediumUrl, window.location.href).href;
+        if (imgElement.complete && imgElement.naturalWidth !== 0 && imgElement.src === absoluteMediumUrl) {
             zoomBtn.style.display = 'flex';
             imgElement.style.display = 'block';
         }
     } else if (media.type === 'sound') {
         zoomBtn.style.display = 'none';
         imgElement.style.display = 'none';
+        imgElement.removeAttribute('src');
         audioContainer.style.display = 'flex';
         audioPlayer.src = media.fileUrl;
         document.getElementById('quiz-attribution').textContent = `Sound: ${media.attribution || 'iNaturalist Contributor'}`;
@@ -209,6 +221,12 @@ export function resetQuizUI(currentIndex, totalQuestions, score) {
     audioPlayer.load();
     
     document.getElementById('quiz-image').removeAttribute('src');
+
+    const zoomImg = document.getElementById('zoom-modal-img');
+    if (zoomImg) {
+        zoomImg.style.display = 'none';
+        zoomImg.removeAttribute('src');
+    }
     
     const input = document.getElementById('input-answer');
     input.value = ""; 
