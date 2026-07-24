@@ -176,6 +176,9 @@ export function updateMediaDisplay(currentMediaArray, currentMediaIndex) {
 }
 
 export function resetQuizUI(currentIndex, totalQuestions, score) {
+    document.getElementById('input-rank').value = 'species';
+    document.getElementById('input-rank').disabled = true;
+    
     document.getElementById('quiz-counter').textContent = `Question ${currentIndex + 1} of ${totalQuestions}`;
     document.getElementById('quiz-score').textContent = `Score: ${score}`;
     
@@ -266,7 +269,7 @@ export function renderQuestionMeta(currentMeta) {
     document.getElementById('quiz-meta').style.display = 'inline-block';
 }
 
-export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm, primaryCommonNorm, sciNorm, score) {
+export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm, primaryCommonNorm, sciNorm, score, pointsEarned, guessedRank) {
     const feedback = document.getElementById('feedback');
     const primaryDisplayName = taxon.preferred_common_name ? `${taxon.preferred_common_name} (${taxon.name})` : taxon.name;
     
@@ -302,7 +305,12 @@ export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm
 
     if (isCorrect) {
         feedback.className = 'correct';
-        feedback.textContent = '✅ Correct! ';
+        
+        if (guessedRank === 'species') {
+             feedback.textContent = `✅ Correct! (+${pointsEarned} pts) `;
+        } else {
+             feedback.textContent = `✅ Partial Credit! You correctly identified the ${guessedRank}. (+${pointsEarned} pts) `;
+        }
         
         const strong = document.createElement('strong');
         if (matchedNorm && matchedNorm !== primaryCommonNorm && matchedNorm !== sciNorm) {
@@ -358,9 +366,9 @@ export function renderResultsView(questions, score) {
     const reviewContainer = document.getElementById('review-container');
     reviewContainer.innerHTML = '';
     
-    const missedQuestions = questions.filter(q => !q.isCorrect);
+    const questionsToReview = questions.filter(q => q.pointsEarned !== 1.0);
 
-    if (missedQuestions.length === 0) {
+    if (questionsToReview.length === 0) {
         const perfectDiv = document.createElement('div');
         perfectDiv.style.textAlign = 'center';
         perfectDiv.style.padding = '20px';
@@ -374,13 +382,13 @@ export function renderResultsView(questions, score) {
     } else {
         const titleDiv = document.createElement('div');
         titleDiv.className = 'missed-title';
-        titleDiv.textContent = `Review Missed Species (${missedQuestions.length})`;
+        titleDiv.textContent = `Review Missed & Partial Credit Species (${questionsToReview.length})`;
         reviewContainer.appendChild(titleDiv);
         
         const gridDiv = document.createElement('div');
         gridDiv.className = 'missed-grid';
 
-        missedQuestions.forEach(q => {
+        questionsToReview.forEach(q => {
             const taxon = q.taxon || { name: 'Data Unavailable', id: '' };
             const primaryCommon = taxon.preferred_common_name || 'Fetch Failed';
             const sciName = taxon.name;
@@ -426,7 +434,15 @@ export function renderResultsView(questions, score) {
             
             const guessDiv = document.createElement('div');
             guessDiv.className = 'missed-card-guess';
-            guessDiv.textContent = 'Your answer: ';
+            
+            if (q.isCorrect && q.pointsEarned < 1.0) {
+                guessDiv.style.background = '#fff3cd';
+                guessDiv.style.color = '#856404';
+                guessDiv.textContent = 'Partial Credit: ';
+            } else {
+                guessDiv.textContent = 'Your answer: ';
+            }
+            
             const guessStrong = document.createElement('strong');
             guessStrong.textContent = userGuess;
             guessDiv.appendChild(guessStrong);

@@ -69,3 +69,13 @@ export function checkExactMatch(inputStr, taxon) {
     }
     return { isCorrect: false, matchedNameDisplay: "", normalizedInput };
 }
+
+export function getPointsForRank(rank) {
+    switch(rank) {
+        case 'species': return 1.0;
+        case 'genus': return 0.7;
+        case 'family': return 0.4;
+        case 'order': return 0.2;
+        default: return 0;
+    }
+}

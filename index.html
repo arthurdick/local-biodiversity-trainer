@@ -138,7 +138,15 @@
 
             <div class="form-group" id="answer-form">
                 <label for="input-answer">What is this?</label>
-                <input type="text" id="input-answer" placeholder="Common or scientific name..." autocomplete="off">
+                <div style="display: flex; gap: 10px;">
+                    <select id="input-rank" aria-label="Taxonomic Rank" style="flex: 0 0 110px;">
+                        <option value="species" selected>Species</option>
+                        <option value="genus">Genus</option>
+                        <option value="family">Family</option>
+                        <option value="order">Order</option>
+                    </select>
+                    <input type="text" id="input-answer" placeholder="Common or scientific name..." autocomplete="off" style="flex: 1;">
+                </div>
                 <button type="button" id="btn-submit" style="margin-top: 10px;">Check Answer</button>
             </div>
 

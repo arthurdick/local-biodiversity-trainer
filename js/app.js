@@ -494,6 +494,8 @@ function handleFetchErrorFallback(q, isMediaMissing = false) {
 }
 
 function triggerQuestionReady() {
+    document.getElementById('input-rank').disabled = false;
+    
     document.getElementById('quiz-loading').style.display = 'none';
     document.getElementById('quiz-attribution').style.display = 'block';
     
@@ -544,16 +546,28 @@ document.getElementById('quiz-audio-player').onerror = () => {
 // --- ANSWER LOGIC ---
 document.getElementById('btn-submit').addEventListener('click', async () => {
     const inputStr = document.getElementById('input-answer').value.trim();
+    const guessedRank = document.getElementById('input-rank').value;
     if (!inputStr) return;
 
     let s = getState();
     const q = s.questions[s.currentIndex];
     const taxon = q.taxon;
     const btnSubmit = document.getElementById('btn-submit');
+    
     document.getElementById('input-answer').disabled = true;
-    btnSubmit.disabled = true; btnSubmit.textContent = "Checking...";
+    document.getElementById('input-rank').disabled = true;
+    btnSubmit.disabled = true;
+    btnSubmit.textContent = "Checking...";
 
     let { isCorrect, matchedNameDisplay, normalizedInput } = engine.checkExactMatch(inputStr, taxon);
+    let pointsEarned = 0;
+
+    // Force API check for higher ranks to verify against taxon ancestors
+    if (guessedRank !== 'species') {
+        isCorrect = false;
+    } else if (isCorrect) {
+        pointsEarned = engine.getPointsForRank('species');
+    }
 
     if (!isCorrect && navigator.onLine) {
         try {
@@ -567,35 +581,55 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
                 for (const result of searchData.results) {
                     const isExactMatch = result.id === taxon.id;
                     const isGuessChildOfTarget = result.ancestor_ids && result.ancestor_ids.includes(taxon.id);
-                    const isGuessParentOfTarget = taxon.ancestor_ids && taxon.ancestor_ids.includes(result.id) && result.rank === 'species';
+                    // Crucial: check if the user's guessed taxon is a valid ancestor of our target
+                    const isGuessParentOfTarget = taxon.ancestor_ids && taxon.ancestor_ids.includes(result.id);
                     
-                    const isTaxonomicallyValid = isExactMatch || isGuessChildOfTarget || isGuessParentOfTarget;
                     const validNames = [engine.normalize(result.name), engine.normalize(result.preferred_common_name), engine.normalize(result.matched_term)];
                     
-                    if (isTaxonomicallyValid && validNames.includes(normalizedInput)) {
-                        isCorrect = true;
-                        matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;
-                        break;
+                    if (validNames.includes(normalizedInput)) {
+                        if (guessedRank === 'species' && (isExactMatch || isGuessChildOfTarget || (isGuessParentOfTarget && result.rank === 'species'))) {
+                            isCorrect = true;
+                            pointsEarned = engine.getPointsForRank('species');
+                            matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;
+                            break;
+                        } else if (guessedRank !== 'species' && isGuessParentOfTarget && result.rank === guessedRank) {
+                            isCorrect = true;
+                            pointsEarned = engine.getPointsForRank(guessedRank);
+                            matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;
+                            break;
+                        }
                     }
                 }
             }
         } catch (error) { console.warn("API check failed. Relying on local strict match."); }
     }
+
+    // Offline / Local Genus Fallback
+    if (!isCorrect && guessedRank === 'genus' && taxon.name) {
+        const actualGenus = engine.normalize(taxon.name.split(' ')[0]);
+        if (normalizedInput === actualGenus) {
+            isCorrect = true;
+            pointsEarned = engine.getPointsForRank('genus');
+            matchedNameDisplay = taxon.name.split(' ')[0];
+        }
+    }
     
     updateQuestion(s.currentIndex, {
-        userAnswer: inputStr,
+        userAnswer: `${inputStr} (${guessedRank})`,
         isCorrect: isCorrect,
+        pointsEarned: pointsEarned, // Storing for missed question review later
         thumbnailUrl: engine.getQuestionThumbnail(q, selectCurrentMedia(s))
     });
     
-    if (isCorrect) setState({ score: s.score + 1 });
+    // Use parse float/toFixed to prevent ugly floating point math errors in JS
+    if (isCorrect) setState({ score: parseFloat((s.score + pointsEarned).toFixed(1)) });
 
     const updatedScore = getState().score;
     const primaryCommonNorm = taxon.preferred_common_name ? engine.normalize(taxon.preferred_common_name) : "";
     const sciNorm = engine.normalize(taxon.name);
     const matchedNorm = engine.normalize(matchedNameDisplay);
 
-    ui.renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm, primaryCommonNorm, sciNorm, updatedScore);
+    ui.renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm, primaryCommonNorm, sciNorm, updatedScore, pointsEarned, guessedRank);
 });
 
 document.getElementById('input-answer').addEventListener('keypress', (e) => {
