@@ -166,6 +166,14 @@
             
             <button type="button" id="btn-restart">Play Again</button>
         </div>
+        
+        <!-- Accessible Zoom Modal -->
+        <dialog id="zoom-modal" class="zoom-modal" aria-label="Image zoom">
+            <button type="button" id="btn-close-modal" class="btn-close-modal" aria-label="Close zoom modal">&times;</button>
+            <div id="zoom-modal-scroll" class="zoom-modal-content">
+                <img id="zoom-modal-img" src="" alt="Full resolution observation">
+            </div>
+        </dialog>
     </main>
 
     <footer class="app-footer">

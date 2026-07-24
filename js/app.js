@@ -551,6 +551,45 @@ document.getElementById('quiz-audio-player').onerror = () => {
     }
 };
 
+// --- MODAL LOGIC ---
+const zoomModal = document.getElementById('zoom-modal');
+const zoomImg = document.getElementById('zoom-modal-img');
+const zoomScroll = document.getElementById('zoom-modal-scroll');
+
+const closeModal = () => {
+    zoomModal.close();
+    zoomImg.classList.remove('zoomed-in');
+};
+
+document.getElementById('btn-close-modal').addEventListener('click', closeModal);
+
+zoomScroll.addEventListener('click', (e) => {
+    if (e.target === zoomScroll) closeModal();
+});
+
+// Toggle 100% zoom and panning
+zoomImg.addEventListener('click', (e) => {
+    // 1. Capture ratios BEFORE toggling the class so we get the click position on the shrunk image
+    const rect = zoomImg.getBoundingClientRect();
+    const xRatio = (e.clientX - rect.left) / rect.width;
+    const yRatio = (e.clientY - rect.top) / rect.height;
+
+    const isZoomed = zoomImg.classList.toggle('zoomed-in');
+    
+    if (isZoomed) {
+        // 2. Wait a frame for the browser to layout the 100% native image
+        requestAnimationFrame(() => {
+            // 3. Calculate target point, strictly factoring in the image's layout offsets inside the container
+            const targetX = zoomImg.offsetLeft + (zoomImg.offsetWidth * xRatio);
+            const targetY = zoomImg.offsetTop + (zoomImg.offsetHeight * yRatio);
+
+            // 4. Scroll the container to perfectly center the target coordinate
+            zoomScroll.scrollLeft = targetX - (zoomScroll.clientWidth / 2);
+            zoomScroll.scrollTop = targetY - (zoomScroll.clientHeight / 2);
+        });
+    }
+});
+
 // --- ANSWER LOGIC ---
 document.getElementById('btn-submit').addEventListener('click', async () => {
     const inputStr = document.getElementById('input-answer').value.trim();

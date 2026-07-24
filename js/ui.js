@@ -154,7 +154,11 @@ export function updateMediaDisplay(currentMediaArray, currentMediaIndex) {
     
     if (media.type === 'photo') {
         imgElement.src = media.mediumUrl;
-        zoomBtn.onclick = () => window.open(media.originalUrl, '_blank');
+        zoomBtn.onclick = () => {
+            const modal = document.getElementById('zoom-modal');
+            document.getElementById('zoom-modal-img').src = media.originalUrl;
+            modal.showModal();
+        };
         document.getElementById('quiz-attribution').textContent = `Photo: ${media.attribution}`;
         
         audioContainer.style.display = 'none';
