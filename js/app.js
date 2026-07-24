@@ -574,7 +574,9 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
             const controller = new AbortController();
             const timeoutMs = getDynamicNetworkTimeout();
             const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-            const searchData = await api.checkTaxonSearch(inputStr, controller.signal);
+            
+            // Pass guessedRank to the API call
+            const searchData = await api.checkTaxonSearch(inputStr, guessedRank, controller.signal);
             clearTimeout(timeoutId);
             
             if (searchData.results && searchData.results.length > 0) {
@@ -587,12 +589,12 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
                     const validNames = [engine.normalize(result.name), engine.normalize(result.preferred_common_name), engine.normalize(result.matched_term)];
                     
                     if (validNames.includes(normalizedInput)) {
-                        if (guessedRank === 'species' && (isExactMatch || isGuessChildOfTarget || (isGuessParentOfTarget && result.rank === 'species'))) {
+                        if (guessedRank === 'species' && (isExactMatch || isGuessChildOfTarget || isGuessParentOfTarget)) {
                             isCorrect = true;
                             pointsEarned = engine.getPointsForRank('species');
                             matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;
                             break;
-                        } else if (guessedRank !== 'species' && isGuessParentOfTarget && result.rank === guessedRank) {
+                        } else if (guessedRank !== 'species' && isGuessParentOfTarget) {
                             isCorrect = true;
                             pointsEarned = engine.getPointsForRank(guessedRank);
                             matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;
