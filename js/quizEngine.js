@@ -72,10 +72,10 @@ export function checkExactMatch(inputStr, taxon) {
 
 export function getPointsForRank(rank) {
     switch(rank) {
-        case 'species': return 1.0;
-        case 'genus': return 0.7;
-        case 'family': return 0.4;
-        case 'order': return 0.2;
+        case 'species': return 10;
+        case 'genus': return 7;
+        case 'family': return 4;
+        case 'order': return 2;
         default: return 0;
     }
 }

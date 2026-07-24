@@ -623,8 +623,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
         thumbnailUrl: engine.getQuestionThumbnail(q, selectCurrentMedia(s))
     });
     
-    // Use parse float/toFixed to prevent ugly floating point math errors in JS
-    if (isCorrect) setState({ score: parseFloat((s.score + pointsEarned).toFixed(1)) });
+    if (isCorrect) setState({ score: s.score + pointsEarned });
 
     const updatedScore = getState().score;
     const primaryCommonNorm = taxon.preferred_common_name ? engine.normalize(taxon.preferred_common_name) : "";

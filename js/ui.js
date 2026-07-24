@@ -180,7 +180,7 @@ export function resetQuizUI(currentIndex, totalQuestions, score) {
     document.getElementById('input-rank').disabled = true;
     
     document.getElementById('quiz-counter').textContent = `Question ${currentIndex + 1} of ${totalQuestions}`;
-    document.getElementById('quiz-score').textContent = `Score: ${score}`;
+    document.getElementById('quiz-score').textContent = `Score: ${score / 10}`;
     
     document.getElementById('btn-zoom-image').style.display = 'none';
     document.getElementById('quiz-image').style.display = 'none';
@@ -315,7 +315,7 @@ export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm
         if (guessedRank === 'species') {
              feedback.textContent = `✅ Correct! (+${pointsEarned} pts) `;
         } else {
-             feedback.textContent = `✅ Partial Credit! You correctly identified the ${guessedRank}. (+${pointsEarned} pts) `;
+             feedback.textContent = `✅ Partial Credit! You correctly identified the ${guessedRank}. (+${pointsEarned / 10} pts) `;
         }
         
         const strong = document.createElement('strong');
@@ -350,7 +350,7 @@ export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm
     }
     
     feedback.appendChild(linksDiv);
-    document.getElementById('quiz-score').textContent = `Score: ${score}`;
+    document.getElementById('quiz-score').textContent = `Score: ${score / 10}`;
     feedback.style.display = 'block';
     
     const btnSubmit = document.getElementById('btn-submit');
@@ -374,11 +374,11 @@ export function renderResultsView(questions, score) {
         audioPlayer.load();
     }
 
-    document.getElementById('final-score').textContent = `${score} / ${questions.length}`;
+    document.getElementById('final-score').textContent = `${score / 10} / ${questions.length}`;
     const reviewContainer = document.getElementById('review-container');
     reviewContainer.innerHTML = '';
     
-    const questionsToReview = questions.filter(q => q.pointsEarned !== 1.0);
+    const questionsToReview = questions.filter(q => q.pointsEarned !== 10);
 
     if (questionsToReview.length === 0) {
         const perfectDiv = document.createElement('div');
@@ -447,7 +447,7 @@ export function renderResultsView(questions, score) {
             const guessDiv = document.createElement('div');
             guessDiv.className = 'missed-card-guess';
             
-            if (q.isCorrect && q.pointsEarned < 1.0) {
+            if (q.isCorrect && q.pointsEarned < 10) {
                 guessDiv.style.background = '#fff3cd';
                 guessDiv.style.color = '#856404';
                 guessDiv.textContent = 'Partial Credit: ';
