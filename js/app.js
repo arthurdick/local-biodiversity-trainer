@@ -451,21 +451,27 @@ document.getElementById('btn-next-media').addEventListener('click', () => {
 
 // --- GAME LOOP ---
 async function renderQuizQuestion() {
+    // 1. Capture the target index before any async operations occur
+    const targetIndex = getState().currentIndex;
+    
     setState({ isQuestionLoaded: false, currentMediaIndex: 0 });
     
     let s = getState();
-    ui.resetQuizUI(s.currentIndex, s.questions.length, s.score);
+    ui.resetQuizUI(targetIndex, s.questions.length, s.score);
 
-    const q = s.questions[s.currentIndex];
+    const q = s.questions[targetIndex];
     
     // Will pull from cache if running or resolve directly
-    const obsData = await loadObservationForQuestion(s.currentIndex);
+    const obsData = await loadObservationForQuestion(targetIndex);
 
-    s = getState(); // refresh after await
+    s = getState(); // Refresh state after await
+
+    // 2. Guard against race conditions: abort if the user has moved on to a new question
+    if (s.currentIndex !== targetIndex) return;
 
     if (obsData.error) { 
         if (obsData.emptyPool && s.config.difficulty === 'all' && s.config.preventDuplicates) {
-            setState({ questions: s.questions.slice(0, s.currentIndex) });
+            setState({ questions: s.questions.slice(0, targetIndex) });
             s = getState();
             ui.renderResultsView(s.questions, s.score);
             return;
