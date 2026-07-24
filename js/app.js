@@ -698,7 +698,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
     const sciNorm = engine.normalize(taxon.name);
     const matchedNorm = engine.normalize(matchedNameDisplay);
 
-    ui.renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm, primaryCommonNorm, sciNorm, updatedScore, pointsEarned, guessedRank);
+    ui.renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm, primaryCommonNorm, sciNorm, updatedScore, pointsEarned, guessedRank, false, q.observation?.id);
 });
 
 // --- SKIP LOGIC ---
@@ -719,7 +719,7 @@ document.getElementById('btn-skip').addEventListener('click', () => {
         thumbnailUrl: engine.getQuestionThumbnail(q, selectCurrentMedia(s))
     });
 
-    ui.renderFeedback(false, taxon, "", "", "", "", s.score, 0, "species", true);
+    ui.renderFeedback(false, taxon, "", "", "", "", s.score, 0, "species", true, q.observation?.id);
 });
 
 document.getElementById('input-answer').addEventListener('keypress', (e) => {

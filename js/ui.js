@@ -282,7 +282,7 @@ export function renderQuestionMeta(currentMeta) {
     document.getElementById('quiz-meta').style.display = 'inline-block';
 }
 
-export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm, primaryCommonNorm, sciNorm, score, pointsEarned, guessedRank, isSkipped = false) {
+export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm, primaryCommonNorm, sciNorm, score, pointsEarned, guessedRank, isSkipped = false, observationId = null) {
     const feedback = document.getElementById('feedback');
     const safeTaxon = taxon || { name: 'Unknown Species', id: '' };
     const primaryDisplayName = safeTaxon.preferred_common_name ? `${safeTaxon.preferred_common_name} (${safeTaxon.name})` : safeTaxon.name;
@@ -305,19 +305,23 @@ export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm
         inatLink.textContent = 'iNaturalist ↗';
         linksDiv.appendChild(inatLink);
 
-        const sep = document.createElement('span');
-        sep.style.margin = '0 4px';
-        sep.style.opacity = '0.5';
-        sep.textContent = '•';
-        linksDiv.appendChild(sep);
+        if (observationId) {
+            const sep = document.createElement('span');
+            sep.style.margin = '0 4px';
+            sep.style.opacity = '0.5';
+            sep.textContent = '•';
+            linksDiv.appendChild(sep);
+        }
     }
 
-    const wikiLink = document.createElement('a');
-    wikiLink.href = `https://en.wikipedia.org/wiki/${encodeURIComponent(safeTaxon.name)}`;
-    wikiLink.target = '_blank';
-    wikiLink.rel = 'noopener';
-    wikiLink.textContent = 'Wikipedia ↗';
-    linksDiv.appendChild(wikiLink);
+    if (observationId) {
+        const obsLink = document.createElement('a');
+        obsLink.href = `https://www.inaturalist.org/observations/${encodeURIComponent(observationId)}`;
+        obsLink.target = '_blank';
+        obsLink.rel = 'noopener';
+        obsLink.textContent = 'Observation ↗';
+        linksDiv.appendChild(obsLink);
+    }
 
     if (isCorrect) {
         feedback.className = 'correct';
@@ -483,12 +487,14 @@ export function renderResultsView(questions, score) {
                 linksDiv.appendChild(inatLink);
             }
             
-            const wikiLink = document.createElement('a');
-            wikiLink.href = `https://en.wikipedia.org/wiki/${encodeURIComponent(sciName)}`;
-            wikiLink.target = '_blank';
-            wikiLink.rel = 'noopener';
-            wikiLink.textContent = 'Wikipedia ↗';
-            linksDiv.appendChild(wikiLink);
+            if (q.observation && q.observation.id) {
+                const obsLink = document.createElement('a');
+                obsLink.href = `https://www.inaturalist.org/observations/${encodeURIComponent(q.observation.id)}`;
+                obsLink.target = '_blank';
+                obsLink.rel = 'noopener';
+                obsLink.textContent = 'Observation ↗';
+                linksDiv.appendChild(obsLink);
+            }
             
             cardBody.appendChild(linksDiv);
             card.appendChild(cardBody);
