@@ -48,13 +48,13 @@ export const getState = () => state;
 
 /**
  * Updates top-level state properties and triggers listeners.
- * Enforces immutability at the write level.
+ * Enforces strict immutability by deep freezing the merged state.
  */
 export const setState = (updates) => {
-    // Spread the old state and updates, then freeze the new top-level object
-    state = Object.freeze({ ...state, ...updates });
+    // Spread the old state and updates, then recursively freeze the new object tree
+    state = deepFreeze({ ...state, ...updates });
     
-    // Pass the already frozen state to listeners
+    // Pass the strictly frozen state to listeners
     listeners.forEach(listener => listener(state));
 };
 
@@ -65,11 +65,11 @@ export const updateQuestion = (index, updates) => {
     // Shallow copy the array
     const newQuestions = [...state.questions];
     
-    // Spread and freeze the specific question being updated
-    newQuestions[index] = Object.freeze({ ...newQuestions[index], ...updates });
+    // Spread and deep freeze the specific question being updated
+    newQuestions[index] = deepFreeze({ ...newQuestions[index], ...updates });
     
-    // Freeze the new array before committing it to state
-    setState({ questions: Object.freeze(newQuestions) });
+    // Pass the new array to setState (which will also freeze the array itself)
+    setState({ questions: newQuestions });
 };
 
 /**
