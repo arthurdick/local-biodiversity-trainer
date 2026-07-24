@@ -90,27 +90,47 @@ function loadPreferences() {
         if (!saved) return;
         const prefs = JSON.parse(saved);
 
+        // Ensure the parsed data is actually an object before accessing properties
+        if (typeof prefs !== 'object' || prefs === null) return;
+
         setState({
-            placeId: prefs.placeId || null,
-            lat: prefs.lat || null,
-            lng: prefs.lng || null,
-            taxonId: prefs.taxonId || null,
-            taxonName: prefs.taxonName || null
+            placeId: (typeof prefs.placeId === 'number' || typeof prefs.placeId === 'string') ? prefs.placeId : null,
+            lat: typeof prefs.lat === 'number' ? prefs.lat : null,
+            lng: typeof prefs.lng === 'number' ? prefs.lng : null,
+            taxonId: (typeof prefs.taxonId === 'number' || typeof prefs.taxonId === 'string') ? prefs.taxonId : null,
+            taxonName: typeof prefs.taxonName === 'string' ? prefs.taxonName : null
         });
 
-        if (prefs.placeName) document.getElementById('input-place').value = prefs.placeName;
-        if (prefs.taxonName) document.getElementById('input-taxon').value = prefs.taxonName;
-        if (prefs.difficulty) document.getElementById('input-difficulty').value = prefs.difficulty;
-        if (prefs.questions) document.getElementById('input-questions').value = prefs.questions;
-        if (prefs.chkPhotos !== undefined) document.getElementById('chk-photos').checked = prefs.chkPhotos;
-        if (prefs.chkSounds !== undefined) document.getElementById('chk-sounds').checked = prefs.chkSounds;
-        if (prefs.chkUnique !== undefined) document.getElementById('chk-unique').checked = prefs.chkUnique;
-        if (prefs.months) {
+        // Validate standard text inputs
+        if (typeof prefs.placeName === 'string') document.getElementById('input-place').value = prefs.placeName;
+        if (typeof prefs.taxonName === 'string') document.getElementById('input-taxon').value = prefs.taxonName;
+        
+        // Validate select options against expected strict values
+        const validDifficulties = ['15', '50', '125', '500', 'all'];
+        if (typeof prefs.difficulty === 'string' && validDifficulties.includes(prefs.difficulty)) {
+            document.getElementById('input-difficulty').value = prefs.difficulty;
+        }
+        
+        const validQuestions = ['5', '10', '20', '50'];
+        if (validQuestions.includes(String(prefs.questions))) {
+            document.getElementById('input-questions').value = String(prefs.questions);
+        }
+
+        // Validate booleans
+        if (typeof prefs.chkPhotos === 'boolean') document.getElementById('chk-photos').checked = prefs.chkPhotos;
+        if (typeof prefs.chkSounds === 'boolean') document.getElementById('chk-sounds').checked = prefs.chkSounds;
+        if (typeof prefs.chkUnique === 'boolean') document.getElementById('chk-unique').checked = prefs.chkUnique;
+        
+        // Safely validate array structure to prevent TypeError on .includes()
+        if (Array.isArray(prefs.months)) {
             document.querySelectorAll('#month-filters input').forEach(cb => {
                 cb.checked = prefs.months.includes(cb.value);
             });
         }
-    } catch (e) { console.warn("Could not load saved preferences", e); }
+    } catch (e) {
+        console.warn("Could not load saved preferences", e);
+    }
+    
     ui.toggleClearButton('input-place', 'clear-place');
     ui.toggleClearButton('input-taxon', 'clear-taxon');
 }
