@@ -1,3 +1,9 @@
+/**
+ * Helper to cleanly format points and scores.
+ * Prevents floating-point inaccuracies while keeping integer scores clean.
+ */
+const formatPoints = (points) => Number((points / 10).toFixed(1));
+
 export function showView(viewId) {
     document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
     const view = document.getElementById(viewId);
@@ -180,7 +186,7 @@ export function resetQuizUI(currentIndex, totalQuestions, score) {
     document.getElementById('input-rank').disabled = true;
     
     document.getElementById('quiz-counter').textContent = `Question ${currentIndex + 1} of ${totalQuestions}`;
-    document.getElementById('quiz-score').textContent = `Score: ${score / 10}`;
+    document.getElementById('quiz-score').textContent = `Score: ${formatPoints(score)}`;
     
     document.getElementById('btn-zoom-image').style.display = 'none';
     document.getElementById('quiz-image').style.display = 'none';
@@ -313,9 +319,9 @@ export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm
         feedback.className = 'correct';
         
         if (guessedRank === 'species') {
-             feedback.textContent = `✅ Correct! (+${pointsEarned} pts) `;
+             feedback.textContent = `✅ Correct! (+${formatPoints(pointsEarned)} pts) `;
         } else {
-             feedback.textContent = `✅ Partial Credit! You correctly identified the ${guessedRank}. (+${pointsEarned / 10} pts) `;
+             feedback.textContent = `✅ Partial Credit! You correctly identified the ${guessedRank}. (+${formatPoints(pointsEarned)} pts) `;
         }
         
         const strong = document.createElement('strong');
@@ -350,7 +356,7 @@ export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm
     }
     
     feedback.appendChild(linksDiv);
-    document.getElementById('quiz-score').textContent = `Score: ${score / 10}`;
+    document.getElementById('quiz-score').textContent = `Score: ${formatPoints(score)}`;
     feedback.style.display = 'block';
     
     const btnSubmit = document.getElementById('btn-submit');
@@ -374,7 +380,7 @@ export function renderResultsView(questions, score) {
         audioPlayer.load();
     }
 
-    document.getElementById('final-score').textContent = `${score / 10} / ${questions.length}`;
+    document.getElementById('final-score').textContent = `${formatPoints(score)} / ${questions.length}`;
     const reviewContainer = document.getElementById('review-container');
     reviewContainer.innerHTML = '';
     
