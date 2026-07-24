@@ -48,17 +48,6 @@ function debounce(func, timeout = 1000) {
     return (...args) => { clearTimeout(timer); timer = setTimeout(() => { func.apply(this, args); }, timeout); };
 }
 
-function getMediaParams(config) {
-    if (config.wantsPhotos && !config.wantsSounds) return '&photos=true';
-    if (!config.wantsPhotos && config.wantsSounds) return '&sounds=true';
-    return '';
-}
-
-function getMonthParams(config) {
-    if (config.months.length === 12 || config.months.length === 0) return '';
-    return `&month=${config.months.join(',')}`;
-}
-
 /**
  * Calculates a dynamic network timeout based on the user's connection speed.
  */
@@ -325,14 +314,18 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
         return;
     }
 
-    let poolUrl = `https://api.inaturalist.org/v2/observations/species_counts?quality_grade=research&captive=false&per_page=${difficulty}${getMediaParams(updatedState.config)}${getMonthParams(updatedState.config)}`;
-    if (updatedState.placeId) poolUrl += `&place_id=${updatedState.placeId}`;
-    else poolUrl += `&lat=${updatedState.lat}&lng=${updatedState.lng}&radius=10`;
-    if (updatedState.taxonId) poolUrl += `&taxon_id=${updatedState.taxonId}`;
-    poolUrl += `&fields=${encodeURIComponent('(count:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,ancestor_ids:!t))')}`;
-
     try {
-        const data = await api.fetchSpeciesPool(poolUrl);
+        const data = await api.fetchSpeciesPool({
+            difficulty,
+            wantsPhotos: updatedState.config.wantsPhotos,
+            wantsSounds: updatedState.config.wantsSounds,
+            months: updatedState.config.months,
+            placeId: updatedState.placeId,
+            lat: updatedState.lat,
+            lng: updatedState.lng,
+            taxonId: updatedState.taxonId
+        });
+
         if (!data.results || data.results.length === 0) {
             btn.disabled = false; btn.textContent = "Load Quiz Pool";
             ui.showGeneralError("No research-grade observations found for these settings. Try a broader location, taxon, or month range.");
@@ -376,28 +369,27 @@ async function loadObservationForQuestion(index) {
         const q = getState().questions[index]; // Fetch fresh copy
         const currentConfig = getState().config;
         
-        let url = `https://api.inaturalist.org/v2/observations?quality_grade=research&captive=false&per_page=1&order_by=random${getMediaParams(currentConfig)}${getMonthParams(currentConfig)}`;
-        if (s.placeId) url += `&place_id=${s.placeId}`;
-        else url += `&lat=${s.lat}&lng=${s.lng}&radius=10`;
-
-        if (currentConfig.difficulty === 'all') {
-            url += `&rank=species,subspecies`;
-            if (s.taxonId) url += `&taxon_id=${s.taxonId}`;
-            if (currentConfig.preventDuplicates) {
-                const seenIds = getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined);
-                if (seenIds.length > 0) url += `&without_taxon_id=${seenIds.join(',')}`;
-            }
-        } else {
-            url += `&taxon_id=${q.taxon.id}`;
-        }
-        
-        url += `&fields=${encodeURIComponent('(observed_on:!t,place_guess:!t,location:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,ancestor_ids:!t),photos:(url:!t,attribution:!t),sounds:(file_url:!t,attribution:!t))')}`;
+        const withoutTaxonIds = (currentConfig.difficulty === 'all' && currentConfig.preventDuplicates)
+            ? getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined)
+            : [];
 
         try {
             const controller = new AbortController();
             const timeoutMs = getDynamicNetworkTimeout();
             const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-            const data = await api.fetchObservation(url, controller.signal);
+
+            const data = await api.fetchObservation({
+                wantsPhotos: currentConfig.wantsPhotos,
+                wantsSounds: currentConfig.wantsSounds,
+                months: currentConfig.months,
+                placeId: s.placeId,
+                lat: s.lat,
+                lng: s.lng,
+                difficulty: currentConfig.difficulty,
+                taxonId: currentConfig.difficulty === 'all' ? s.taxonId : q.taxon.id,
+                withoutTaxonIds
+            }, controller.signal);
+
             clearTimeout(timeoutId);
 
             if (data.results && data.results.length > 0) {
