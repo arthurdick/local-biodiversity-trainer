@@ -204,6 +204,7 @@ export function resetQuizUI(currentIndex, totalQuestions, score) {
     input.value = ""; 
     input.disabled = true;
     document.getElementById('btn-submit').style.display = 'none';
+    document.getElementById('btn-skip').style.display = 'none';
     document.getElementById('btn-next').style.display = 'none';
     document.getElementById('feedback').style.display = 'none';
 }
@@ -237,6 +238,8 @@ export function renderFetchError(taxonName, isMediaMissing) {
     }
     
     errorDiv.style.display = 'block';
+    document.getElementById('btn-submit').style.display = 'none';
+    document.getElementById('btn-skip').style.display = 'none';
     const btnNext = document.getElementById('btn-next');
     btnNext.style.display = 'block';
     btnNext.textContent = "Skip to Next ➔";
@@ -269,9 +272,10 @@ export function renderQuestionMeta(currentMeta) {
     document.getElementById('quiz-meta').style.display = 'inline-block';
 }
 
-export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm, primaryCommonNorm, sciNorm, score, pointsEarned, guessedRank) {
+export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm, primaryCommonNorm, sciNorm, score, pointsEarned, guessedRank, isSkipped = false) {
     const feedback = document.getElementById('feedback');
-    const primaryDisplayName = taxon.preferred_common_name ? `${taxon.preferred_common_name} (${taxon.name})` : taxon.name;
+    const safeTaxon = taxon || { name: 'Unknown Species', id: '' };
+    const primaryDisplayName = safeTaxon.preferred_common_name ? `${safeTaxon.preferred_common_name} (${safeTaxon.name})` : safeTaxon.name;
     
     const imgElement = document.getElementById('quiz-image');
     if (imgElement && imgElement.src) {
@@ -283,21 +287,23 @@ export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm
     linksDiv.className = 'feedback-links';
     linksDiv.textContent = '📖 Learn more: ';
 
-    const inatLink = document.createElement('a');
-    inatLink.href = `https://www.inaturalist.org/taxa/${encodeURIComponent(taxon.id)}`;
-    inatLink.target = '_blank';
-    inatLink.rel = 'noopener';
-    inatLink.textContent = 'iNaturalist ↗';
-    linksDiv.appendChild(inatLink);
+    if (safeTaxon.id) {
+        const inatLink = document.createElement('a');
+        inatLink.href = `https://www.inaturalist.org/taxa/${encodeURIComponent(safeTaxon.id)}`;
+        inatLink.target = '_blank';
+        inatLink.rel = 'noopener';
+        inatLink.textContent = 'iNaturalist ↗';
+        linksDiv.appendChild(inatLink);
 
-    const sep = document.createElement('span');
-    sep.style.margin = '0 4px';
-    sep.style.opacity = '0.5';
-    sep.textContent = '•';
-    linksDiv.appendChild(sep);
+        const sep = document.createElement('span');
+        sep.style.margin = '0 4px';
+        sep.style.opacity = '0.5';
+        sep.textContent = '•';
+        linksDiv.appendChild(sep);
+    }
 
     const wikiLink = document.createElement('a');
-    wikiLink.href = `https://en.wikipedia.org/wiki/${encodeURIComponent(taxon.name)}`;
+    wikiLink.href = `https://en.wikipedia.org/wiki/${encodeURIComponent(safeTaxon.name)}`;
     wikiLink.target = '_blank';
     wikiLink.rel = 'noopener';
     wikiLink.textContent = 'Wikipedia ↗';
@@ -330,7 +336,11 @@ export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm
         }
     } else {
         feedback.className = 'incorrect';
-        feedback.textContent = '❌ Not quite.';
+        if (isSkipped) {
+            feedback.textContent = '⏭️ Question skipped.';
+        } else {
+            feedback.textContent = '❌ Not quite.';
+        }
         feedback.appendChild(document.createElement('br'));
         feedback.appendChild(document.createTextNode('Answer: '));
         
@@ -347,6 +357,8 @@ export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm
     btnSubmit.style.display = 'none';
     btnSubmit.disabled = false;
     btnSubmit.textContent = "Check Answer";
+
+    document.getElementById('btn-skip').style.display = 'none';
     
     const btnNext = document.getElementById('btn-next');
     btnNext.textContent = "Next Observation ➔";

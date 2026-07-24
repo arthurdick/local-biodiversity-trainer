@@ -507,6 +507,7 @@ function triggerQuestionReady() {
         document.getElementById('input-answer').disabled = false; 
         document.getElementById('input-answer').focus();
         document.getElementById('btn-submit').style.display = 'block';
+        document.getElementById('btn-skip').style.display = 'block';
         loadObservationForQuestion(s.currentIndex + 1);
     }
 }
@@ -528,7 +529,7 @@ document.getElementById('quiz-image').onerror = () => {
         document.getElementById('media-controls').style.display = 'none';
         ui.renderFetchError("", false);
         setState({ isQuestionLoaded: true });
-        loadObservationForQuestion(s.currentIndex + 1);
+        loadObservationForQuestion(getState().currentIndex + 1);
     }
 };
 
@@ -539,7 +540,7 @@ document.getElementById('quiz-audio-player').onerror = () => {
         document.getElementById('media-controls').style.display = 'none';
         ui.renderFetchError("", false);
         setState({ isQuestionLoaded: true });
-        loadObservationForQuestion(s.currentIndex + 1);
+        loadObservationForQuestion(getState().currentIndex + 1);
     }
 };
 
@@ -556,6 +557,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
     
     document.getElementById('input-answer').disabled = true;
     document.getElementById('input-rank').disabled = true;
+    document.getElementById('btn-skip').style.display = 'none';
     btnSubmit.disabled = true;
     btnSubmit.textContent = "Checking...";
 
@@ -632,6 +634,27 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
     const matchedNorm = engine.normalize(matchedNameDisplay);
 
     ui.renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm, primaryCommonNorm, sciNorm, updatedScore, pointsEarned, guessedRank);
+});
+
+// --- SKIP LOGIC ---
+document.getElementById('btn-skip').addEventListener('click', () => {
+    let s = getState();
+    const q = s.questions[s.currentIndex];
+    const taxon = q.taxon;
+
+    document.getElementById('input-answer').disabled = true;
+    document.getElementById('input-rank').disabled = true;
+    document.getElementById('btn-submit').style.display = 'none';
+    document.getElementById('btn-skip').style.display = 'none';
+
+    updateQuestion(s.currentIndex, {
+        userAnswer: "(Skipped)",
+        isCorrect: false,
+        pointsEarned: 0,
+        thumbnailUrl: engine.getQuestionThumbnail(q, selectCurrentMedia(s))
+    });
+
+    ui.renderFeedback(false, taxon, "", "", "", "", s.score, 0, "species", true);
 });
 
 document.getElementById('input-answer').addEventListener('keypress', (e) => {

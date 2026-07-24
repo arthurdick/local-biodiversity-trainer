@@ -147,7 +147,10 @@
                     </select>
                     <input type="text" id="input-answer" placeholder="Common or scientific name..." autocomplete="off" style="flex: 1;">
                 </div>
-                <button type="button" id="btn-submit" style="margin-top: 10px;">Check Answer</button>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button type="button" id="btn-submit" style="flex: 1;">Check Answer</button>
+                    <button type="button" id="btn-skip" style="flex: 1; display: none;">Skip</button>
+                </div>
             </div>
 
             <div id="feedback" aria-live="polite"></div>
