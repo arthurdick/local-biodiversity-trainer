@@ -23,42 +23,61 @@ const initialState = {
     isQuestionLoaded: false
 };
 
-let state = structuredClone(initialState);
+/**
+ * Helper utility to deeply freeze objects.
+ * Guarantees nested structures (like config and questions) are immutable.
+ */
+function deepFreeze(obj) {
+    Object.keys(obj).forEach(prop => {
+        if (typeof obj[prop] === 'object' && obj[prop] !== null && !Object.isFrozen(obj[prop])) {
+            deepFreeze(obj[prop]);
+        }
+    });
+    return Object.freeze(obj);
+}
+
+// Deep freeze the initial state to prevent any accidental mutations right from the start
+let state = deepFreeze(structuredClone(initialState));
 const listeners = new Set();
 
 /**
- * Retrieves a deep copy of the current state.
+ * Retrieves the current state.
+ * Returns the frozen state directly, eliminating the previous structuredClone performance penalty on every read.
  */
-export const getState = () => structuredClone(state);
+export const getState = () => state;
 
 /**
  * Updates top-level state properties and triggers listeners.
+ * Enforces immutability at the write level.
  */
 export const setState = (updates) => {
-    state = { ...state, ...updates };
+    // Spread the old state and updates, then freeze the new top-level object
+    state = Object.freeze({ ...state, ...updates });
     
-    // Pass a deep copy to listeners to prevent accidental mutation downstream
-    const stateSnapshot = structuredClone(state);
-    listeners.forEach(listener => listener(stateSnapshot));
+    // Pass the already frozen state to listeners
+    listeners.forEach(listener => listener(state));
 };
 
 /**
  * Safely updates a specific question object within the questions array.
  */
 export const updateQuestion = (index, updates) => {
+    // Shallow copy the array
     const newQuestions = [...state.questions];
-    newQuestions[index] = { ...newQuestions[index], ...updates };
-    setState({ questions: newQuestions });
+    
+    // Spread and freeze the specific question being updated
+    newQuestions[index] = Object.freeze({ ...newQuestions[index], ...updates });
+    
+    // Freeze the new array before committing it to state
+    setState({ questions: Object.freeze(newQuestions) });
 };
 
 /**
  * Resets the state back to its initial configuration.
  */
 export const resetState = () => {
-    state = structuredClone(initialState);
-    
-    const stateSnapshot = structuredClone(state);
-    listeners.forEach(listener => listener(stateSnapshot));
+    state = deepFreeze(structuredClone(initialState));
+    listeners.forEach(listener => listener(state));
 };
 
 /**
