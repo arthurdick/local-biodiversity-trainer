@@ -34,6 +34,10 @@ export function toggleList(listId, show) {
 }
 
 export function handleAutocompleteKeydown(e, listId) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+    }
+
     const list = document.getElementById(listId);
     const inputId = listId.replace('list', 'input');
     const input = document.getElementById(inputId);
@@ -57,7 +61,6 @@ export function handleAutocompleteKeydown(e, listId) {
         let prevIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
         updateActiveItem(items, prevIndex, input, list);
     } else if (e.key === 'Enter' && currentIndex !== -1) {
-        e.preventDefault();
         items[currentIndex].click();
     } else if (e.key === 'Escape') {
         e.preventDefault();
