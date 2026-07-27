@@ -461,19 +461,20 @@ async function loadObservationForQuestion(index) {
                     // iNaturalist API safely supports paging deep, cap at 200 (10,000 results limit)
                     const maxPages = Math.min(Math.ceil(totalSpecies / 50), 200); 
                     
-                    // Approximate inverse weighting: species counts roughly follow Zipf's law (~1/rank).
-                    // By weighting each page proportionally to its page number (rank), we mirror the
-                    // inverse frequency pool logic, retaining a small chance for page 1 (common species).
+                    // Approximate inverse weighting using a logarithmic curve to prevent extreme skew
+                    // Higher pages inherently contain rarer species, weighted using a milder 1 + log10 scale
                     let totalWeight = 0;
                     const pageWeights = [];
                     
                     for (let p = 1; p <= maxPages; p++) {
-                        totalWeight += p;
+                        const weight = 1 + Math.log10(p);
+                        totalWeight += weight;
                         pageWeights.push({ page: p, threshold: totalWeight });
                     }
                     
                     const roll = Math.random() * totalWeight;
-                    deepPage = pageWeights.find(pw => roll <= pw.threshold).page;
+                    // Safely fallback to the final item against floating point bounds
+                    deepPage = (pageWeights.find(pw => roll <= pw.threshold) || pageWeights[pageWeights.length - 1]).page;
                 }
 
                 const deepData = await api.fetchSpeciesPool({
@@ -500,20 +501,21 @@ async function loadObservationForQuestion(index) {
 
                     let randomItem;
 
-                    // If total species is very small, use true inverse weighting instead of array slicing
+                    // If total species is very small, use true inverse logarithmic weighting
                     if (totalSpecies <= 50) {
                         let totalWeight = 0;
-                        const smoothingConstant = 1; // Prevents species with a count of 1 from completely eclipsing others
                         
                         const weightedResults = validResults.map(r => {
-                            const count = r.count || 1; // Fallback in case count is missing
-                            const weight = 1 / (count + smoothingConstant);
+                            const count = Math.max(1, r.count || 1); // Fallback in case count is missing
+                            const logWeight = Math.log10(count + 1);
+                            const weight = 1 / logWeight;
                             totalWeight += weight;
                             return { item: r, threshold: totalWeight };
                         });
                         
                         const roll = Math.random() * totalWeight;
-                        randomItem = weightedResults.find(w => roll <= w.threshold).item;
+                        // Precision safety fallback
+                        randomItem = (weightedResults.find(w => roll <= w.threshold) || weightedResults[weightedResults.length - 1]).item;
                     } else {
                         // For large pools, the deep paging logic has already handled the rarity weighting
                         randomItem = validResults[Math.floor(Math.random() * validResults.length)];
@@ -543,7 +545,7 @@ async function loadObservationForQuestion(index) {
                 placeId: s.placeId,
                 lat: s.lat,
                 lng: s.lng,
-                // FIX: Avoid passing 'all' when we have a pre-selected taxon,
+                // Avoid passing 'all' when we have a pre-selected taxon,
                 // so the API doesn't falsely filter out hybrid, form, or variety ranks.
                 difficulty: isStandardExpert ? 'all' : 'specific',
                 // Assign accurate TaxonID based on active mode

@@ -22,11 +22,18 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
     const questions = [];
     
     // Create a working pool with our adjusted weights
-    let availablePool = dataResults.map(r => ({
-        taxon: r.taxon,
-        // If rarity mode is on, invert the weight
-        weight: isRarityMode ? (1 / r.count) : r.count
-    }));
+    let availablePool = dataResults.map(r => {
+        // Enforce a minimum count of 1 to prevent log10(1) = 0 and subsequent Infinity issues
+        const count = Math.max(1, r.count || 1); 
+        // Apply logarithmic transformation to smooth extreme skews
+        const logWeight = Math.log10(count + 1);
+        
+        return {
+            taxon: r.taxon,
+            // If rarity mode is on, invert the log weight
+            weight: isRarityMode ? (1 / logWeight) : logWeight
+        };
+    });
     
     if (preventDuplicates) {
         const limit = Math.min(questionLimit, availablePool.length);
@@ -37,7 +44,8 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
             if (totalWeight <= 0) break;
 
             const roll = Math.random() * totalWeight;
-            let runningWeight = 0, selectedIndex = 0;
+            // Default selectedIndex to the last item to prevent floating-point rounding errors defaulting to index 0
+            let runningWeight = 0, selectedIndex = availablePool.length - 1;
 
             for (let j = 0; j < availablePool.length; j++) {
                 runningWeight += availablePool[j].weight;
@@ -62,7 +70,8 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
 
         for (let i = 0; i < questionLimit; i++) {
             const roll = Math.random() * totalWeights;
-            const selected = weightedPool.find(item => roll <= item.threshold);
+            // Fallback to the last item to handle potential float rounding precision issues
+            const selected = weightedPool.find(item => roll <= item.threshold) || weightedPool[weightedPool.length - 1];
             questions.push({ taxon: selected.taxon, observation: null });
         }
     }
