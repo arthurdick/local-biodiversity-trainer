@@ -115,11 +115,15 @@ export const fetchTaxaAutocomplete = async (query, signal) => {
     return res.json();
 };
 
-export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, months, placeId, lat, lng, taxonId }, signal) => {
+export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, months, placeId, lat, lng, taxonId, page = 1, perPage = null }, signal) => {
+    // If perPage is explicitly passed, use it; otherwise fallback to difficulty string mapping
+    const limit = perPage !== null ? String(perPage) : String(difficulty);
+    
     const params = new URLSearchParams({
         quality_grade: 'research',
         captive: 'false',
-        per_page: String(difficulty),
+        per_page: limit,
+        page: String(page),
         fields: '(count:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,ancestor_ids:!t))'
     });
 

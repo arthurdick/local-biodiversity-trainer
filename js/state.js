@@ -10,7 +10,9 @@ const initialState = {
         wantsSounds: true,
         months: [],
         difficulty: '50',
-        preventDuplicates: true
+        preventDuplicates: true,
+        isRarityMode: false,
+        expertTotalSpecies: 0
     },
     
     // 2. Core Game Data

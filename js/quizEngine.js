@@ -18,14 +18,20 @@ export function getQuestionThumbnail(q, currentMediaArray) {
     return '';
 }
 
-export function generateWeightedPool(dataResults, questionLimit, preventDuplicates) {
+export function generateWeightedPool(dataResults, questionLimit, preventDuplicates, isRarityMode = false) {
     const questions = [];
     
+    // Create a working pool with our adjusted weights
+    let availablePool = dataResults.map(r => ({
+        taxon: r.taxon,
+        // If rarity mode is on, invert the weight
+        weight: isRarityMode ? (1 / r.count) : r.count
+    }));
+    
     if (preventDuplicates) {
-        let availablePool = dataResults.map(r => ({ taxon: r.taxon, count: r.count }));
         const limit = Math.min(questionLimit, availablePool.length);
 
-        let totalWeight = availablePool.reduce((sum, item) => sum + item.count, 0);
+        let totalWeight = availablePool.reduce((sum, item) => sum + item.weight, 0);
 
         for (let i = 0; i < limit; i++) {
             if (totalWeight <= 0) break;
@@ -34,7 +40,7 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
             let runningWeight = 0, selectedIndex = 0;
 
             for (let j = 0; j < availablePool.length; j++) {
-                runningWeight += availablePool[j].count;
+                runningWeight += availablePool[j].weight;
                 if (roll <= runningWeight) {
                     selectedIndex = j;
                     break;
@@ -44,14 +50,14 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
             const selectedItem = availablePool[selectedIndex];
             questions.push({ taxon: selectedItem.taxon, observation: null });
             
-            totalWeight -= selectedItem.count;
+            totalWeight -= selectedItem.weight;
             availablePool.splice(selectedIndex, 1);
         }
     } else {
         let totalWeights = 0;
-        const weightedPool = dataResults.map(r => {
-            totalWeights += r.count;
-            return { taxon: r.taxon, threshold: totalWeights };
+        const weightedPool = availablePool.map(item => {
+            totalWeights += item.weight;
+            return { taxon: item.taxon, threshold: totalWeights };
         });
 
         for (let i = 0; i < questionLimit; i++) {

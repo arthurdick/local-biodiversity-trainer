@@ -86,6 +86,7 @@ function savePreferences() {
         chkPhotos: document.getElementById('chk-photos').checked,
         chkSounds: document.getElementById('chk-sounds').checked,
         chkUnique: document.getElementById('chk-unique').checked,
+        chkRarity: document.getElementById('chk-rarity').checked,
         months: Array.from(document.querySelectorAll('#month-filters input:checked')).map(cb => cb.value)
     };
     localStorage.setItem('bio_trainer_prefs', JSON.stringify(prefs));
@@ -127,6 +128,7 @@ function loadPreferences() {
         if (typeof prefs.chkPhotos === 'boolean') document.getElementById('chk-photos').checked = prefs.chkPhotos;
         if (typeof prefs.chkSounds === 'boolean') document.getElementById('chk-sounds').checked = prefs.chkSounds;
         if (typeof prefs.chkUnique === 'boolean') document.getElementById('chk-unique').checked = prefs.chkUnique;
+        if (typeof prefs.chkRarity === 'boolean') document.getElementById('chk-rarity').checked = prefs.chkRarity;
         
         // Safely validate array structure to prevent TypeError on .includes()
         if (Array.isArray(prefs.months)) {
@@ -315,10 +317,11 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     const difficulty = document.getElementById('input-difficulty').value;
     const questionLimit = parseInt(document.getElementById('input-questions').value);
     const preventDuplicates = document.getElementById('chk-unique').checked;
+    const isRarityMode = document.getElementById('chk-rarity').checked;
 
     // Snapshot user preferences directly into state config
     setState({
-        config: { wantsPhotos, wantsSounds, months, difficulty, preventDuplicates }
+        config: { wantsPhotos, wantsSounds, months, difficulty, preventDuplicates, isRarityMode, expertTotalSpecies: 0 }
     });
 
     savePreferences();
@@ -327,21 +330,59 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
 
     const updatedState = getState();
 
+    // -- EXPERT MODE LOGIC --
     if (difficulty === 'all') {
-        setState({
-            questions: Array.from({ length: questionLimit }, () => ({ taxon: null, observation: null })),
-            currentIndex: 0,
-            score: 0
-        });
-        
-        loadObservationForQuestion(0);
-        ui.showView('quiz-view');
-        renderQuizQuestion();
-        
-        btn.disabled = false; btn.textContent = "Load Quiz Pool";
-        return;
+        if (isRarityMode) {
+            // STEP 1: Fast Pre-flight check to get total_results for dynamic pagination later
+            try {
+                const preFlightData = await api.fetchSpeciesPool({
+                    perPage: 1, 
+                    wantsPhotos: updatedState.config.wantsPhotos,
+                    wantsSounds: updatedState.config.wantsSounds,
+                    months: updatedState.config.months,
+                    placeId: updatedState.placeId,
+                    lat: updatedState.lat,
+                    lng: updatedState.lng,
+                    taxonId: updatedState.taxonId
+                });
+
+                const totalSpecies = preFlightData.total_results || 0;
+                
+                // Shift the heavy lifting to the JIT loader for per-question randomization
+                setState({
+                    config: { ...updatedState.config, expertTotalSpecies: totalSpecies },
+                    questions: Array.from({ length: questionLimit }, () => ({ taxon: null, observation: null })),
+                    currentIndex: 0,
+                    score: 0
+                });
+                
+                loadObservationForQuestion(0);
+                ui.showView('quiz-view');
+                renderQuizQuestion();
+            } catch (error) {
+                ui.showGeneralError("Error loading rare species data. Please check your internet connection.");
+            } finally {
+                btn.disabled = false; btn.textContent = "Load Quiz Pool";
+            }
+            return;
+        } else {
+            // Standard Expert logic
+            setState({
+                questions: Array.from({ length: questionLimit }, () => ({ taxon: null, observation: null })),
+                currentIndex: 0,
+                score: 0
+            });
+            
+            loadObservationForQuestion(0);
+            ui.showView('quiz-view');
+            renderQuizQuestion();
+            
+            btn.disabled = false; btn.textContent = "Load Quiz Pool";
+            return;
+        }
     }
 
+    // -- STANDARD POOLS (Beginner to Hard) --
     try {
         const data = await api.fetchSpeciesPool({
             difficulty,
@@ -361,7 +402,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
         }
 
         setState({
-            questions: engine.generateWeightedPool(data.results, questionLimit, preventDuplicates),
+            questions: engine.generateWeightedPool(data.results, questionLimit, preventDuplicates, updatedState.config.isRarityMode),
             currentIndex: 0,
             score: 0
         });
@@ -401,13 +442,85 @@ async function loadObservationForQuestion(index) {
         const q = getState().questions[index]; // Fetch fresh copy
         const currentConfig = getState().config;
         
-        const withoutTaxonIds = (currentConfig.difficulty === 'all' && currentConfig.preventDuplicates)
-            ? getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined)
-            : [];
+        // Mode detection
+        const isStandardExpert = currentConfig.difficulty === 'all' && !currentConfig.isRarityMode;
+        const isRareExpert = currentConfig.difficulty === 'all' && currentConfig.isRarityMode;
 
         try {
             const timeoutMs = getDynamicNetworkTimeout();
             const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+            
+            let targetTaxon = q.taxon;
+            
+            // If in Rare Expert mode and we haven't assigned a taxon yet, fetch a random deep page!
+            if (isRareExpert && !targetTaxon) {
+                const totalSpecies = currentConfig.expertTotalSpecies || 0;
+                let deepPage = 1;
+                
+                if (totalSpecies > 50) {
+                    // iNaturalist API safely supports paging deep, cap at 200 (10,000 results limit)
+                    const maxPages = Math.min(Math.ceil(totalSpecies / 50), 200); 
+                    
+                    // Approximate inverse weighting: species counts roughly follow Zipf's law (~1/rank).
+                    // By weighting each page proportionally to its page number (rank), we mirror the
+                    // inverse frequency pool logic, retaining a small chance for page 1 (common species).
+                    let totalWeight = 0;
+                    const pageWeights = [];
+                    
+                    for (let p = 1; p <= maxPages; p++) {
+                        totalWeight += p;
+                        pageWeights.push({ page: p, threshold: totalWeight });
+                    }
+                    
+                    const roll = Math.random() * totalWeight;
+                    deepPage = pageWeights.find(pw => roll <= pw.threshold).page;
+                }
+
+                const deepData = await api.fetchSpeciesPool({
+                    perPage: 50,
+                    page: deepPage,
+                    wantsPhotos: currentConfig.wantsPhotos,
+                    wantsSounds: currentConfig.wantsSounds,
+                    months: currentConfig.months,
+                    placeId: s.placeId,
+                    lat: s.lat,
+                    lng: s.lng,
+                    taxonId: s.taxonId
+                }, controller.signal);
+
+                if (deepData.results && deepData.results.length > 0) {
+                    let validResults = deepData.results;
+                    
+                    // Internal duplicate prevention to ensure we don't pick a rare bird twice
+                    if (currentConfig.preventDuplicates) {
+                        const existingIds = getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined);
+                        validResults = deepData.results.filter(r => !existingIds.includes(r.taxon.id));
+                        if (validResults.length === 0) validResults = deepData.results; // fallback
+                    }
+                    
+                    // If total species is very small, manually skew towards the bottom half of the array
+                    if (totalSpecies <= 50) {
+                        validResults = validResults.slice(Math.floor(validResults.length / 2));
+                        if (validResults.length === 0) validResults = deepData.results;
+                    }
+
+                    const randomItem = validResults[Math.floor(Math.random() * validResults.length)];
+                    targetTaxon = randomItem.taxon;
+                    
+                    // Sync it to state immediately so if the observation fetch fails, we retain the chosen taxon for retries
+                    updateQuestion(index, { taxon: targetTaxon });
+                } else {
+                    clearTimeout(timeoutId);
+                    const emptyData = { error: true, emptyPool: true };
+                    updateQuestion(index, { observation: emptyData });
+                    return emptyData;
+                }
+            }
+            
+            // Only use API-level duplicate prevention for standard random expert mode
+            const withoutTaxonIds = (isStandardExpert && currentConfig.preventDuplicates)
+                ? getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined)
+                : [];
 
             const data = await api.fetchObservation({
                 wantsPhotos: currentConfig.wantsPhotos,
@@ -416,8 +529,11 @@ async function loadObservationForQuestion(index) {
                 placeId: s.placeId,
                 lat: s.lat,
                 lng: s.lng,
-                difficulty: currentConfig.difficulty,
-                taxonId: currentConfig.difficulty === 'all' ? s.taxonId : q.taxon.id,
+                // FIX: Avoid passing 'all' when we have a pre-selected taxon,
+                // so the API doesn't falsely filter out hybrid, form, or variety ranks.
+                difficulty: isStandardExpert ? 'all' : 'specific',
+                // Assign accurate TaxonID based on active mode
+                taxonId: isStandardExpert ? s.taxonId : targetTaxon?.id,
                 withoutTaxonIds
             }, controller.signal);
 
@@ -426,7 +542,9 @@ async function loadObservationForQuestion(index) {
             if (data.results && data.results.length > 0) {
                 const obs = data.results[0];
                 const updates = { observation: obs };
-                if (currentConfig.difficulty === 'all') updates.taxon = obs.taxon;
+                
+                // Only overwrite the taxon state if we are in standard random expert mode
+                if (isStandardExpert) updates.taxon = obs.taxon;
                 
                 updateQuestion(index, updates);
                 
