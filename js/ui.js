@@ -242,6 +242,15 @@ export function resetQuizUI(currentIndex, totalQuestions, score) {
         zoomImg.removeAttribute('src');
     }
     
+    const hintBtn = document.getElementById('btn-toggle-hint');
+    const hintContent = document.getElementById('quiz-hint-content');
+    if (hintBtn && hintContent) {
+        hintBtn.style.display = 'none';
+        hintBtn.textContent = '💡 Show Field Notes (Hint)';
+        hintContent.style.display = 'none';
+        hintContent.textContent = '';
+    }
+    
     const input = document.getElementById('input-answer');
     input.value = ""; 
     input.disabled = true;
@@ -249,6 +258,29 @@ export function resetQuizUI(currentIndex, totalQuestions, score) {
     document.getElementById('btn-skip').style.display = 'none';
     document.getElementById('btn-next').style.display = 'none';
     document.getElementById('feedback').style.display = 'none';
+}
+
+/**
+ * Renders the optional field notes/description hint button if observations contain observer notes.
+ */
+export function renderFieldNotes(description) {
+    const hintBtn = document.getElementById('btn-toggle-hint');
+    const hintContent = document.getElementById('quiz-hint-content');
+    
+    if (!hintBtn || !hintContent) return;
+
+    const trimmedDesc = description ? description.trim() : '';
+
+    if (trimmedDesc.length > 0) {
+        // Sanitize raw HTML tags while preserving line breaks
+        hintContent.textContent = trimmedDesc;
+        hintBtn.style.display = 'inline-block';
+        hintBtn.textContent = '💡 Show Field Notes (Hint)';
+        hintContent.style.display = 'none';
+    } else {
+        hintBtn.style.display = 'none';
+        hintContent.style.display = 'none';
+    }
 }
 
 export function renderFetchError(taxonName, isMediaMissing) {

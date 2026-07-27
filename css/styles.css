@@ -305,6 +305,45 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
     margin-bottom: 5px;
 }
 
+.hint-wrapper {
+    margin: 12px 0;
+    text-align: center;
+    width: 100%;
+}
+
+.btn-hint {
+    background-color: #e8f5e9;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+    padding: 6px 14px;
+    font-size: 13px;
+    border-radius: 20px;
+    cursor: pointer;
+    width: auto;
+    margin: 0 auto;
+    font-weight: bold;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.btn-hint:hover {
+    background-color: var(--primary);
+    color: #ffffff;
+}
+
+.hint-content {
+    margin-top: 10px;
+    padding: 12px 16px;
+    background-color: #fffde7;
+    border-left: 4px solid #fbc02d;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #5d4037;
+    text-align: left;
+    word-break: break-word;
+    white-space: pre-wrap;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
 /* ==========================================================================
    6. Answer Inputs & Quiz Buttons
    ========================================================================== */

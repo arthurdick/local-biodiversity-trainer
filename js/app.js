@@ -569,8 +569,11 @@ function triggerQuestionReady() {
     document.getElementById('quiz-attribution').style.display = 'block';
     
     const s = getState();
+    const currentObs = s.questions[s.currentIndex]?.observation;
+    
     ui.renderQuestionMeta(selectCurrentMeta(s));
     ui.renderTargetBadge(s.questions[s.currentIndex].taxon);
+    ui.renderFieldNotes(currentObs?.description);
     
     if (!s.isQuestionLoaded) {
         setState({ isQuestionLoaded: true });
@@ -615,6 +618,20 @@ document.getElementById('quiz-audio-player').onerror = () => {
         observationService.loadObservationForQuestion(getState().currentIndex + 1);
     }
 };
+
+document.getElementById('btn-toggle-hint').addEventListener('click', () => {
+    const hintBtn = document.getElementById('btn-toggle-hint');
+    const hintContent = document.getElementById('quiz-hint-content');
+    
+    const isHidden = hintContent.style.display === 'none';
+    if (isHidden) {
+        hintContent.style.display = 'block';
+        hintBtn.textContent = '🙈 Hide Field Notes';
+    } else {
+        hintContent.style.display = 'none';
+        hintBtn.textContent = '💡 Show Field Notes (Hint)';
+    }
+});
 
 // --- MODAL LOGIC ---
 const zoomModal = document.getElementById('zoom-modal');
