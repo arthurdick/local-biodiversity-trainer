@@ -348,10 +348,15 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
 
                 const totalSpecies = preFlightData.total_results || 0;
                 
+                // Cap question count if preventDuplicates is true and total species is less than selected question count
+                const actualQuestionCount = updatedState.config.preventDuplicates && totalSpecies > 0
+                    ? Math.min(questionLimit, totalSpecies)
+                    : questionLimit;
+                
                 // Shift the heavy lifting to the JIT loader for per-question randomization
                 setState({
                     config: { ...updatedState.config, expertTotalSpecies: totalSpecies },
-                    questions: Array.from({ length: questionLimit }, () => ({ taxon: null, observation: null })),
+                    questions: Array.from({ length: actualQuestionCount }, () => ({ taxon: null, observation: null })),
                     currentIndex: 0,
                     score: 0
                 });
@@ -496,7 +501,14 @@ async function loadObservationForQuestion(index) {
                     if (currentConfig.preventDuplicates) {
                         const existingIds = getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined);
                         validResults = deepData.results.filter(r => !existingIds.includes(r.taxon.id));
-                        if (validResults.length === 0) validResults = deepData.results; // fallback
+                        
+                        // If no unique species remain across available results, treat as empty pool
+                        if (validResults.length === 0) {
+                            clearTimeout(timeoutId);
+                            const emptyData = { error: true, emptyPool: true };
+                            updateQuestion(index, { observation: emptyData });
+                            return emptyData;
+                        }
                     }
 
                     let randomItem;
