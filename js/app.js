@@ -189,7 +189,6 @@ radios.forEach(radio => {
         
         const newMode = e.target.value;
         
-        // Update the state immediately
         setState({ locMode: newMode });
         
         if (newMode === 'search') {
@@ -347,7 +346,7 @@ document.getElementById('input-lng').addEventListener('input', (e) => {
 
 document.getElementById('input-radius').addEventListener('input', (e) => {
     const val = parseInt(e.target.value, 10);
-    setState({ radius: isNaN(val) || val < 1 ? 10 : val }); // Default to 10 if cleared or invalid
+    setState({ radius: isNaN(val) || val < 1 ? 10 : val });
 });
 
 // --- GAME BOOTSTRAPPING ---
@@ -689,11 +688,14 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
         observationService.getDynamicNetworkTimeout
     );
     
+    const mediaInfo = engine.getQuestionThumbnail(q, selectCurrentMedia(s));
+    
     updateQuestion(s.currentIndex, {
         userAnswer: `${inputStr} (${guessedRank})`,
         isCorrect: isCorrect,
         pointsEarned: pointsEarned,
-        thumbnailUrl: engine.getQuestionThumbnail(q, selectCurrentMedia(s))
+        thumbnailUrl: mediaInfo.url,
+        mediaAttribution: mediaInfo.attribution
     });
     
     if (isCorrect) setState({ score: s.score + pointsEarned });
@@ -717,11 +719,14 @@ document.getElementById('btn-skip').addEventListener('click', () => {
     document.getElementById('btn-submit').style.display = 'none';
     document.getElementById('btn-skip').style.display = 'none';
 
+    const mediaInfo = engine.getQuestionThumbnail(q, selectCurrentMedia(s));
+
     updateQuestion(s.currentIndex, {
         userAnswer: "(Skipped)",
         isCorrect: false,
         pointsEarned: 0,
-        thumbnailUrl: engine.getQuestionThumbnail(q, selectCurrentMedia(s))
+        thumbnailUrl: mediaInfo.url,
+        mediaAttribution: mediaInfo.attribution
     });
 
     ui.renderFeedback(false, taxon, "", "", "", "", s.score, 0, "species", true, q.observation?.id);
@@ -739,10 +744,12 @@ document.getElementById('btn-next').addEventListener('click', (e) => {
     const currentQ = s.questions[s.currentIndex];
     
     if (currentQ.isCorrect === undefined) {
+        const mediaInfo = engine.getQuestionThumbnail(currentQ, selectCurrentMedia(s));
         updateQuestion(s.currentIndex, {
             isCorrect: false,
             userAnswer: "(Skipped)",
-            thumbnailUrl: engine.getQuestionThumbnail(currentQ, selectCurrentMedia(s))
+            thumbnailUrl: mediaInfo.url,
+            mediaAttribution: mediaInfo.attribution
         });
     }
     

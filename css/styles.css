@@ -388,6 +388,37 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 }
 
 .missed-card-body { padding: 10px; display: flex; flex-direction: column; flex-grow: 1; justify-content: space-between; }
+
+.missed-card-media {
+    position: relative;
+    width: 100%;
+    height: 130px;
+    background: #222;
+}
+
+.missed-card-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Attribution overlay badge sitting on the image */
+.missed-card-attribution {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.65);
+    color: #ffffff;
+    font-size: 10px;
+    padding: 3px 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+}
+
 .missed-card-name { font-weight: bold; color: var(--text-main); line-height: 1.2; margin-bottom: 2px; }
 .missed-card-sci { font-style: italic; color: var(--text-muted); font-size: 0.9em; }
 

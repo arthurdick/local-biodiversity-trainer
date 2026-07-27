@@ -13,11 +13,22 @@ export function normalize(str) {
 
 export function getQuestionThumbnail(q, currentMediaArray) {
     const photoMedia = currentMediaArray.find(m => m.type === 'photo');
-    if (photoMedia) return photoMedia.mediumUrl;
-    if (q.observation && q.observation.photos && q.observation.photos.length > 0) {
-        return q.observation.photos[0].url.replace('square', 'medium');
+    if (photoMedia) {
+        return {
+            url: photoMedia.mediumUrl,
+            attribution: `Photo: ${photoMedia.attribution}`
+        };
     }
-    return '';
+    
+    const soundMedia = currentMediaArray.find(m => m.type === 'sound');
+    if (soundMedia) {
+        return {
+            url: '',
+            attribution: `Sound: ${soundMedia.attribution || 'iNaturalist Contributor'}`
+        };
+    }
+
+    return { url: '', attribution: '' };
 }
 
 /**

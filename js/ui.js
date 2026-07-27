@@ -313,7 +313,6 @@ export function renderQuestionMeta(currentMeta) {
     
     const observerEl = document.getElementById('meta-observer');
     if (observerEl) {
-        // Combines the observer name and their specific observation license
         observerEl.textContent = `👤 ${currentMeta.observer} (${currentMeta.license})`;
     }
     
@@ -455,17 +454,30 @@ export function renderResultsView(questions, score) {
             const card = document.createElement('div');
             card.className = 'missed-card';
 
+            const mediaWrapper = document.createElement('div');
+            mediaWrapper.className = 'missed-card-media';
+
             if (imgUrl) {
                 const img = document.createElement('img');
                 img.src = imgUrl;
                 img.alt = primaryCommon || sciName;
-                card.appendChild(img);
+                mediaWrapper.appendChild(img);
             } else {
                 const mediaPlaceholder = document.createElement('div');
                 mediaPlaceholder.className = 'media-placeholder';
                 mediaPlaceholder.textContent = isAudioObservation ? '🔊 Audio Observation' : '⚠️ Skipped / No Image';
-                card.appendChild(mediaPlaceholder);
+                mediaWrapper.appendChild(mediaPlaceholder);
             }
+
+            if (q.mediaAttribution) {
+                const attrDiv = document.createElement('div');
+                attrDiv.className = 'missed-card-attribution';
+                attrDiv.textContent = q.mediaAttribution;
+                attrDiv.title = q.mediaAttribution;
+                mediaWrapper.appendChild(attrDiv);
+            }
+
+            card.appendChild(mediaWrapper);
             
             const cardBody = document.createElement('div');
             cardBody.className = 'missed-card-body';
@@ -497,6 +509,7 @@ export function renderResultsView(questions, score) {
             guessStrong.textContent = userGuess;
             guessDiv.appendChild(guessStrong);
             infoDiv.appendChild(guessDiv);
+
             cardBody.appendChild(infoDiv);
             
             const linksDiv = document.createElement('div');
