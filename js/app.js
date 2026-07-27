@@ -432,7 +432,7 @@ async function renderQuizQuestion() {
     if (s.currentIndex !== targetIndex) return;
 
     if (obsData.error) { 
-        if (obsData.emptyPool && s.config.difficulty === 'all' && s.config.preventDuplicates) {
+        if (obsData.emptyPool && s.config.difficulty === 'all') {
             setState({ questions: s.questions.slice(0, targetIndex) });
             s = getState();
             ui.renderResultsView(s.questions, s.score);
