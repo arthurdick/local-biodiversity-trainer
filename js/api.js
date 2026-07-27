@@ -122,6 +122,7 @@ export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, m
     const params = new URLSearchParams({
         quality_grade: 'research',
         captive: 'false',
+        hrank: 'species',
         per_page: limit,
         page: String(page),
         fields: '(count:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,ancestor_ids:!t))'

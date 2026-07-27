@@ -336,7 +336,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
             // STEP 1: Fast Pre-flight check to get total_results for dynamic pagination later
             try {
                 const preFlightData = await api.fetchSpeciesPool({
-                    perPage: 1, 
+                    perPage: 1,
                     wantsPhotos: updatedState.config.wantsPhotos,
                     wantsSounds: updatedState.config.wantsSounds,
                     months: updatedState.config.months,
