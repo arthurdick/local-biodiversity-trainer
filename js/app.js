@@ -185,6 +185,8 @@ const inputPlace = document.getElementById('input-place');
 radios.forEach(radio => {
     radio.addEventListener('change', (e) => {
         ui.clearGeneralError();
+        placeValidation.clearError();
+        
         const newMode = e.target.value;
         
         // Update the state immediately
@@ -357,13 +359,13 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     const s = getState();
 
     if (s.locMode === 'search') {
-        if (!s.placeId) { 
-            placeValidation.showError("⚠️ Please search and select a location."); 
-            hasError = true; 
+        if (!s.placeId) {
+            placeValidation.showError("⚠️ Please search and select a location.");
+            hasError = true;
         }
     } else {
         if (s.lat === null || s.lng === null) {
-            ui.showGeneralError("Please enter valid latitude and longitude coordinates, or use GPS."); 
+            ui.showGeneralError("Please enter valid latitude and longitude coordinates, or use GPS.");
             hasError = true;
         } else {
             setState({ lat: manualLat, lng: manualLng, placeId: null, radius: radius });
