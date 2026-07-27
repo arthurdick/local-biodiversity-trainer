@@ -12,13 +12,13 @@
     <main>
         <!-- Setup View -->
         <div id="setup-view" class="view active">
-            <h1 id="setup-heading" tabindex="-1" style="outline: none;">Biodiversity Trainer</h1>
+            <h1 id="setup-heading" tabindex="-1">Biodiversity Trainer</h1>
             <p>Learn local species weighted by real-world frequencies.</p>
 
             <form id="setup-form">
                 <div class="form-group z-high autocomplete-wrapper">
                     <label for="input-place">1. Location</label>
-                    <button id="btn-gps" type="button" style="margin-bottom: 10px; background-color: #555;">📍 Use My Exact Location (GPS)</button>
+                    <button id="btn-gps" type="button">📍 Use My Exact Location (GPS)</button>
                     <div class="input-relative-wrapper">
                         <input type="text" id="input-place" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="list-place" aria-haspopup="listbox" placeholder="...or search a city, park, or country" autocomplete="off">
                         <button type="button" id="clear-place" class="btn-clear" aria-label="Clear location input" title="Clear location">&times;</button>
@@ -104,67 +104,67 @@
 
         <!-- Quiz View -->
         <div id="quiz-view" class="view">
-            <h2 id="quiz-heading" class="visually-hidden" tabindex="-1" style="outline: none;">Quiz Active</h2>
+            <h2 id="quiz-heading" class="visually-hidden" tabindex="-1">Quiz Active</h2>
             <div class="progress" aria-live="polite">
                 <span id="quiz-counter">Question 1 of 10</span>
                 <span id="quiz-score">Score: 0</span>
             </div>
             
-            <div style="text-align: center; margin-bottom: 10px;">
-                <span id="quiz-target-badge" class="target-badge" style="display:none;" aria-live="polite"></span>
+            <div class="badge-container">
+                <span id="quiz-target-badge" class="target-badge" aria-live="polite"></span>
             </div>
             
             <div class="quiz-media-container">
                 <div id="quiz-loading" aria-live="assertive">Fetching random observation...</div>
-                <div id="quiz-error" style="display:none;" aria-live="assertive"></div>
+                <div id="quiz-error" aria-live="assertive"></div>
                 
                 <button type="button" id="btn-zoom-image" aria-label="View full resolution image" title="Click to view full resolution">
-                    <img id="quiz-image" src="" alt="Observation photo" style="display:none;">
+                    <img id="quiz-image" src="" alt="Observation photo">
                 </button>
                 
-                <div id="quiz-audio-container" class="audio-player-wrapper" style="display:none;">
+                <div id="quiz-audio-container" class="audio-player-wrapper">
                     <div class="audio-icon" aria-hidden="true">🎧</div>
                     <audio id="quiz-audio-player" controls preload="auto"></audio>
                 </div>
 
-                <div id="media-controls" class="media-controls" style="display:none;">
+                <div id="media-controls" class="media-controls">
                     <button type="button" id="btn-prev-media" aria-label="Previous Media">◀</button>
                     <span id="media-counter" aria-live="polite">1 / 1</span>
                     <button type="button" id="btn-next-media" aria-label="Next Media">▶</button>
                 </div>
                 
-                <div id="quiz-meta" class="quiz-meta" style="display:none;">
+                <div id="quiz-meta" class="quiz-meta">
                     <span id="meta-date"></span> <span class="divider">•</span> <a id="meta-location" target="_blank" href="#"></a>
                 </div>
                 
-                <span id="quiz-attribution" class="attribution" style="display:none;"></span>
+                <span id="quiz-attribution" class="attribution"></span>
             </div>
 
             <div class="form-group" id="answer-form">
                 <label for="input-answer">What is this?</label>
-                <div style="display: flex; gap: 10px;">
-                    <select id="input-rank" aria-label="Taxonomic Rank" style="flex: 0 0 110px;">
+                <div class="answer-inputs-row">
+                    <select id="input-rank" aria-label="Taxonomic Rank">
                         <option value="species" selected>Species</option>
                         <option value="genus">Genus</option>
                         <option value="family">Family</option>
                         <option value="order">Order</option>
                     </select>
-                    <input type="text" id="input-answer" placeholder="Common or scientific name..." autocomplete="off" style="flex: 1;">
+                    <input type="text" id="input-answer" placeholder="Common or scientific name..." autocomplete="off">
                 </div>
-                <div style="display: flex; gap: 10px; margin-top: 10px;">
-                    <button type="button" id="btn-submit" style="flex: 1;">Check Answer</button>
-                    <button type="button" id="btn-skip" style="flex: 1; display: none;">Skip</button>
+                <div class="answer-buttons-row">
+                    <button type="button" id="btn-submit">Check Answer</button>
+                    <button type="button" id="btn-skip">Skip</button>
                 </div>
             </div>
 
             <div id="feedback" aria-live="polite"></div>
-            <button type="button" id="btn-next" style="display:none; margin-top: 15px;">Next Observation ➔</button>
+            <button type="button" id="btn-next">Next Observation ➔</button>
         </div>
 
         <!-- Results View -->
         <div id="results-view" class="view">
-            <h1 id="results-heading" tabindex="-1" style="text-align: center; outline: none;">Quiz Complete!</h1>
-            <h2 style="text-align: center; font-size: 2.5em; margin-bottom: 20px;" id="final-score"></h2>
+            <h1 id="results-heading" tabindex="-1">Quiz Complete!</h1>
+            <h2 id="final-score"></h2>
             
             <div id="review-container"></div>
             

@@ -110,14 +110,12 @@ export function setupInlineValidation(inputId, entityName, validationCheckFn, ha
     function showError(message) {
         errorEl.textContent = message;
         errorEl.style.display = 'block';
-        input.style.borderColor = 'var(--error)';
-        input.style.borderWidth = '2px';
+        input.classList.add('input-error');
     }
 
     function clearError() {
         errorEl.style.display = 'none';
-        input.style.borderColor = 'var(--border)';
-        input.style.borderWidth = '1px';
+        input.classList.remove('input-error');
     }
 
     input.addEventListener('blur', () => {
@@ -263,8 +261,7 @@ export function renderFetchError(taxonName, isMediaMissing) {
         errorDiv.appendChild(document.createElement('br'));
         errorDiv.appendChild(document.createElement('br'));
         const span = document.createElement('span');
-        span.style.color = '#aaa';
-        span.style.fontWeight = 'normal';
+        span.className = 'error-hint';
         span.textContent = 'This occasionally happens in the iNaturalist database.';
         errorDiv.appendChild(span);
     } else {
@@ -275,8 +272,7 @@ export function renderFetchError(taxonName, isMediaMissing) {
         errorDiv.appendChild(document.createElement('br'));
         errorDiv.appendChild(document.createElement('br'));
         const span = document.createElement('span');
-        span.style.color = '#aaa';
-        span.style.fontWeight = 'normal';
+        span.className = 'error-hint';
         span.textContent = 'Please check your internet connection or filters.';
         errorDiv.appendChild(span);
     }
@@ -302,15 +298,17 @@ export function renderQuestionMeta(currentMeta) {
     const locText = currentMeta.locationText || 'Unknown Location';
     locLink.textContent = `📍 ${locText}`;
     
+    locLink.classList.remove('disabled-link', 'enabled-link');
+    
     if (currentMeta.coordinates) {
         locLink.href = `https://www.google.com/maps/search/?api=1&query=${currentMeta.coordinates}`;
-        locLink.style.pointerEvents = 'auto';
+        locLink.classList.add('enabled-link');
     } else if (currentMeta.locationText) {
         locLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(currentMeta.locationText)}`;
-        locLink.style.pointerEvents = 'auto';
+        locLink.classList.add('enabled-link');
     } else {
         locLink.href = "#";
-        locLink.style.pointerEvents = 'none';
+        locLink.classList.add('disabled-link');
     }
     
     document.getElementById('quiz-meta').style.display = 'inline-block';
@@ -341,8 +339,7 @@ export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm
 
         if (observationId) {
             const sep = document.createElement('span');
-            sep.style.margin = '0 4px';
-            sep.style.opacity = '0.5';
+            sep.className = 'feedback-separator';
             sep.textContent = '•';
             linksDiv.appendChild(sep);
         }
@@ -374,8 +371,7 @@ export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm
             feedback.appendChild(document.createElement('br'));
             
             const span = document.createElement('span');
-            span.style.fontSize = '0.9em';
-            span.style.fontWeight = 'normal';
+            span.className = 'feedback-alias-note';
             span.textContent = `(Recorded broadly as: ${primaryDisplayName})`;
             feedback.appendChild(span);
         } else {
@@ -430,13 +426,7 @@ export function renderResultsView(questions, score) {
 
     if (questionsToReview.length === 0) {
         const perfectDiv = document.createElement('div');
-        perfectDiv.style.textAlign = 'center';
-        perfectDiv.style.padding = '20px';
-        perfectDiv.style.background = '#e8f5e9';
-        perfectDiv.style.color = 'var(--success)';
-        perfectDiv.style.borderRadius = 'var(--radius)';
-        perfectDiv.style.marginBottom = '20px';
-        perfectDiv.style.fontWeight = 'bold';
+        perfectDiv.className = 'perfect-score-banner';
         perfectDiv.textContent = '🎉 Perfect score! You identified every species correctly!';
         reviewContainer.appendChild(perfectDiv);
     } else {
@@ -466,12 +456,7 @@ export function renderResultsView(questions, score) {
                 card.appendChild(img);
             } else {
                 const mediaPlaceholder = document.createElement('div');
-                mediaPlaceholder.style.height = '130px';
-                mediaPlaceholder.style.background = '#333';
-                mediaPlaceholder.style.display = 'flex';
-                mediaPlaceholder.style.alignItems = 'center';
-                mediaPlaceholder.style.justifyContent = 'center';
-                mediaPlaceholder.style.color = '#888';
+                mediaPlaceholder.className = 'media-placeholder';
                 mediaPlaceholder.textContent = isAudioObservation ? '🔊 Audio Observation' : '⚠️ Skipped / No Image';
                 card.appendChild(mediaPlaceholder);
             }
@@ -496,8 +481,7 @@ export function renderResultsView(questions, score) {
             guessDiv.className = 'missed-card-guess';
             
             if (q.isCorrect && q.pointsEarned < 10) {
-                guessDiv.style.background = '#fff3cd';
-                guessDiv.style.color = '#856404';
+                guessDiv.classList.add('partial-credit');
                 guessDiv.textContent = 'Partial Credit: ';
             } else {
                 guessDiv.textContent = 'Your answer: ';
