@@ -2,10 +2,7 @@ import { getState, setState, updateQuestion, resetState } from './state.js';
 import * as api from './api.js';
 import * as engine from './quizEngine.js';
 import * as ui from './ui.js';
-
-// --- RUNTIME CACHE ---
-const pendingFetches = new Map();
-const activeControllers = new Map();
+import * as observationService from './observationService.js';
 
 // --- STATE SELECTORS (Derived Data) ---
 function selectCurrentMedia(currentState) {
@@ -56,25 +53,6 @@ function debounce(func, timeout = 250) {
     return (...args) => { clearTimeout(timer); timer = setTimeout(() => { func.apply(this, args); }, timeout); };
 }
 
-/**
- * Calculates a dynamic network timeout based on the user's connection speed.
- */
-function getDynamicNetworkTimeout(defaultTimeout = 10000) {
-    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-    if (!connection) return defaultTimeout;
-
-    switch (connection.effectiveType) {
-        case 'slow-2g':
-        case '2g':
-            return 30000; // 30 seconds for very slow connections
-        case '3g':
-            return 20000; // 20 seconds for 3G
-        case '4g':
-        default:
-            return defaultTimeout;
-    }
-}
-
 function savePreferences() {
     const s = getState();
     const prefs = {
@@ -98,7 +76,6 @@ function loadPreferences() {
         if (!saved) return;
         const prefs = JSON.parse(saved);
 
-        // Ensure the parsed data is actually an object before accessing properties
         if (typeof prefs !== 'object' || prefs === null) return;
 
         setState({
@@ -109,11 +86,9 @@ function loadPreferences() {
             taxonName: typeof prefs.taxonName === 'string' ? prefs.taxonName : null
         });
 
-        // Validate standard text inputs
         if (typeof prefs.placeName === 'string') document.getElementById('input-place').value = prefs.placeName;
         if (typeof prefs.taxonName === 'string') document.getElementById('input-taxon').value = prefs.taxonName;
         
-        // Validate select options against expected strict values
         const validDifficulties = ['15', '50', '125', '500', 'all'];
         if (typeof prefs.difficulty === 'string' && validDifficulties.includes(prefs.difficulty)) {
             document.getElementById('input-difficulty').value = prefs.difficulty;
@@ -124,13 +99,11 @@ function loadPreferences() {
             document.getElementById('input-questions').value = String(prefs.questions);
         }
 
-        // Validate booleans
         if (typeof prefs.chkPhotos === 'boolean') document.getElementById('chk-photos').checked = prefs.chkPhotos;
         if (typeof prefs.chkSounds === 'boolean') document.getElementById('chk-sounds').checked = prefs.chkSounds;
         if (typeof prefs.chkUnique === 'boolean') document.getElementById('chk-unique').checked = prefs.chkUnique;
         if (typeof prefs.chkRarity === 'boolean') document.getElementById('chk-rarity').checked = prefs.chkRarity;
         
-        // Safely validate array structure to prevent TypeError on .includes()
         if (Array.isArray(prefs.months)) {
             document.querySelectorAll('#month-filters input').forEach(cb => {
                 cb.checked = prefs.months.includes(cb.value);
@@ -167,13 +140,11 @@ function setupAutocomplete(config) {
     const inputEl = document.getElementById(config.inputId);
     const clearBtnEl = document.getElementById(config.clearBtnId);
 
-    // Input event for fetching
     inputEl.addEventListener('input', debounce(async (e) => {
         ui.toggleClearButton(config.inputId, config.clearBtnId);
         const query = e.target.value;
         const listEl = document.getElementById(config.listId);
         
-        // Safer and faster than innerHTML = ''
         listEl.replaceChildren();
         
         setState(config.onClearState());
@@ -230,10 +201,8 @@ function setupAutocomplete(config) {
         }
     }));
 
-    // Keyboard navigation
     inputEl.addEventListener('keydown', (e) => ui.handleAutocompleteKeydown(e, config.listId));
 
-    // Clear button functionality
     clearBtnEl.addEventListener('click', () => {
         inputEl.value = '';
         setState(config.onClearState());
@@ -244,7 +213,6 @@ function setupAutocomplete(config) {
     });
 }
 
-// Initialize Autocompletes
 setupAutocomplete({
     inputId: 'input-place',
     listId: 'list-place',
@@ -319,7 +287,6 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     const preventDuplicates = document.getElementById('chk-unique').checked;
     const isRarityMode = document.getElementById('chk-rarity').checked;
 
-    // Snapshot user preferences directly into state config
     setState({
         config: { wantsPhotos, wantsSounds, months, difficulty, preventDuplicates, isRarityMode, expertTotalSpecies: 0 }
     });
@@ -330,10 +297,8 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
 
     const updatedState = getState();
 
-    // -- EXPERT MODE LOGIC --
     if (difficulty === 'all') {
         if (isRarityMode) {
-            // STEP 1: Fast Pre-flight check to get total_results for dynamic pagination later
             try {
                 const preFlightData = await api.fetchSpeciesPool({
                     perPage: 1,
@@ -348,12 +313,10 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
 
                 const totalSpecies = preFlightData.total_results || 0;
                 
-                // Cap question count if preventDuplicates is true and total species is less than selected question count
                 const actualQuestionCount = updatedState.config.preventDuplicates && totalSpecies > 0
                     ? Math.min(questionLimit, totalSpecies)
                     : questionLimit;
                 
-                // Shift the heavy lifting to the JIT loader for per-question randomization
                 setState({
                     config: { ...updatedState.config, expertTotalSpecies: totalSpecies },
                     questions: Array.from({ length: actualQuestionCount }, () => ({ taxon: null, observation: null })),
@@ -361,7 +324,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
                     score: 0
                 });
                 
-                loadObservationForQuestion(0);
+                observationService.loadObservationForQuestion(0);
                 ui.showView('quiz-view');
                 renderQuizQuestion();
             } catch (error) {
@@ -371,14 +334,13 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
             }
             return;
         } else {
-            // Standard Expert logic
             setState({
                 questions: Array.from({ length: questionLimit }, () => ({ taxon: null, observation: null })),
                 currentIndex: 0,
                 score: 0
             });
             
-            loadObservationForQuestion(0);
+            observationService.loadObservationForQuestion(0);
             ui.showView('quiz-view');
             renderQuizQuestion();
             
@@ -387,7 +349,6 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
         }
     }
 
-    // -- STANDARD POOLS (Beginner to Hard) --
     try {
         const data = await api.fetchSpeciesPool({
             difficulty,
@@ -412,7 +373,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
             score: 0
         });
         
-        loadObservationForQuestion(0);
+        observationService.loadObservationForQuestion(0);
         ui.showView('quiz-view');
         renderQuizQuestion();
     } catch (error) {
@@ -421,188 +382,6 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
         btn.disabled = false; btn.textContent = "Load Quiz Pool";
     }
 });
-
-// --- JIT PREFETCH WITH CACHE ---
-async function loadObservationForQuestion(index) {
-    const s = getState();
-    if (index >= s.questions.length) return;
-    
-    // Check state first
-    if (s.questions[index].observation) return s.questions[index].observation;
-    
-    // Check runtime cache for pending fetch
-    if (pendingFetches.has(index)) return pendingFetches.get(index);
-
-    if (!navigator.onLine) {
-        const errorData = { error: true };
-        updateQuestion(index, { observation: errorData });
-        return errorData;
-    }
-
-    // Instantiate and track the AbortController outside the promise
-    const controller = new AbortController();
-    activeControllers.set(index, controller);
-
-    const fetchPromise = (async () => {
-        const q = getState().questions[index]; // Fetch fresh copy
-        const currentConfig = getState().config;
-        
-        // Mode detection
-        const isStandardExpert = currentConfig.difficulty === 'all' && !currentConfig.isRarityMode;
-        const isRareExpert = currentConfig.difficulty === 'all' && currentConfig.isRarityMode;
-
-        try {
-            const timeoutMs = getDynamicNetworkTimeout();
-            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-            
-            let targetTaxon = q.taxon;
-            
-            // If in Rare Expert mode and we haven't assigned a taxon yet, fetch a random deep page!
-            if (isRareExpert && !targetTaxon) {
-                const totalSpecies = currentConfig.expertTotalSpecies || 0;
-                let deepPage = 1;
-                
-                if (totalSpecies > 50) {
-                    // iNaturalist API safely supports paging deep, cap at 200 (10,000 results limit)
-                    const maxPages = Math.min(Math.ceil(totalSpecies / 50), 200); 
-                    
-                    // Approximate inverse weighting using a logarithmic curve to prevent extreme skew
-                    // Higher pages inherently contain rarer species, weighted using a milder 1 + log10 scale
-                    let totalWeight = 0;
-                    const pageWeights = [];
-                    
-                    for (let p = 1; p <= maxPages; p++) {
-                        const weight = 1 + Math.log10(p);
-                        totalWeight += weight;
-                        pageWeights.push({ page: p, threshold: totalWeight });
-                    }
-                    
-                    const roll = Math.random() * totalWeight;
-                    // Safely fallback to the final item against floating point bounds
-                    deepPage = (pageWeights.find(pw => roll <= pw.threshold) || pageWeights[pageWeights.length - 1]).page;
-                }
-
-                const deepData = await api.fetchSpeciesPool({
-                    perPage: 50,
-                    page: deepPage,
-                    wantsPhotos: currentConfig.wantsPhotos,
-                    wantsSounds: currentConfig.wantsSounds,
-                    months: currentConfig.months,
-                    placeId: s.placeId,
-                    lat: s.lat,
-                    lng: s.lng,
-                    taxonId: s.taxonId
-                }, controller.signal);
-
-                if (deepData.results && deepData.results.length > 0) {
-                    let validResults = deepData.results;
-                    
-                    // Internal duplicate prevention to ensure we don't pick a rare bird twice
-                    if (currentConfig.preventDuplicates) {
-                        const existingIds = getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined);
-                        validResults = deepData.results.filter(r => !existingIds.includes(r.taxon.id));
-                        
-                        // If no unique species remain across available results, treat as empty pool
-                        if (validResults.length === 0) {
-                            clearTimeout(timeoutId);
-                            const emptyData = { error: true, emptyPool: true };
-                            updateQuestion(index, { observation: emptyData });
-                            return emptyData;
-                        }
-                    }
-
-                    let randomItem;
-
-                    // If total species is very small, use true inverse logarithmic weighting
-                    if (totalSpecies <= 50) {
-                        let totalWeight = 0;
-                        
-                        const weightedResults = validResults.map(r => {
-                            const count = Math.max(1, r.count || 1); // Fallback in case count is missing
-                            const logWeight = Math.log10(count + 1);
-                            const weight = 1 / logWeight;
-                            totalWeight += weight;
-                            return { item: r, threshold: totalWeight };
-                        });
-                        
-                        const roll = Math.random() * totalWeight;
-                        // Precision safety fallback
-                        randomItem = (weightedResults.find(w => roll <= w.threshold) || weightedResults[weightedResults.length - 1]).item;
-                    } else {
-                        // For large pools, the deep paging logic has already handled the rarity weighting
-                        randomItem = validResults[Math.floor(Math.random() * validResults.length)];
-                    }
-
-                    targetTaxon = randomItem.taxon;
-                    
-                    // Sync it to state immediately so if the observation fetch fails, we retain the chosen taxon for retries
-                    updateQuestion(index, { taxon: targetTaxon });
-                } else {
-                    clearTimeout(timeoutId);
-                    const emptyData = { error: true, emptyPool: true };
-                    updateQuestion(index, { observation: emptyData });
-                    return emptyData;
-                }
-            }
-            
-            // Only use API-level duplicate prevention for standard random expert mode
-            const withoutTaxonIds = (isStandardExpert && currentConfig.preventDuplicates)
-                ? getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined)
-                : [];
-
-            const data = await api.fetchObservation({
-                wantsPhotos: currentConfig.wantsPhotos,
-                wantsSounds: currentConfig.wantsSounds,
-                months: currentConfig.months,
-                placeId: s.placeId,
-                lat: s.lat,
-                lng: s.lng,
-                // Avoid passing 'all' when we have a pre-selected taxon,
-                // so the API doesn't falsely filter out hybrid, form, or variety ranks.
-                difficulty: isStandardExpert ? 'all' : 'specific',
-                // Assign accurate TaxonID based on active mode
-                taxonId: isStandardExpert ? s.taxonId : targetTaxon?.id,
-                withoutTaxonIds
-            }, controller.signal);
-
-            clearTimeout(timeoutId);
-
-            if (data.results && data.results.length > 0) {
-                const obs = data.results[0];
-                const updates = { observation: obs };
-                
-                // Only overwrite the taxon state if we are in standard random expert mode
-                if (isStandardExpert) updates.taxon = obs.taxon;
-                
-                updateQuestion(index, updates);
-                
-                if (obs.photos && obs.photos.length > 0) {
-                    const preload = new Image();
-                    preload.src = obs.photos[0].url.replace('square', 'medium');
-                }
-                return obs;
-            } else {
-                const emptyData = { error: true, emptyPool: true };
-                updateQuestion(index, { observation: emptyData });
-                return emptyData;
-            }
-        } catch(e) {
-            const errorData = { error: true };
-            
-            // Only update state if it wasn't an intentional abort from a restart
-            if (e.name !== 'AbortError') {
-                updateQuestion(index, { observation: errorData });
-            }
-            return errorData;
-        } finally {
-            pendingFetches.delete(index);
-            activeControllers.delete(index);
-        }
-    })();
-
-    pendingFetches.set(index, fetchPromise);
-    return fetchPromise;
-}
 
 // --- MEDIA NAVIGATION ---
 document.getElementById('btn-prev-media').addEventListener('click', () => {
@@ -625,7 +404,6 @@ document.getElementById('btn-next-media').addEventListener('click', () => {
 
 // --- GAME LOOP ---
 async function renderQuizQuestion() {
-    // 1. Capture the target index before any async operations occur
     const targetIndex = getState().currentIndex;
     
     setState({ isQuestionLoaded: false, currentMediaIndex: 0 });
@@ -635,12 +413,10 @@ async function renderQuizQuestion() {
 
     const q = s.questions[targetIndex];
     
-    // Will pull from cache if running or resolve directly
-    const obsData = await loadObservationForQuestion(targetIndex);
+    const obsData = await observationService.loadObservationForQuestion(targetIndex);
 
-    s = getState(); // Refresh state after await
+    s = getState();
 
-    // 2. Guard against race conditions: abort if the user has moved on to a new question
     if (s.currentIndex !== targetIndex) return;
 
     if (obsData.error) { 
@@ -670,7 +446,7 @@ function handleFetchErrorFallback(q, isMediaMissing = false) {
     
     ui.renderFetchError(taxonName, isMediaMissing);
     setState({ isQuestionLoaded: true });
-    loadObservationForQuestion(getState().currentIndex + 1);
+    observationService.loadObservationForQuestion(getState().currentIndex + 1);
 }
 
 function triggerQuestionReady() {
@@ -689,7 +465,7 @@ function triggerQuestionReady() {
         document.getElementById('input-answer').focus();
         document.getElementById('btn-submit').style.display = 'block';
         document.getElementById('btn-skip').style.display = 'block';
-        loadObservationForQuestion(s.currentIndex + 1);
+        observationService.loadObservationForQuestion(s.currentIndex + 1);
     }
 }
 
@@ -712,7 +488,7 @@ document.getElementById('quiz-image').onerror = (e) => {
         document.getElementById('media-controls').style.display = 'none';
         ui.renderFetchError("", false);
         setState({ isQuestionLoaded: true });
-        loadObservationForQuestion(getState().currentIndex + 1);
+        observationService.loadObservationForQuestion(getState().currentIndex + 1);
     }
 };
 
@@ -723,7 +499,7 @@ document.getElementById('quiz-audio-player').onerror = () => {
         document.getElementById('media-controls').style.display = 'none';
         ui.renderFetchError("", false);
         setState({ isQuestionLoaded: true });
-        loadObservationForQuestion(getState().currentIndex + 1);
+        observationService.loadObservationForQuestion(getState().currentIndex + 1);
     }
 };
 
@@ -756,9 +532,7 @@ zoomScroll.addEventListener('click', (e) => {
     if (e.target === zoomScroll) closeModal();
 });
 
-// Toggle 100% zoom and panning
 zoomImg.addEventListener('click', (e) => {
-    // 1. Capture ratios BEFORE toggling the class so we get the click position on the shrunk image
     const rect = zoomImg.getBoundingClientRect();
     const xRatio = (e.clientX - rect.left) / rect.width;
     const yRatio = (e.clientY - rect.top) / rect.height;
@@ -766,13 +540,10 @@ zoomImg.addEventListener('click', (e) => {
     const isZoomed = zoomImg.classList.toggle('zoomed-in');
     
     if (isZoomed) {
-        // 2. Wait a frame for the browser to layout the 100% native image
         requestAnimationFrame(() => {
-            // 3. Calculate target point, strictly factoring in the image's layout offsets inside the container
             const targetX = zoomImg.offsetLeft + (zoomImg.offsetWidth * xRatio);
             const targetY = zoomImg.offsetTop + (zoomImg.offsetHeight * yRatio);
 
-            // 4. Scroll the container to perfectly center the target coordinate
             zoomScroll.scrollLeft = targetX - (zoomScroll.clientWidth / 2);
             zoomScroll.scrollTop = targetY - (zoomScroll.clientHeight / 2);
         });
@@ -796,67 +567,18 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
     btnSubmit.disabled = true;
     btnSubmit.textContent = "Checking...";
 
-    let { isCorrect, matchedNameDisplay, normalizedInput } = engine.checkExactMatch(inputStr, taxon);
-    let pointsEarned = 0;
-
-    // Force API check for higher ranks to verify against taxon ancestors
-    if (guessedRank !== 'species') {
-        isCorrect = false;
-    } else if (isCorrect) {
-        pointsEarned = engine.getPointsForRank('species');
-    }
-
-    if (!isCorrect && navigator.onLine) {
-        try {
-            const controller = new AbortController();
-            const timeoutMs = getDynamicNetworkTimeout();
-            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-            
-            // Pass guessedRank to the API call
-            const searchData = await api.checkTaxonSearch(inputStr, guessedRank, controller.signal);
-            clearTimeout(timeoutId);
-            
-            if (searchData.results && searchData.results.length > 0) {
-                for (const result of searchData.results) {
-                    const isExactMatch = result.id === taxon.id;
-                    const isGuessChildOfTarget = result.ancestor_ids && result.ancestor_ids.includes(taxon.id);
-                    // Crucial: check if the user's guessed taxon is a valid ancestor of our target
-                    const isGuessParentOfTarget = taxon.ancestor_ids && taxon.ancestor_ids.includes(result.id);
-                    
-                    const validNames = [engine.normalize(result.name), engine.normalize(result.preferred_common_name), engine.normalize(result.matched_term)];
-                    
-                    if (validNames.includes(normalizedInput)) {
-                        if (guessedRank === 'species' && (isExactMatch || isGuessChildOfTarget || isGuessParentOfTarget)) {
-                            isCorrect = true;
-                            pointsEarned = engine.getPointsForRank('species');
-                            matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;
-                            break;
-                        } else if (guessedRank !== 'species' && isGuessParentOfTarget) {
-                            isCorrect = true;
-                            pointsEarned = engine.getPointsForRank(guessedRank);
-                            matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;
-                            break;
-                        }
-                    }
-                }
-            }
-        } catch (error) { console.warn("API check failed. Relying on local strict match."); }
-    }
-
-    // Offline / Local Genus Fallback
-    if (!isCorrect && guessedRank === 'genus' && taxon.name) {
-        const actualGenus = engine.normalize(taxon.name.split(' ')[0]);
-        if (normalizedInput === actualGenus) {
-            isCorrect = true;
-            pointsEarned = engine.getPointsForRank('genus');
-            matchedNameDisplay = taxon.name.split(' ')[0];
-        }
-    }
+    const { isCorrect, pointsEarned, matchedNameDisplay } = await engine.evaluateAnswer(
+        inputStr,
+        guessedRank,
+        taxon,
+        navigator.onLine,
+        observationService.getDynamicNetworkTimeout
+    );
     
     updateQuestion(s.currentIndex, {
         userAnswer: `${inputStr} (${guessedRank})`,
         isCorrect: isCorrect,
-        pointsEarned: pointsEarned, // Storing for missed question review later
+        pointsEarned: pointsEarned,
         thumbnailUrl: engine.getQuestionThumbnail(q, selectCurrentMedia(s))
     });
     
@@ -919,10 +641,7 @@ document.getElementById('btn-next').addEventListener('click', (e) => {
 });
 
 document.getElementById('btn-restart').addEventListener('click', () => {
-    activeControllers.forEach(controller => controller.abort());
-    activeControllers.clear();
-    pendingFetches.clear();
-
+    observationService.clearCache();
     resetState();
     loadPreferences();
     ui.showView('setup-view');

@@ -1,3 +1,5 @@
+import * as api from './api.js';
+
 export function normalize(str) {
     if (!str) return '';
     return str
@@ -18,19 +20,23 @@ export function getQuestionThumbnail(q, currentMediaArray) {
     return '';
 }
 
+/**
+ * Standardizes logarithmic weighting mathematically to reduce API skewing.
+ */
+export function getLogWeight(count) {
+    return Math.log10(Math.max(1, count) + 1);
+}
+
 export function generateWeightedPool(dataResults, questionLimit, preventDuplicates, isRarityMode = false) {
     const questions = [];
     
-    // Create a working pool with our adjusted weights
+    // Create a working pool using the standardized weights
     let availablePool = dataResults.map(r => {
-        // Enforce a minimum count of 1 to prevent log10(1) = 0 and subsequent Infinity issues
         const count = Math.max(1, r.count || 1); 
-        // Apply logarithmic transformation to smooth extreme skews
-        const logWeight = Math.log10(count + 1);
+        const logWeight = getLogWeight(count);
         
         return {
             taxon: r.taxon,
-            // If rarity mode is on, invert the log weight
             weight: isRarityMode ? (1 / logWeight) : logWeight
         };
     });
@@ -44,7 +50,6 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
             if (totalWeight <= 0) break;
 
             const roll = Math.random() * totalWeight;
-            // Default selectedIndex to the last item to prevent floating-point rounding errors defaulting to index 0
             let runningWeight = 0, selectedIndex = availablePool.length - 1;
 
             for (let j = 0; j < availablePool.length; j++) {
@@ -70,12 +75,50 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
 
         for (let i = 0; i < questionLimit; i++) {
             const roll = Math.random() * totalWeights;
-            // Fallback to the last item to handle potential float rounding precision issues
             const selected = weightedPool.find(item => roll <= item.threshold) || weightedPool[weightedPool.length - 1];
             questions.push({ taxon: selected.taxon, observation: null });
         }
     }
     return questions;
+}
+
+/**
+ * Deep paging algorithm for Rare Expert mode.
+ */
+export function calculateDeepPage(totalSpecies) {
+    let deepPage = 1;
+    if (totalSpecies > 50) {
+        const maxPages = Math.min(Math.ceil(totalSpecies / 50), 200);
+        let totalWeight = 0;
+        const pageWeights = [];
+        
+        for (let p = 1; p <= maxPages; p++) {
+            const weight = 1 + Math.log10(p);
+            totalWeight += weight;
+            pageWeights.push({ page: p, threshold: totalWeight });
+        }
+        
+        const roll = Math.random() * totalWeight;
+        deepPage = (pageWeights.find(pw => roll <= pw.threshold) || pageWeights[pageWeights.length - 1]).page;
+    }
+    return deepPage;
+}
+
+/**
+ * Selects a rare taxon utilizing inverse logarithmic weighting for isolated small pools.
+ */
+export function selectRareTaxonFromPool(validResults) {
+    let totalWeight = 0;
+    const weightedResults = validResults.map(r => {
+        const count = Math.max(1, r.count || 1);
+        const logWeight = getLogWeight(count);
+        const weight = 1 / logWeight;
+        totalWeight += weight;
+        return { item: r, threshold: totalWeight };
+    });
+    
+    const roll = Math.random() * totalWeight;
+    return (weightedResults.find(w => roll <= w.threshold) || weightedResults[weightedResults.length - 1]).item;
 }
 
 export function checkExactMatch(inputStr, taxon) {
@@ -97,4 +140,65 @@ export function getPointsForRank(rank) {
         case 'order': return 2;
         default: return 0;
     }
+}
+
+/**
+ * Orchestrates local strict matching, API ancestor validation, and offline Genus fallback.
+ */
+export async function evaluateAnswer(inputStr, guessedRank, taxon, isOnline, getTimeoutFn) {
+    let { isCorrect, matchedNameDisplay, normalizedInput } = checkExactMatch(inputStr, taxon);
+    let pointsEarned = 0;
+
+    if (guessedRank !== 'species') {
+        isCorrect = false;
+    } else if (isCorrect) {
+        pointsEarned = getPointsForRank('species');
+    }
+
+    if (!isCorrect && isOnline) {
+        try {
+            const controller = new AbortController();
+            const timeoutMs = getTimeoutFn ? getTimeoutFn() : 10000;
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+            
+            const searchData = await api.checkTaxonSearch(inputStr, guessedRank, controller.signal);
+            clearTimeout(timeoutId);
+            
+            if (searchData.results && searchData.results.length > 0) {
+                for (const result of searchData.results) {
+                    const isExactMatch = result.id === taxon.id;
+                    const isGuessChildOfTarget = result.ancestor_ids && result.ancestor_ids.includes(taxon.id);
+                    const isGuessParentOfTarget = taxon.ancestor_ids && taxon.ancestor_ids.includes(result.id);
+                    
+                    const validNames = [normalize(result.name), normalize(result.preferred_common_name), normalize(result.matched_term)];
+                    
+                    if (validNames.includes(normalizedInput)) {
+                        if (guessedRank === 'species' && (isExactMatch || isGuessChildOfTarget || isGuessParentOfTarget)) {
+                            isCorrect = true;
+                            pointsEarned = getPointsForRank('species');
+                            matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;
+                            break;
+                        } else if (guessedRank !== 'species' && isGuessParentOfTarget) {
+                            isCorrect = true;
+                            pointsEarned = getPointsForRank(guessedRank);
+                            matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (error) { console.warn("API check failed. Relying on local strict match."); }
+    }
+
+    // Offline / Local Genus Fallback
+    if (!isCorrect && guessedRank === 'genus' && taxon.name) {
+        const actualGenus = normalize(taxon.name.split(' ')[0]);
+        if (normalizedInput === actualGenus) {
+            isCorrect = true;
+            pointsEarned = getPointsForRank('genus');
+            matchedNameDisplay = taxon.name.split(' ')[0];
+        }
+    }
+
+    return { isCorrect, pointsEarned, matchedNameDisplay };
 }
