@@ -1,5 +1,8 @@
 const API_BASE = 'https://api.inaturalist.org/v2';
 
+// Valid Creative Commons licenses
+const CC_LICENSES = 'cc0,cc-by,cc-by-nc,cc-by-sa,cc-by-nd,cc-by-nc-sa,cc-by-nc-nd';
+
 /**
  * Resolves the user's preferred locale from browser settings.
  */
@@ -98,9 +101,15 @@ const appendMediaParams = (params, wantsPhotos, wantsSounds) => {
         params.set('sounds', 'true');
     }
     
-    // Filter observations and photos to ensure they are licensed
-    params.set('licensed', 'true');
-    params.set('photo_licensed', 'true');
+    // Ensure both observation data and associated media strictly use open licenses
+    params.set('license', CC_LICENSES);
+    
+    if (wantsPhotos) {
+        params.set('photo_license', CC_LICENSES);
+    }
+    if (wantsSounds) {
+        params.set('sound_license', CC_LICENSES);
+    }
 };
 
 /**
