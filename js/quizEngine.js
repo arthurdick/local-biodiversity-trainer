@@ -37,6 +37,7 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
         
         return {
             taxon: r.taxon,
+            count: count,
             weight: isRarityMode ? (1 / logWeight) : logWeight
         };
     });
@@ -67,16 +68,33 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
             availablePool.splice(selectedIndex, 1);
         }
     } else {
-        let totalWeights = 0;
-        const weightedPool = availablePool.map(item => {
-            totalWeights += item.weight;
-            return { taxon: item.taxon, threshold: totalWeights };
-        });
-
+        // Dynamic recalculation for allowed duplicates
         for (let i = 0; i < questionLimit; i++) {
-            const roll = Math.random() * totalWeights;
-            const selected = weightedPool.find(item => roll <= item.threshold) || weightedPool[weightedPool.length - 1];
-            questions.push({ taxon: selected.taxon, observation: null });
+            if (availablePool.length === 0) break; // Stop gracefully if the entire pool is exhausted
+            
+            let totalWeight = availablePool.reduce((sum, item) => sum + item.weight, 0);
+            const roll = Math.random() * totalWeight;
+            
+            let runningWeight = 0, selectedIndex = availablePool.length - 1;
+
+            for (let j = 0; j < availablePool.length; j++) {
+                runningWeight += availablePool[j].weight;
+                if (roll <= runningWeight) {
+                    selectedIndex = j;
+                    break;
+                }
+            }
+
+            const selectedItem = availablePool[selectedIndex];
+            questions.push({ taxon: selectedItem.taxon, observation: null });
+            
+            // Track how many times this species has been queued
+            selectedItem.selectedCount = (selectedItem.selectedCount || 0) + 1;
+            
+            // If we've exhausted all observations for this species, remove it from the pool
+            if (selectedItem.selectedCount >= selectedItem.count) {
+                availablePool.splice(selectedIndex, 1);
+            }
         }
     }
     return questions;

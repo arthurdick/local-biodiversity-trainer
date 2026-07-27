@@ -92,13 +92,28 @@ export async function loadObservationForQuestion(index) {
                     if (currentConfig.preventDuplicates) {
                         const existingIds = getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined);
                         validResults = deepData.results.filter(r => !existingIds.includes(r.taxon.id));
+                    } else {
+                        // Calculate how many times each taxon has already been queued
+                        const existingIdCounts = {};
+                        getState().questions.forEach(quest => {
+                            if (quest.taxon?.id) {
+                                existingIdCounts[quest.taxon.id] = (existingIdCounts[quest.taxon.id] || 0) + 1;
+                            }
+                        });
                         
-                        if (validResults.length === 0) {
-                            clearTimeout(timeoutId);
-                            const emptyData = { error: true, emptyPool: true };
-                            updateQuestion(index, { observation: emptyData });
-                            return emptyData;
-                        }
+                        // Filter out taxa where the selected count meets or exceeds total available observations
+                        validResults = deepData.results.filter(r => {
+                            const selectedCount = existingIdCounts[r.taxon.id] || 0;
+                            const totalAvailable = Math.max(1, r.count || 1);
+                            return selectedCount < totalAvailable;
+                        });
+                    }
+                    
+                    if (validResults.length === 0) {
+                        clearTimeout(timeoutId);
+                        const emptyData = { error: true, emptyPool: true };
+                        updateQuestion(index, { observation: emptyData });
+                        return emptyData;
                     }
 
                     let randomItem;
@@ -123,6 +138,10 @@ export async function loadObservationForQuestion(index) {
             const withoutTaxonIds = (isStandardExpert && currentConfig.preventDuplicates)
                 ? getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined)
                 : [];
+                
+            const notObsIds = getState().questions
+                .map(quest => quest.observation?.uuid)
+                .filter(uuid => uuid !== undefined);
 
             const data = await api.fetchObservation({
                 wantsPhotos: currentConfig.wantsPhotos,
@@ -133,7 +152,8 @@ export async function loadObservationForQuestion(index) {
                 lng: s.lng,
                 difficulty: isStandardExpert ? 'all' : 'specific',
                 taxonId: isStandardExpert ? s.taxonId : targetTaxon?.id,
-                withoutTaxonIds
+                withoutTaxonIds,
+                notObsIds
             }, controller.signal);
 
             clearTimeout(timeoutId);

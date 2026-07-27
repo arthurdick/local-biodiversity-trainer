@@ -161,13 +161,13 @@ export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, m
     return res.json();
 };
 
-export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, placeId, lat, lng, difficulty, taxonId, withoutTaxonIds = [] }, signal) => {
+export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, placeId, lat, lng, difficulty, taxonId, withoutTaxonIds = [], notObsIds = [] }, signal) => {
     const params = new URLSearchParams({
         quality_grade: 'research',
         captive: 'false',
         per_page: '1',
         order_by: 'random',
-        fields: '(id:!t,observed_on:!t,place_guess:!t,location:!t,license_code:!t,user:(login:!t,name:!t),taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,ancestor_ids:!t),photos:(url:!t,attribution:!t,license_code:!t),sounds:(file_url:!t,attribution:!t,license_code:!t))'
+        fields: '(id:!t,uuid:!t,observed_on:!t,place_guess:!t,location:!t,license_code:!t,user:(login:!t,name:!t),taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,ancestor_ids:!t),photos:(url:!t,attribution:!t,license_code:!t),sounds:(file_url:!t,attribution:!t,license_code:!t))'
     });
 
     appendMediaParams(params, wantsPhotos, wantsSounds);
@@ -189,6 +189,10 @@ export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, place
         }
     } else if (taxonId) {
         params.set('taxon_id', String(taxonId));
+    }
+
+    if (notObsIds && notObsIds.length > 0) {
+        params.set('not_id', notObsIds.join(','));
     }
 
     const res = await apiQueue.enqueue(`${API_BASE}/observations?${params}`, { cache: 'no-store', signal });
