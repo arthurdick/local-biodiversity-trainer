@@ -36,10 +36,17 @@ function selectCurrentMedia(currentState) {
 function selectCurrentMeta(currentState) {
     const obs = currentState.questions[currentState.currentIndex]?.observation;
     if (!obs || obs.error) return null;
+    
+    const formattedLicense = obs.license_code
+        ? obs.license_code.toUpperCase()
+        : 'All Rights Reserved';
+
     return {
         date: obs.observed_on,
         locationText: obs.place_guess,
-        coordinates: obs.location
+        coordinates: obs.location,
+        observer: obs.user?.name || obs.user?.login || 'Unknown Observer',
+        license: formattedLicense
     };
 }
 

@@ -311,7 +311,13 @@ export function renderQuestionMeta(currentMeta) {
         locLink.classList.add('disabled-link');
     }
     
-    document.getElementById('quiz-meta').style.display = 'inline-block';
+    const observerEl = document.getElementById('meta-observer');
+    if (observerEl) {
+        // Combines the observer name and their specific observation license
+        observerEl.textContent = `👤 ${currentMeta.observer} (${currentMeta.license})`;
+    }
+    
+    document.getElementById('quiz-meta').style.display = 'flex';
 }
 
 export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm, primaryCommonNorm, sciNorm, score, pointsEarned, guessedRank, isSkipped = false, observationId = null) {
