@@ -356,7 +356,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     ui.clearGeneralError();
     let hasError = false;
     
-    const s = getState();
+    let s = getState();
 
     if (s.locMode === 'search') {
         if (!s.placeId) {
@@ -364,7 +364,11 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
             hasError = true;
         }
     } else {
-        if (s.lat === null || s.lng === null) {
+        const manualLat = parseFloat(document.getElementById('input-lat').value);
+        const manualLng = parseFloat(document.getElementById('input-lng').value);
+        const radius = parseInt(document.getElementById('input-radius').value, 10) || 10;
+        
+        if (isNaN(manualLat) || isNaN(manualLng)) {
             ui.showGeneralError("Please enter valid latitude and longitude coordinates, or use GPS.");
             hasError = true;
         } else {
