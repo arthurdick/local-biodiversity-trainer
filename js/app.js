@@ -497,14 +497,28 @@ async function loadObservationForQuestion(index) {
                         validResults = deepData.results.filter(r => !existingIds.includes(r.taxon.id));
                         if (validResults.length === 0) validResults = deepData.results; // fallback
                     }
-                    
-                    // If total species is very small, manually skew towards the bottom half of the array
+
+                    let randomItem;
+
+                    // If total species is very small, use true inverse weighting instead of array slicing
                     if (totalSpecies <= 50) {
-                        validResults = validResults.slice(Math.floor(validResults.length / 2));
-                        if (validResults.length === 0) validResults = deepData.results;
+                        let totalWeight = 0;
+                        const smoothingConstant = 1; // Prevents species with a count of 1 from completely eclipsing others
+                        
+                        const weightedResults = validResults.map(r => {
+                            const count = r.count || 1; // Fallback in case count is missing
+                            const weight = 1 / (count + smoothingConstant);
+                            totalWeight += weight;
+                            return { item: r, threshold: totalWeight };
+                        });
+                        
+                        const roll = Math.random() * totalWeight;
+                        randomItem = weightedResults.find(w => roll <= w.threshold).item;
+                    } else {
+                        // For large pools, the deep paging logic has already handled the rarity weighting
+                        randomItem = validResults[Math.floor(Math.random() * validResults.length)];
                     }
 
-                    const randomItem = validResults[Math.floor(Math.random() * validResults.length)];
                     targetTaxon = randomItem.taxon;
                     
                     // Sync it to state immediately so if the observation fetch fails, we retain the chosen taxon for retries
