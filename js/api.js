@@ -128,7 +128,7 @@ export const fetchTaxaAutocomplete = async (query, signal) => {
     return res.json();
 };
 
-export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, months, placeId, lat, lng, taxonId, page = 1, perPage = null }, signal) => {
+export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, taxonId, page = 1, perPage = null }, signal) => {
     // If perPage is explicitly passed, use it; otherwise fallback to difficulty string mapping
     const limit = perPage !== null ? String(perPage) : String(difficulty);
     
@@ -149,7 +149,7 @@ export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, m
     } else if (lat !== null && lat !== undefined && lng !== null && lng !== undefined) {
         params.set('lat', String(lat));
         params.set('lng', String(lng));
-        params.set('radius', '10');
+        params.set('radius', String(radius || 10));
     }
 
     if (taxonId) {
@@ -161,7 +161,7 @@ export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, m
     return res.json();
 };
 
-export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, placeId, lat, lng, difficulty, taxonId, withoutTaxonIds = [], notObsIds = [] }, signal) => {
+export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, difficulty, taxonId, withoutTaxonIds = [], notObsIds = [] }, signal) => {
     const params = new URLSearchParams({
         quality_grade: 'research',
         captive: 'false',
@@ -178,7 +178,7 @@ export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, place
     } else if (lat !== null && lat !== undefined && lng !== null && lng !== undefined) {
         params.set('lat', String(lat));
         params.set('lng', String(lng));
-        params.set('radius', '10');
+        params.set('radius', String(radius || 10));
     }
 
     if (difficulty === 'all') {

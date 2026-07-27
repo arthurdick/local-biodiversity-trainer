@@ -16,14 +16,44 @@
             <p>Learn local species weighted by real-world frequencies.</p>
 
             <form id="setup-form">
-                <div class="form-group z-high autocomplete-wrapper">
-                    <label for="input-place">1. Location</label>
-                    <button id="btn-gps" type="button">📍 Use My Exact Location (GPS)</button>
-                    <div class="input-relative-wrapper">
-                        <input type="text" id="input-place" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="list-place" aria-haspopup="listbox" placeholder="...or search a city, park, or country" autocomplete="off">
-                        <button type="button" id="clear-place" class="btn-clear" aria-label="Clear location input" title="Clear location">&times;</button>
+                <div class="form-group z-high">
+                    <label>1. Location</label>
+                    
+                    <div class="location-toggle">
+                        <input type="radio" id="mode-search" name="loc-mode" value="search" checked>
+                        <label for="mode-search" class="location-toggle-label">Search Place</label>
+                        
+                        <input type="radio" id="mode-coords" name="loc-mode" value="coords">
+                        <label for="mode-coords" class="location-toggle-label">Custom Coordinates</label>
                     </div>
-                    <ul id="list-place" class="autocomplete-list" role="listbox"></ul>
+
+                    <!-- Search Mode Section -->
+                    <div id="section-search" class="location-section active autocomplete-wrapper">
+                        <div class="input-relative-wrapper">
+                            <input type="text" id="input-place" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="list-place" aria-haspopup="listbox" placeholder="Search a city, park, or country..." autocomplete="off">
+                            <button type="button" id="clear-place" class="btn-clear" aria-label="Clear location input" title="Clear location">&times;</button>
+                        </div>
+                        <ul id="list-place" class="autocomplete-list" role="listbox"></ul>
+                    </div>
+
+                    <!-- Coordinate Mode Section -->
+                    <div id="section-coords" class="location-section">
+                        <button id="btn-gps" type="button">📍 Use My Exact Location (GPS)</button>
+                        <div class="coords-row">
+                            <div class="coords-group">
+                                <label for="input-lat">Latitude</label>
+                                <input type="number" id="input-lat" step="any" placeholder="e.g. 51.0447">
+                            </div>
+                            <div class="coords-group">
+                                <label for="input-lng">Longitude</label>
+                                <input type="number" id="input-lng" step="any" placeholder="e.g. -114.0719">
+                            </div>
+                            <div class="coords-group">
+                                <label for="input-radius">Radius (km)</label>
+                                <input type="number" id="input-radius" min="1" max="100" value="10">
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-group z-mid autocomplete-wrapper">

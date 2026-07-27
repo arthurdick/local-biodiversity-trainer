@@ -1,8 +1,10 @@
 const initialState = {
     // 1. Setup & Configuration Snapshot
+    locMode: 'search',
     placeId: null,
     lat: null,
     lng: null,
+    radius: 10,
     taxonId: null,
     taxonName: null,
     config: {

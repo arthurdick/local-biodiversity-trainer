@@ -67,10 +67,21 @@ function debounce(func, timeout = 250) {
 
 function savePreferences() {
     const s = getState();
+    
+    const locModeInput = document.querySelector('input[name="loc-mode"]:checked');
+    const locMode = locModeInput ? locModeInput.value : 'search';
+
     const prefs = {
-        placeId: s.placeId, lat: s.lat, lng: s.lng,
+        locMode: locMode,
+        placeId: s.placeId,
+        lat: s.lat,
+        lng: s.lng,
+        radius: parseInt(document.getElementById('input-radius').value) || 10,
+        manualLat: document.getElementById('input-lat').value,
+        manualLng: document.getElementById('input-lng').value,
         placeName: document.getElementById('input-place').value,
-        taxonId: s.taxonId, taxonName: s.taxonName,
+        taxonId: s.taxonId,
+        taxonName: s.taxonName,
         difficulty: document.getElementById('input-difficulty').value,
         questions: document.getElementById('input-questions').value,
         chkPhotos: document.getElementById('chk-photos').checked,
@@ -91,12 +102,24 @@ function loadPreferences() {
         if (typeof prefs !== 'object' || prefs === null) return;
 
         setState({
+            locMode: ['search', 'coords'].includes(prefs.locMode) ? prefs.locMode : 'search',
             placeId: (typeof prefs.placeId === 'number' || typeof prefs.placeId === 'string') ? prefs.placeId : null,
             lat: typeof prefs.lat === 'number' ? prefs.lat : null,
             lng: typeof prefs.lng === 'number' ? prefs.lng : null,
+            radius: typeof prefs.radius === 'number' ? prefs.radius : 10,
             taxonId: (typeof prefs.taxonId === 'number' || typeof prefs.taxonId === 'string') ? prefs.taxonId : null,
             taxonName: typeof prefs.taxonName === 'string' ? prefs.taxonName : null
         });
+
+        if (prefs.locMode === 'coords') {
+            document.getElementById('mode-coords').checked = true;
+            document.getElementById('section-search').classList.remove('active');
+            document.getElementById('section-coords').classList.add('active');
+        }
+
+        if (prefs.radius) document.getElementById('input-radius').value = prefs.radius;
+        if (prefs.manualLat !== undefined) document.getElementById('input-lat').value = prefs.manualLat;
+        if (prefs.manualLng !== undefined) document.getElementById('input-lng').value = prefs.manualLng;
 
         if (typeof prefs.placeName === 'string') document.getElementById('input-place').value = prefs.placeName;
         if (typeof prefs.taxonName === 'string') document.getElementById('input-taxon').value = prefs.taxonName;
@@ -131,7 +154,14 @@ function loadPreferences() {
 
 // --- SETUP & VALIDATION ---
 const placeValidation = ui.setupInlineValidation('input-place', 'location', 
-    () => !!getState().placeId, () => getState().lat !== null
+    () => {
+        const s = getState();
+        return s.locMode === 'search' ? !!s.placeId : true;
+    },
+    () => {
+        const s = getState();
+        return s.locMode === 'search' ? (s.lat !== null && s.lng !== null) : true;
+    }
 );
 const taxonValidation = ui.setupInlineValidation('input-taxon', 'valid target taxon', 
     () => !!getState().taxonId, () => false
@@ -145,6 +175,36 @@ document.addEventListener('click', (e) => {
 
 document.getElementById('btn-months-all').addEventListener('click', () => document.querySelectorAll('#month-filters input').forEach(cb => cb.checked = true));
 document.getElementById('btn-months-none').addEventListener('click', () => document.querySelectorAll('#month-filters input').forEach(cb => cb.checked = false));
+
+// --- LOCATION MODE TOGGLE ---
+const radios = document.querySelectorAll('input[name="loc-mode"]');
+const sectionSearch = document.getElementById('section-search');
+const sectionCoords = document.getElementById('section-coords');
+const inputPlace = document.getElementById('input-place');
+
+radios.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        ui.clearGeneralError();
+        const newMode = e.target.value;
+        
+        // Update the state immediately
+        setState({ locMode: newMode });
+        
+        if (newMode === 'search') {
+            sectionSearch.classList.add('active');
+            sectionCoords.classList.remove('active');
+            document.getElementById('input-lat').value = '';
+            document.getElementById('input-lng').value = '';
+            setState({ lat: null, lng: null });
+        } else {
+            sectionCoords.classList.add('active');
+            sectionSearch.classList.remove('active');
+            inputPlace.value = '';
+            ui.toggleClearButton('input-place', 'clear-place');
+            setState({ placeId: null });
+        }
+    });
+});
 
 // --- AUTOCOMPLETE LOGIC ---
 function setupAutocomplete(config) {
@@ -257,9 +317,12 @@ document.getElementById('btn-gps').addEventListener('click', () => {
 
     navigator.geolocation.getCurrentPosition(
         (pos) => {
-            setState({ lat: pos.coords.latitude, lng: pos.coords.longitude, placeId: null });
-            document.getElementById('input-place').value = `📍 GPS Coordinates Captured`;
-            ui.toggleClearButton('input-place', 'clear-place'); placeValidation.clearError();
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            document.getElementById('input-lat').value = lat;
+            document.getElementById('input-lng').value = lng;
+            setState({ lat, lng, placeId: null });
+            
             btn.textContent = originalText; btn.disabled = false;
         },
         () => {
@@ -267,6 +330,22 @@ document.getElementById('btn-gps').addEventListener('click', () => {
             setTimeout(() => { btn.textContent = originalText; btn.disabled = false; }, 5000);
         }
     );
+});
+
+// --- CUSTOM COORDINATE STATE BINDING ---
+document.getElementById('input-lat').addEventListener('input', (e) => {
+    const val = parseFloat(e.target.value);
+    setState({ lat: isNaN(val) ? null : val });
+});
+
+document.getElementById('input-lng').addEventListener('input', (e) => {
+    const val = parseFloat(e.target.value);
+    setState({ lng: isNaN(val) ? null : val });
+});
+
+document.getElementById('input-radius').addEventListener('input', (e) => {
+    const val = parseInt(e.target.value, 10);
+    setState({ radius: isNaN(val) || val < 1 ? 10 : val }); // Default to 10 if cleared or invalid
 });
 
 // --- GAME BOOTSTRAPPING ---
@@ -277,7 +356,22 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     
     const s = getState();
 
-    if (!s.placeId && !s.lat) { placeValidation.showError("⚠️ Please search and select a location, or use GPS."); hasError = true; }
+    if (s.locMode === 'search') {
+        if (!s.placeId) { 
+            placeValidation.showError("⚠️ Please search and select a location."); 
+            hasError = true; 
+        }
+    } else {
+        if (s.lat === null || s.lng === null) {
+            ui.showGeneralError("Please enter valid latitude and longitude coordinates, or use GPS."); 
+            hasError = true;
+        } else {
+            setState({ lat: manualLat, lng: manualLng, placeId: null, radius: radius });
+        }
+    }
+
+    s = getState();
+
     if (document.getElementById('input-taxon').value.trim() !== '' && !s.taxonId) {
         taxonValidation.showError("⚠️ Please select a valid target taxon from the list, or clear this field."); hasError = true;
     }
@@ -320,6 +414,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
                     placeId: updatedState.placeId,
                     lat: updatedState.lat,
                     lng: updatedState.lng,
+                    radius: updatedState.radius,
                     taxonId: updatedState.taxonId
                 });
 
@@ -370,6 +465,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
             placeId: updatedState.placeId,
             lat: updatedState.lat,
             lng: updatedState.lng,
+            radius: updatedState.radius,
             taxonId: updatedState.taxonId
         });
 

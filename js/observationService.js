@@ -83,6 +83,7 @@ export async function loadObservationForQuestion(index) {
                     placeId: s.placeId,
                     lat: s.lat,
                     lng: s.lng,
+                    radius: s.radius,
                     taxonId: s.taxonId
                 }, controller.signal);
 
@@ -150,6 +151,7 @@ export async function loadObservationForQuestion(index) {
                 placeId: s.placeId,
                 lat: s.lat,
                 lng: s.lng,
+                radius: s.radius,
                 difficulty: isStandardExpert ? 'all' : 'specific',
                 taxonId: isStandardExpert ? s.taxonId : targetTaxon?.id,
                 withoutTaxonIds,
