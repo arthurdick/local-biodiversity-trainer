@@ -4,6 +4,21 @@ const API_BASE = 'https://api.inaturalist.org/v2';
 const CC_LICENSES = 'cc0,cc-by,cc-by-nc,cc-by-sa,cc-by-nd,cc-by-nc-sa,cc-by-nc-nd';
 
 /**
+ * Resolves the user's preferred locale from browser settings.
+ */
+export const getLocale = () => {
+    if (typeof navigator !== 'undefined') {
+        if (navigator.languages && navigator.languages.length > 0) {
+            return navigator.languages[0];
+        }
+        if (navigator.language) {
+            return navigator.language;
+        }
+    }
+    return 'en';
+};
+
+/**
  * Global Request Throttler
  * Ensures requests to the API are spaced by at least `interval` milliseconds.
  */
@@ -106,10 +121,11 @@ const appendMonthParams = (params, months) => {
     }
 };
 
-export const fetchPlaces = async (query, signal) => {
+export const fetchPlaces = async (query, signal, locale = getLocale()) => {
     const params = new URLSearchParams({
         q: query,
-        fields: '(id:!t,name:!t,display_name:!t)'
+        fields: '(id:!t,name:!t,display_name:!t)',
+        locale: locale
     });
 
     const res = await apiQueue.enqueue(`${API_BASE}/places?${params}`, { signal });
@@ -117,10 +133,11 @@ export const fetchPlaces = async (query, signal) => {
     return res.json();
 };
 
-export const fetchTaxaAutocomplete = async (query, signal) => {
+export const fetchTaxaAutocomplete = async (query, signal, locale = getLocale()) => {
     const params = new URLSearchParams({
         q: query,
-        fields: '(id:!t,name:!t,preferred_common_name:!t)'
+        fields: '(id:!t,name:!t,preferred_common_name:!t)',
+        locale: locale
     });
 
     const res = await apiQueue.enqueue(`${API_BASE}/taxa/autocomplete?${params}`, { signal });
@@ -128,7 +145,7 @@ export const fetchTaxaAutocomplete = async (query, signal) => {
     return res.json();
 };
 
-export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, taxonId, page = 1, perPage = null }, signal) => {
+export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, taxonId, page = 1, perPage = null, locale = getLocale() }, signal) => {
     // If perPage is explicitly passed, use it; otherwise fallback to difficulty string mapping
     const limit = perPage !== null ? String(perPage) : String(difficulty);
     
@@ -138,7 +155,8 @@ export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, m
         hrank: 'species',
         per_page: limit,
         page: String(page),
-        fields: '(count:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,ancestor_ids:!t))'
+        fields: '(count:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,ancestor_ids:!t))',
+        locale: locale
     });
 
     appendMediaParams(params, wantsPhotos, wantsSounds);
@@ -161,13 +179,14 @@ export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, m
     return res.json();
 };
 
-export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, difficulty, taxonId, withoutTaxonIds = [], notObsIds = [] }, signal) => {
+export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, difficulty, taxonId, withoutTaxonIds = [], notObsIds = [], locale = getLocale() }, signal) => {
     const params = new URLSearchParams({
         quality_grade: 'research',
         captive: 'false',
         per_page: '1',
         order_by: 'random',
-        fields: '(id:!t,uuid:!t,observed_on:!t,place_guess:!t,location:!t,license_code:!t,user:(login:!t,name:!t),taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,ancestor_ids:!t),photos:(url:!t,attribution:!t,license_code:!t),sounds:(file_url:!t,attribution:!t,license_code:!t))'
+        fields: '(id:!t,uuid:!t,observed_on:!t,place_guess:!t,location:!t,license_code:!t,user:(login:!t,name:!t),taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,ancestor_ids:!t),photos:(url:!t,attribution:!t,license_code:!t),sounds:(file_url:!t,attribution:!t,license_code:!t))',
+        locale: locale
     });
 
     appendMediaParams(params, wantsPhotos, wantsSounds);
@@ -200,14 +219,15 @@ export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, place
     return res.json();
 };
 
-export const checkTaxonSearch = async (inputStr, guessedRank, signal) => {
+export const checkTaxonSearch = async (inputStr, guessedRank, signal, locale = getLocale()) => {
     const rankQuery = guessedRank === 'species' ? 'species,subspecies' : guessedRank;
     const params = new URLSearchParams({
         q: inputStr,
         rank: rankQuery,
         is_active: 'true',
         per_page: '50',
-        fields: '(id:!t,name:!t,preferred_common_name:!t,matched_term:!t,ancestor_ids:!t,rank:!t)'
+        fields: '(id:!t,name:!t,preferred_common_name:!t,matched_term:!t,ancestor_ids:!t,rank:!t)',
+        locale: locale
     });
 
     const res = await apiQueue.enqueue(`${API_BASE}/taxa?${params}`, { signal });
