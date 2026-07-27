@@ -184,7 +184,7 @@ export const checkTaxonSearch = async (inputStr, guessedRank, signal) => {
         q: inputStr,
         rank: rankQuery,
         is_active: 'true',
-        per_page: '500',
+        per_page: '50',
         fields: '(id:!t,name:!t,preferred_common_name:!t,matched_term:!t,ancestor_ids:!t,rank:!t)'
     });
 
