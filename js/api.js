@@ -1,5 +1,8 @@
 const API_BASE = 'https://api.inaturalist.org/v2';
 
+// Valid Creative Commons licenses
+const CC_LICENSES = 'cc0,cc-by,cc-by-nc,cc-by-sa,cc-by-nd,cc-by-nc-sa,cc-by-nc-nd';
+
 /**
  * Global Request Throttler
  * Ensures requests to the API are spaced by at least `interval` milliseconds.
@@ -82,6 +85,16 @@ const appendMediaParams = (params, wantsPhotos, wantsSounds) => {
     } else if (!wantsPhotos && wantsSounds) {
         params.set('sounds', 'true');
     }
+    
+    // Ensure both observation data and associated media strictly use open licenses
+    params.set('license', CC_LICENSES);
+    
+    if (wantsPhotos) {
+        params.set('photo_license', CC_LICENSES);
+    }
+    if (wantsSounds) {
+        params.set('sound_license', CC_LICENSES);
+    }
 };
 
 /**
@@ -154,7 +167,7 @@ export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, place
         captive: 'false',
         per_page: '1',
         order_by: 'random',
-        fields: '(id:!t,observed_on:!t,place_guess:!t,location:!t,license_code:!t,user:(login:!t,name:!t),taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,ancestor_ids:!t),photos:(url:!t,attribution:!t),sounds:(file_url:!t,attribution:!t))'
+        fields: '(id:!t,observed_on:!t,place_guess:!t,location:!t,license_code:!t,user:(login:!t,name:!t),taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,ancestor_ids:!t),photos:(url:!t,attribution:!t,license_code:!t),sounds:(file_url:!t,attribution:!t,license_code:!t))'
     });
 
     appendMediaParams(params, wantsPhotos, wantsSounds);

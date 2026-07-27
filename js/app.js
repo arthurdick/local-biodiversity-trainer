@@ -12,20 +12,32 @@ function selectCurrentMedia(currentState) {
     
     const media = [];
     if (currentState.config.wantsPhotos && obs.photos) {
-        obs.photos.forEach(p => media.push({
-            type: 'photo',
-            mediumUrl: p.url.replace('square', 'medium'),
-            originalUrl: p.url.replace('square', 'original'),
-            attribution: p.attribution
-        }));
+        obs.photos.forEach(p => {
+            // Check for explicit media license to filter out "All Rights Reserved" exceptions
+            if (p.license_code) {
+                media.push({
+                    type: 'photo',
+                    mediumUrl: p.url.replace('square', 'medium'),
+                    originalUrl: p.url.replace('square', 'original'),
+                    attribution: p.attribution,
+                    license: p.license_code.toUpperCase()
+                });
+            }
+        });
     }
     
     if (currentState.config.wantsSounds && obs.sounds) {
-        obs.sounds.forEach(s => media.push({
-            type: 'sound',
-            fileUrl: s.file_url,
-            attribution: s.attribution
-        }));
+        obs.sounds.forEach(s => {
+            // Check for explicit media license to filter out "All Rights Reserved" exceptions
+            if (s.license_code) {
+                media.push({
+                    type: 'sound',
+                    fileUrl: s.file_url,
+                    attribution: s.attribution,
+                    license: s.license_code.toUpperCase()
+                });
+            }
+        });
     }
     return media;
 }
