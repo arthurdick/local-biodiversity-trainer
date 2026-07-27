@@ -9,7 +9,7 @@ const initialState = {
     taxonName: null,
     config: {
         wantsPhotos: true,
-        wantsSounds: true,
+        wantsSounds: false,
         months: [],
         difficulty: '50',
         preventDuplicates: true,
