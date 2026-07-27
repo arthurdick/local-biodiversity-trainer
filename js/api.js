@@ -120,7 +120,7 @@ export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, m
         quality_grade: 'research',
         captive: 'false',
         per_page: String(difficulty),
-        fields: '(count:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,ancestor_ids:!t))'
+        fields: '(count:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,ancestor_ids:!t))'
     });
 
     appendMediaParams(params, wantsPhotos, wantsSounds);
@@ -149,7 +149,7 @@ export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, place
         captive: 'false',
         per_page: '1',
         order_by: 'random',
-        fields: '(id:!t,observed_on:!t,place_guess:!t,location:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,ancestor_ids:!t),photos:(url:!t,attribution:!t),sounds:(file_url:!t,attribution:!t))'
+        fields: '(id:!t,observed_on:!t,place_guess:!t,location:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,ancestor_ids:!t),photos:(url:!t,attribution:!t),sounds:(file_url:!t,attribution:!t))'
     });
 
     appendMediaParams(params, wantsPhotos, wantsSounds);

@@ -528,6 +528,7 @@ function triggerQuestionReady() {
     
     const s = getState();
     ui.renderQuestionMeta(selectCurrentMeta(s));
+    ui.renderTargetBadge(s.questions[s.currentIndex].taxon);
     
     if (!s.isQuestionLoaded) {
         setState({ isQuestionLoaded: true });

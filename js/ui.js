@@ -142,6 +142,16 @@ export function setupInlineValidation(inputId, entityName, validationCheckFn, ha
     return { clearError, showError };
 }
 
+export function renderTargetBadge(taxon) {
+    const badge = document.getElementById('quiz-target-badge');
+    if (taxon && taxon.iconic_taxon_name) {
+        badge.textContent = `🎯 Target: ${taxon.iconic_taxon_name}`;
+        badge.style.display = 'inline-block';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
 export function updateMediaDisplay(currentMediaArray, currentMediaIndex) {
     if (currentMediaArray.length === 0) return;
     
@@ -217,6 +227,9 @@ export function resetQuizUI(currentIndex, totalQuestions, score) {
     document.getElementById('quiz-attribution').style.display = 'none';
     document.getElementById('quiz-error').style.display = 'none';
     document.getElementById('quiz-loading').style.display = 'block';
+    
+    const badge = document.getElementById('quiz-target-badge');
+    if (badge) badge.style.display = 'none';
     
     const audioPlayer = document.getElementById('quiz-audio-player');
     audioPlayer.pause();
