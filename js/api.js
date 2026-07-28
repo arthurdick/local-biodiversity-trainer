@@ -236,7 +236,7 @@ export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, place
 };
 
 export const checkTaxonSearch = async (inputStr, guessedRank, signal, locale = getLocale()) => {
-    const rankQuery = guessedRank === 'species' ? 'species,subspecies' : guessedRank;
+    const rankQuery = guessedRank === 'species' ? 'species,subspecies,variety,form' : guessedRank;
     const params = new URLSearchParams({
         q: inputStr,
         rank: rankQuery,

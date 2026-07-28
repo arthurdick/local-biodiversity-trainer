@@ -695,7 +695,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
 
     let s = getState();
     const q = s.questions[s.currentIndex];
-    const taxon = q.taxon;
+    const taxon = q.observation?.taxon || q.taxon;
     const btnSubmit = document.getElementById('btn-submit');
     
     document.getElementById('input-answer').disabled = true;
@@ -736,7 +736,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
 document.getElementById('btn-skip').addEventListener('click', () => {
     let s = getState();
     const q = s.questions[s.currentIndex];
-    const taxon = q.taxon;
+    const taxon = q.observation?.taxon || q.taxon;
 
     document.getElementById('input-answer').disabled = true;
     document.getElementById('input-rank').disabled = true;

@@ -411,7 +411,7 @@ export function renderFeedback(isCorrect, taxon, matchedNameDisplay, matchedNorm
             
             const span = document.createElement('span');
             span.className = 'feedback-alias-note';
-            span.textContent = `(Recorded broadly as: ${primaryDisplayName})`;
+            span.textContent = `(Community Taxon: ${primaryDisplayName})`;
             feedback.appendChild(span);
         } else {
             strong.textContent = primaryDisplayName;
@@ -478,7 +478,7 @@ export function renderResultsView(questions, score) {
         gridDiv.className = 'missed-grid';
 
         questionsToReview.forEach(q => {
-            const taxon = q.taxon || { name: 'Data Unavailable', id: '' };
+            const taxon = q.observation?.taxon || q.taxon || { name: 'Data Unavailable', id: '' };
             const primaryCommon = taxon.preferred_common_name || 'Fetch Failed';
             const sciName = taxon.name;
             const imgUrl = q.thumbnailUrl || '';
