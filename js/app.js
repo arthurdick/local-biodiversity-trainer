@@ -395,6 +395,11 @@ document.getElementById('btn-zoom-image').addEventListener('click', () => {
     const media = selectCurrentMedia(getState())[getState().currentMediaIndex];
     setState({ ui: { ...getState().ui, zoomMediaUrl: media.originalUrl, isZoomedIn: false } });
 });
+document.getElementById('zoom-modal').addEventListener('close', () => {
+    if (getState().ui.zoomMediaUrl) {
+        setState({ ui: { ...getState().ui, zoomMediaUrl: null } });
+    }
+});
 document.getElementById('btn-close-modal').addEventListener('click', () => setState({ ui: { ...getState().ui, zoomMediaUrl: null } }));
 document.getElementById('zoom-modal-img').addEventListener('click', (e) => {
     const s = getState();
