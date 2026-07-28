@@ -424,10 +424,6 @@ document.getElementById('clear-answer').addEventListener('click', () => {
     document.getElementById('input-answer').focus();
 });
 
-document.getElementById('input-answer').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && !e.target.disabled) document.getElementById('btn-submit').click();
-});
-
 document.getElementById('btn-skip').addEventListener('click', () => {
     let s = getState();
     const q = s.questions[s.currentIndex];
@@ -438,7 +434,9 @@ document.getElementById('btn-skip').addEventListener('click', () => {
     });
 });
 
-document.getElementById('btn-submit').addEventListener('click', async () => {
+document.getElementById('answer-form').addEventListener('submit', async (e) => {
+    e.preventDefault(); // Prevent the page from actually reloading
+    
     const s = getState();
     const q = s.questions[s.currentIndex];
     
