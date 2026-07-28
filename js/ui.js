@@ -9,6 +9,9 @@ export function showView(viewId) {
     const view = document.getElementById(viewId);
     view.classList.add('active');
     
+    // ensure the window rests at the top on every view transition
+    window.scrollTo(0, 0);
+    
     const focusTarget = view.querySelector('[tabindex="-1"]');
     if (focusTarget) focusTarget.focus();
 }
@@ -577,4 +580,10 @@ export function renderResultsView(questions, score) {
         reviewContainer.appendChild(gridDiv);
     }
     showView('results-view');
+    
+    // Reset the missed-grid scroll position
+    const grid = document.querySelector('.missed-grid');
+    if (grid) {
+        grid.scrollTop = 0;
+    }
 }
