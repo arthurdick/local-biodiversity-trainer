@@ -140,6 +140,8 @@ const appendMonthParams = (params, months) => {
 export const fetchPlaces = async (query, signal, locale = getLocale()) => {
     const params = new URLSearchParams({
         q: query,
+        order_by: 'area',
+        geo: 'true',      // Ensures the place has a valid geometry for observation fetching
         fields: '(id:!t,name:!t,display_name:!t)',
         locale: locale
     });
