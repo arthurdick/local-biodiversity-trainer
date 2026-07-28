@@ -312,7 +312,10 @@ setupAutocomplete({
         return `${common}(${taxon.name})`;
     },
     onClearState: () => ({ taxonId: null, taxonName: null }),
-    onSelectState: (taxon) => ({ taxonId: taxon.id, taxonName: taxon.preferred_common_name || taxon.name }),
+    onSelectState: (taxon) => {
+        const common = taxon.preferred_common_name ? `${taxon.preferred_common_name} ` : '';
+        return { taxonId: taxon.id, taxonName: `${common}(${taxon.name})` };
+    },
     validationObj: taxonValidation
 });
 
