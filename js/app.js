@@ -8,10 +8,21 @@ import * as observationService from './observationService.js';
 let prevState = getState();
 
 subscribe((newState) => {
-    // 1. Execute purely declarative DOM sync
+    // 1. Compute Deltas FIRST to prevent stale state references
+    const isNewQuiz = prevState.ui.activeView !== 'quiz-view' && newState.ui.activeView === 'quiz-view';
+    const isNextQuestion = prevState.currentIndex !== newState.currentIndex && newState.currentIndex < newState.questions.length;
+    
+    const prevQ = prevState.questions[prevState.currentIndex];
+    const currentQ = newState.questions[newState.currentIndex];
+    const newObservationArrived = currentQ?.observation && !prevQ?.observation;
+
+    // 2. IMMEDIATELY update prevState to prevent nested staleness and infinite loops
+    prevState = newState;
+
+    // 3. Execute purely declarative DOM sync
     ui.render(newState);
 
-    // 2. Sync cached media readiness (Controller check)
+    // 4. Sync cached media readiness (Controller check)
     if (newState.ui.activeView === 'quiz-view' && !newState.ui.isMediaLoaded) {
         const mediaArray = selectCurrentMedia(newState);
         const currentMedia = mediaArray[newState.currentMediaIndex];
@@ -29,19 +40,13 @@ subscribe((newState) => {
         }
     }
 
-    // 3. Fetch Network Side-Effects
-    const isNewQuiz = prevState.ui.activeView !== 'quiz-view' && newState.ui.activeView === 'quiz-view';
-    const isNextQuestion = prevState.currentIndex !== newState.currentIndex && newState.currentIndex < newState.questions.length;
-    
+    // 5. Fetch Network Side-Effects
     if (isNewQuiz || isNextQuestion) {
         observationService.loadObservationForQuestion(newState.currentIndex);
     }
 
-    // 4. React to newly arrived observation data
-    const prevQ = prevState.questions[prevState.currentIndex];
-    const currentQ = newState.questions[newState.currentIndex];
-
-    if (currentQ?.observation && !prevQ?.observation) {
+    // 6. React to newly arrived observation data
+    if (newObservationArrived) {
         const obs = currentQ.observation;
         if (obs.error) {
             if (obs.emptyPool && newState.config.difficulty === 'all') {
@@ -62,8 +67,6 @@ subscribe((newState) => {
             }
         }
     }
-
-    prevState = newState;
 });
 
 // --- STORAGE ---
