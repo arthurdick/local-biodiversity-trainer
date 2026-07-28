@@ -247,6 +247,7 @@ export function resetQuizUI(currentIndex, totalQuestions, score) {
     if (hintBtn && hintContent) {
         hintBtn.style.display = 'none';
         hintBtn.textContent = '💡 Show Field Notes (Hint)';
+        hintBtn.setAttribute('aria-expanded', 'false');
         hintContent.style.display = 'none';
         hintContent.textContent = '';
     }
@@ -276,6 +277,7 @@ export function renderFieldNotes(description) {
         hintContent.textContent = trimmedDesc;
         hintBtn.style.display = 'inline-block';
         hintBtn.textContent = '💡 Show Field Notes (Hint)';
+        hintBtn.setAttribute('aria-expanded', 'false');
         hintContent.style.display = 'none';
     } else {
         hintBtn.style.display = 'none';

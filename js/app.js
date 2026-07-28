@@ -632,9 +632,11 @@ document.getElementById('btn-toggle-hint').addEventListener('click', () => {
     if (isHidden) {
         hintContent.style.display = 'block';
         hintBtn.textContent = '🙈 Hide Field Notes';
+        hintBtn.setAttribute('aria-expanded', 'true');
     } else {
         hintContent.style.display = 'none';
         hintBtn.textContent = '💡 Show Field Notes (Hint)';
+        hintBtn.setAttribute('aria-expanded', 'false');
     }
 });
 
