@@ -13,7 +13,6 @@ function selectCurrentMedia(currentState) {
     const media = [];
     if (currentState.config.wantsPhotos && obs.photos) {
         obs.photos.forEach(p => {
-            // Check for explicit media license to filter out "All Rights Reserved" exceptions
             if (p.license_code) {
                 media.push({
                     type: 'photo',
@@ -28,7 +27,6 @@ function selectCurrentMedia(currentState) {
     
     if (currentState.config.wantsSounds && obs.sounds) {
         obs.sounds.forEach(s => {
-            // Check for explicit media license to filter out "All Rights Reserved" exceptions
             if (s.license_code) {
                 media.push({
                     type: 'sound',
@@ -564,13 +562,8 @@ async function renderQuizQuestion() {
 }
 
 function handleFetchErrorFallback(q, isMediaMissing = false) {
-    let taxonName = "Random Species";
-    if (q.taxon) taxonName = q.taxon.preferred_common_name || q.taxon.name;
-    else if (getState().taxonName) taxonName = getState().taxonName;
-    
-    ui.renderFetchError(taxonName, isMediaMissing);
+    ui.renderFetchError(isMediaMissing);
     setState({ isQuestionLoaded: true });
-    observationService.loadObservationForQuestion(getState().currentIndex + 1);
 }
 
 function triggerQuestionReady() {
@@ -621,9 +614,8 @@ document.getElementById('quiz-image').onerror = (e) => {
     const currentMedia = mediaArray[s.currentMediaIndex];
     if (currentMedia?.type === 'photo' && e.target.src === new URL(currentMedia.mediumUrl, window.location.href).href) {
         document.getElementById('media-controls').style.display = 'none';
-        ui.renderFetchError("", false);
+        ui.renderFetchError(false);
         setState({ isQuestionLoaded: true });
-        observationService.loadObservationForQuestion(getState().currentIndex + 1);
     }
 };
 
@@ -632,9 +624,8 @@ document.getElementById('quiz-audio-player').onerror = () => {
     const mediaArray = selectCurrentMedia(s);
     if (mediaArray[s.currentMediaIndex]?.type === 'sound') {
         document.getElementById('media-controls').style.display = 'none';
-        ui.renderFetchError("", false);
+        ui.renderFetchError(false);
         setState({ isQuestionLoaded: true });
-        observationService.loadObservationForQuestion(getState().currentIndex + 1);
     }
 };
 
@@ -745,7 +736,6 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
         inputStr,
         guessedRank,
         taxon,
-        navigator.onLine,
         observationService.getDynamicNetworkTimeout
     );
     
@@ -821,6 +811,22 @@ document.getElementById('btn-next').addEventListener('click', (e) => {
     
     if (s.currentIndex >= s.questions.length) ui.renderResultsView(s.questions, s.score);
     else renderQuizQuestion();
+});
+
+// --- RETRY & END FAILBACK LOGIC ---
+document.getElementById('btn-retry').addEventListener('click', () => {
+    const s = getState();
+    updateQuestion(s.currentIndex, { observation: null });
+    renderQuizQuestion();
+});
+
+document.getElementById('btn-skip-end').addEventListener('click', () => {
+    const s = getState();
+    // Truncate unanswered questions up to the current index
+    const truncatedQuestions = s.questions.slice(0, s.currentIndex);
+    setState({ questions: truncatedQuestions });
+    
+    ui.renderResultsView(truncatedQuestions, s.score);
 });
 
 document.getElementById('btn-restart').addEventListener('click', () => {

@@ -44,12 +44,6 @@ export async function loadObservationForQuestion(index) {
     // Check runtime cache for pending fetch
     if (pendingFetches.has(index)) return pendingFetches.get(index);
 
-    if (!navigator.onLine) {
-        const errorData = { error: true };
-        updateQuestion(index, { observation: errorData });
-        return errorData;
-    }
-
     const controller = new AbortController();
     activeControllers.set(index, controller);
 

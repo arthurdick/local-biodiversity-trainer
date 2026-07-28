@@ -361,6 +361,24 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 }
 #btn-skip:hover { background-color: #555; }
 
+#btn-retry {
+    display: none;
+    margin-top: 15px;
+    background-color: #f0ad4e;
+}
+#btn-retry:hover {
+    background-color: #ec971f;
+}
+
+#btn-skip-end {
+    display: none;
+    margin-top: 15px;
+    background-color: #666;
+}
+#btn-skip-end:hover {
+    background-color: #555;
+}
+
 #btn-next {
     display: none;
     margin-top: 15px;

@@ -258,6 +258,8 @@ export function resetQuizUI(currentIndex, totalQuestions, score) {
     document.getElementById('btn-submit').style.display = 'none';
     document.getElementById('btn-skip').style.display = 'none';
     document.getElementById('btn-next').style.display = 'none';
+    document.getElementById('btn-retry').style.display = 'none';
+    document.getElementById('btn-skip-end').style.display = 'none';
     document.getElementById('feedback').style.display = 'none';
 }
 
@@ -285,7 +287,7 @@ export function renderFieldNotes(description) {
     }
 }
 
-export function renderFetchError(taxonName, isMediaMissing) {
+export function renderFetchError(isMediaMissing) {
     document.getElementById('quiz-loading').style.display = 'none';
     const errorDiv = document.getElementById('quiz-error');
     errorDiv.innerHTML = '';
@@ -299,10 +301,7 @@ export function renderFetchError(taxonName, isMediaMissing) {
         span.textContent = 'This occasionally happens in the iNaturalist database.';
         errorDiv.appendChild(span);
     } else {
-        errorDiv.textContent = '❌ Failed to load observation for ';
-        const strong = document.createElement('strong');
-        strong.textContent = taxonName;
-        errorDiv.appendChild(strong);
+        errorDiv.textContent = '❌ Failed to load observation data.';
         errorDiv.appendChild(document.createElement('br'));
         errorDiv.appendChild(document.createElement('br'));
         const span = document.createElement('span');
@@ -314,10 +313,14 @@ export function renderFetchError(taxonName, isMediaMissing) {
     errorDiv.style.display = 'block';
     document.getElementById('btn-submit').style.display = 'none';
     document.getElementById('btn-skip').style.display = 'none';
-    const btnNext = document.getElementById('btn-next');
-    btnNext.style.display = 'block';
-    btnNext.textContent = "Skip to Next ➔";
-    btnNext.focus();
+    document.getElementById('btn-next').style.display = 'none';
+    
+    const btnRetry = document.getElementById('btn-retry');
+    btnRetry.style.display = 'block';
+
+    const btnSkipEnd = document.getElementById('btn-skip-end');
+    btnSkipEnd.style.display = 'block';
+    btnSkipEnd.focus();
 }
 
 export function renderQuestionMeta(currentMeta) {

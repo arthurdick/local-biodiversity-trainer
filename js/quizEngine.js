@@ -172,9 +172,9 @@ export function getPointsForRank(rank) {
 }
 
 /**
- * Orchestrates local strict matching, API ancestor validation, and offline Genus fallback.
+ * Orchestrates local strict matching and API ancestor validation.
  */
-export async function evaluateAnswer(inputStr, guessedRank, taxon, isOnline, getTimeoutFn) {
+export async function evaluateAnswer(inputStr, guessedRank, taxon, getTimeoutFn) {
     let { isCorrect, matchedNameDisplay, normalizedInput } = checkExactMatch(inputStr, taxon);
     let pointsEarned = 0;
 
@@ -184,7 +184,7 @@ export async function evaluateAnswer(inputStr, guessedRank, taxon, isOnline, get
         pointsEarned = getPointsForRank('species');
     }
 
-    if (!isCorrect && isOnline) {
+    if (!isCorrect) {
         try {
             const controller = new AbortController();
             const timeoutMs = getTimeoutFn ? getTimeoutFn() : 10000;
@@ -217,16 +217,6 @@ export async function evaluateAnswer(inputStr, guessedRank, taxon, isOnline, get
                 }
             }
         } catch (error) { console.warn("API check failed. Relying on local strict match."); }
-    }
-
-    // Offline / Local Genus Fallback
-    if (!isCorrect && guessedRank === 'genus' && taxon.name) {
-        const actualGenus = normalize(taxon.name.split(' ')[0]);
-        if (normalizedInput === actualGenus) {
-            isCorrect = true;
-            pointsEarned = getPointsForRank('genus');
-            matchedNameDisplay = taxon.name.split(' ')[0];
-        }
     }
 
     return { isCorrect, pointsEarned, matchedNameDisplay };
