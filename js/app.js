@@ -135,22 +135,28 @@ document.querySelectorAll('input[name="loc-mode"]').forEach(radio => {
 });
 
 // --- AUTOCOMPLETE LOGIC ---
-function setupAutocomplete(inputId, type, fetchDataFn) {
+function setupAutocomplete(config) {
+    const {
+        inputId, listId, clearBtnId, fetchDataFn,
+        stateKeys: { id, name, error, results, showList, activeIdx },
+        formatDisplay, validateOnBlur, errorMsg
+    } = config;
+
     let abortController = null;
-    
-    document.getElementById(inputId).addEventListener('input', debounce(async (e) => {
+    const inputEl = document.getElementById(inputId);
+    const listEl = document.getElementById(listId);
+    const clearBtn = document.getElementById(clearBtnId);
+
+    // 1. Input Event (Debounced Fetch)
+    inputEl.addEventListener('input', debounce(async (e) => {
         const query = e.target.value;
-        const uiKey = type === 'place' ? 'showPlaceList' : 'showTaxonList';
-        const dataKey = type === 'place' ? 'placeResults' : 'taxonResults';
-        const activeKey = type === 'place' ? 'activePlaceIdx' : 'activeTaxonIdx';
-        
         setState({ 
-            form: { ...getState().form, [`${type}Id`]: null, [`${type}Name`]: query },
-            ui: { ...getState().ui, [activeKey]: -1, [`${type}Error`]: null }
+            form: { ...getState().form, [id]: null, [name]: query },
+            ui: { ...getState().ui, [activeIdx]: -1, [error]: null }
         });
         
         if (query.length < 3) {
-            setState({ ui: { ...getState().ui, [uiKey]: false } });
+            setState({ ui: { ...getState().ui, [showList]: false } });
             return;
         }
 
@@ -159,109 +165,142 @@ function setupAutocomplete(inputId, type, fetchDataFn) {
 
         try {
             const data = await fetchDataFn(query, abortController.signal);
-            setState({ ui: { ...getState().ui, [dataKey]: data.results, [uiKey]: data.results.length > 0 } });
+            setState({ ui: { ...getState().ui, [results]: data.results, [showList]: data.results.length > 0 } });
         } catch(err) {
             if (err.name !== 'AbortError') console.warn(`${inputId} search offline`);
         }
     }));
 
-    // Keyboard Navigation
-    document.getElementById(inputId).addEventListener('keydown', (e) => {
+    // 2. Focus Event (Re-open & Clear Error)
+    inputEl.addEventListener('focus', (e) => {
         const s = getState();
-        const uiKey = type === 'place' ? 'showPlaceList' : 'showTaxonList';
-        const dataKey = type === 'place' ? 'placeResults' : 'taxonResults';
-        const activeKey = type === 'place' ? 'activePlaceIdx' : 'activeTaxonIdx';
+        const hasNoSelection = !s.form[id];
+        const shouldShow = hasNoSelection && e.target.value.length >= 3 && s.ui[results].length > 0;
+        setState({ ui: { ...s.ui, [error]: null, [showList]: shouldShow } });
+    });
+
+    // 3. Blur Event (Validation)
+    inputEl.addEventListener('blur', () => {
+        setTimeout(() => {
+            const s = getState();
+            // Use custom validation if provided, otherwise default to checking if the ID exists
+            const isValid = validateOnBlur ? validateOnBlur(s) : !!s.form[id];
+            
+            if ((s.form[name] || '').trim() !== '' && !isValid) {
+                setState({ ui: { ...s.ui, [error]: errorMsg, [showList]: false } });
+            } else if (s.ui[showList]) {
+                setState({ ui: { ...s.ui, [showList]: false } });
+            }
+        }, 200);
+    });
+
+    // 4. Keyboard Navigation
+    inputEl.addEventListener('keydown', (e) => {
+        const s = getState();
+        if (!s.ui[showList]) return;
         
-        if (!s.ui[uiKey]) return;
+        listEl.classList.add('using-keyboard');
         
-        // Track keyboard intent
-        document.getElementById(`list-${type}`).classList.add('using-keyboard');
-        
-        let newIdx = s.ui[activeKey];
-        const total = s.ui[dataKey].length;
+        let newIdx = s.ui[activeIdx];
+        const total = s.ui[results].length;
         
         if (e.key === 'ArrowDown') {
             e.preventDefault();
             newIdx = (newIdx < total - 1) ? newIdx + 1 : 0;
-            setState({ ui: { ...s.ui, [activeKey]: newIdx } });
+            setState({ ui: { ...s.ui, [activeIdx]: newIdx } });
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             newIdx = (newIdx > 0) ? newIdx - 1 : total - 1;
-            setState({ ui: { ...s.ui, [activeKey]: newIdx } });
+            setState({ ui: { ...s.ui, [activeIdx]: newIdx } });
         } else if (e.key === 'Enter') {
             e.preventDefault();
             if (newIdx >= 0 && newIdx < total) {
-                const item = s.ui[dataKey][newIdx];
+                const item = s.ui[results][newIdx];
                 setState({ 
-                    form: { ...s.form, [`${type}Id`]: item.id, [`${type}Name`]: type === 'place' ? (item.display_name || item.name) : (item.preferred_common_name ? `${item.preferred_common_name} (${item.name})` : item.name) },
-                    ui: { ...s.ui, [uiKey]: false, [`${type}Error`]: null }
+                    form: { ...s.form, [id]: item.id, [name]: formatDisplay(item) },
+                    ui: { ...s.ui, [showList]: false, [error]: null }
                 });
             }
         } else if (e.key === 'Escape') {
             e.preventDefault();
-            setState({ ui: { ...s.ui, [uiKey]: false } });
+            setState({ ui: { ...s.ui, [showList]: false } });
         }
     });
 
-    document.getElementById(`list-${type}`).addEventListener('mousemove', (e) => {
-        e.currentTarget.classList.remove('using-keyboard');
-    });
+    // 5. Mouse Intent Tracking
+    listEl.addEventListener('mousemove', (e) => e.currentTarget.classList.remove('using-keyboard'));
 
-    // Click Delegation
-    document.getElementById(`list-${type}`).addEventListener('click', (e) => {
+    // 6. Click Delegation
+    listEl.addEventListener('click', (e) => {
         const li = e.target.closest('li');
         if (li) {
             const idx = parseInt(li.id.split('-').pop(), 10);
-            const item = getState().ui[type === 'place' ? 'placeResults' : 'taxonResults'][idx];
+            const item = getState().ui[results][idx];
             setState({ 
-                form: { ...getState().form, [`${type}Id`]: item.id, [`${type}Name`]: type === 'place' ? (item.display_name || item.name) : (item.preferred_common_name ? `${item.preferred_common_name} (${item.name})` : item.name) },
-                ui: { ...getState().ui, [type === 'place' ? 'showPlaceList' : 'showTaxonList']: false, [`${type}Error`]: null }
+                form: { ...getState().form, [id]: item.id, [name]: formatDisplay(item) },
+                ui: { ...getState().ui, [showList]: false, [error]: null }
             });
-            document.getElementById(inputId).focus();
+            inputEl.focus();
         }
     });
-    
-    document.getElementById(inputId).addEventListener('focus', (e) => {
-        const s = getState();
-        const uiKey = type === 'place' ? 'showPlaceList' : 'showTaxonList';
-        const dataKey = type === 'place' ? 'placeResults' : 'taxonResults';
-        const errorKey = type === 'place' ? 'placeError' : 'taxonError';
-        const idKey = type === 'place' ? 'placeId' : 'taxonId';
-        
-        // We only want to show the list if they haven't locked in a valid ID
-        const hasNoSelection = !s.form[idKey];
-        const shouldShowList = hasNoSelection && e.target.value.length >= 3 && s.ui[dataKey].length > 0;
 
-        setState({
-            ui: {
-                ...s.ui,
-                [errorKey]: null, // Instantly clear any validation errors
-                [uiKey]: shouldShowList
-            }
+    // 7. Clear Button Action
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            setState({
+                form: { ...getState().form, [id]: null, [name]: '' },
+                ui: { ...getState().ui, [showList]: false, [error]: null }
+            });
+            inputEl.focus();
         });
-    });
+    }
 }
 
-setupAutocomplete('input-place', 'place', api.fetchPlaces);
-setupAutocomplete('input-taxon', 'taxon', api.fetchTaxaAutocomplete);
+// Register active dropdown UI keys to easily clear them globally
+const activeDropdownKeys = ['showPlaceList', 'showTaxonList'];
 
-// Clear buttons & Global Close
-document.getElementById('clear-place').addEventListener('click', () => {
-    setState({ form: { ...getState().form, placeId: null, placeName: '' }, ui: { ...getState().ui, showPlaceList: false, placeError: null } });
-    document.getElementById('input-place').focus();
+setupAutocomplete({
+    inputId: 'input-place',
+    listId: 'list-place',
+    clearBtnId: 'clear-place',
+    fetchDataFn: api.fetchPlaces,
+    stateKeys: {
+        id: 'placeId', name: 'placeName', error: 'placeError',
+        results: 'placeResults', showList: 'showPlaceList', activeIdx: 'activePlaceIdx'
+    },
+    formatDisplay: (item) => item.display_name || item.name,
+    validateOnBlur: (s) => s.form.locMode === 'search' ? !!s.form.placeId : (s.form.lat !== null && s.form.lng !== null),
+    errorMsg: "⚠️ Please select a location from the dropdown list."
 });
 
-document.getElementById('clear-taxon').addEventListener('click', () => {
-    setState({ form: { ...getState().form, taxonId: null, taxonName: '' }, ui: { ...getState().ui, showTaxonList: false, taxonError: null } });
-    document.getElementById('input-taxon').focus();
+setupAutocomplete({
+    inputId: 'input-taxon',
+    listId: 'list-taxon',
+    clearBtnId: 'clear-taxon',
+    fetchDataFn: api.fetchTaxaAutocomplete,
+    stateKeys: {
+        id: 'taxonId', name: 'taxonName', error: 'taxonError',
+        results: 'taxonResults', showList: 'showTaxonList', activeIdx: 'activeTaxonIdx'
+    },
+    formatDisplay: (item) => item.preferred_common_name ? `${item.preferred_common_name} (${item.name})` : item.name,
+    validateOnBlur: (s) => !!s.form.taxonId,
+    errorMsg: "⚠️ Please select a valid target taxon from the list."
 });
 
 document.addEventListener('click', (e) => {
     if (!e.target.closest('.autocomplete-wrapper')) {
         const s = getState();
-        if (s.ui.showPlaceList || s.ui.showTaxonList) {
-            setState({ ui: { ...s.ui, showPlaceList: false, showTaxonList: false } });
-        }
+        const updates = {};
+        let shouldUpdate = false;
+        
+        activeDropdownKeys.forEach(key => {
+            if (s.ui[key]) {
+                updates[key] = false;
+                shouldUpdate = true;
+            }
+        });
+        
+        if (shouldUpdate) setState({ ui: { ...s.ui, ...updates } });
     }
 });
 
@@ -276,30 +315,6 @@ document.getElementById('btn-gps').addEventListener('click', () => {
         },
         () => setState({ ui: { ...getState().ui, isLocatingGps: false, setupError: 'Could not get location' } })
     );
-});
-
-// Blur validation
-document.getElementById('input-place').addEventListener('blur', () => {
-    setTimeout(() => {
-        const s = getState();
-        const validate = s.form.locMode === 'search' ? !!s.form.placeId : (s.form.lat !== null && s.form.lng !== null);
-        if ((s.form.placeName || '').trim() !== '' && !validate) {
-            setState({ ui: { ...s.ui, placeError: "⚠️ Please select a location from the dropdown list.", showPlaceList: false } });
-        } else if (s.ui.showPlaceList) {
-            setState({ ui: { ...s.ui, showPlaceList: false } });
-        }
-    }, 200);
-});
-
-document.getElementById('input-taxon').addEventListener('blur', () => {
-    setTimeout(() => {
-        const s = getState();
-        if ((s.form.taxonName || '').trim() !== '' && !s.form.taxonId) {
-            setState({ ui: { ...s.ui, taxonError: "⚠️ Please select a valid target taxon from the list.", showTaxonList: false } });
-        } else if (s.ui.showTaxonList) {
-            setState({ ui: { ...s.ui, showTaxonList: false } });
-        }
-    }, 200);
 });
 
 // --- GAME BOOTSTRAPPING ---

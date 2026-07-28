@@ -1,5 +1,32 @@
 import { selectCurrentMedia, selectCurrentMeta } from './state.js';
 
+const autocompleteConfigs = [
+    {
+        type: 'place',
+        inputId: 'input-place',
+        listId: 'list-place',
+        clearBtnId: 'clear-place',
+        nameKey: 'placeName',
+        errorKey: 'placeError',
+        resultsKey: 'placeResults',
+        showKey: 'showPlaceList',
+        activeIdxKey: 'activePlaceIdx',
+        formatDisplay: (item) => item.display_name || item.name
+    },
+    {
+        type: 'taxon',
+        inputId: 'input-taxon',
+        listId: 'list-taxon',
+        clearBtnId: 'clear-taxon',
+        nameKey: 'taxonName',
+        errorKey: 'taxonError',
+        resultsKey: 'taxonResults',
+        showKey: 'showTaxonList',
+        activeIdxKey: 'activeTaxonIdx',
+        formatDisplay: (item) => item.preferred_common_name ? `${item.preferred_common_name} (${item.name})` : item.name
+    }
+];
+
 export const formatPoints = (points) => Number((points / 10).toFixed(1));
 
 // Helper to safely pause and reset audio playback
@@ -62,9 +89,6 @@ export function render(state) {
         syncInput('input-difficulty', state.form.difficulty);
         syncInput('input-questions', state.form.questionLimit);
 
-        document.getElementById('clear-place').style.display = state.form.placeName ? 'block' : 'none';
-        document.getElementById('clear-taxon').style.display = state.form.taxonName ? 'block' : 'none';
-
         const btnStart = document.getElementById('btn-start');
         btnStart.disabled = state.ui.isLoadingQuizPool;
         btnStart.textContent = state.ui.isLoadingQuizPool ? "Analyzing Regional Ecology..." : "Load Quiz Pool";
@@ -72,13 +96,25 @@ export function render(state) {
         const btnGps = document.getElementById('btn-gps');
         btnGps.disabled = state.ui.isLocatingGps;
         btnGps.textContent = state.ui.isLocatingGps ? "⏳ Locating..." : "📍 Use My Exact Location (GPS)";
+        
+        // Dynamic Autocomplete Rendering
+        autocompleteConfigs.forEach(config => {
+            const clearBtn = document.getElementById(config.clearBtnId);
+            if (clearBtn) {
+                clearBtn.style.display = state.form[config.nameKey] ? 'block' : 'none';
+            }
+            
+            renderInputError(config.inputId, state.ui[config.errorKey]);
+            
+            renderAutocomplete(
+                config,
+                state.ui[config.resultsKey],
+                state.ui[config.showKey],
+                state.ui[config.activeIdxKey]
+            );
+        });
 
         renderError('form-error-message', state.ui.setupError);
-        renderInputError('input-place', state.ui.placeError);
-        renderInputError('input-taxon', state.ui.taxonError);
-
-        renderAutocomplete('list-place', 'place', state.ui.placeResults, state.ui.showPlaceList, state.ui.activePlaceIdx);
-        renderAutocomplete('list-taxon', 'taxon', state.ui.taxonResults, state.ui.showTaxonList, state.ui.activeTaxonIdx);
     }
 
     // 3. Quiz View
@@ -197,9 +233,10 @@ export function render(state) {
 
 // --- SUB-RENDERERS ---
 
-function renderAutocomplete(listId, type, results, show, activeIdx) {
+function renderAutocomplete(config, results, show, activeIdx) {
+    const { listId, inputId, type, formatDisplay } = config;
     const list = document.getElementById(listId);
-    const input = document.getElementById(`input-${type}`);
+    const input = document.getElementById(inputId);
     
     if (show && results.length > 0) {
         const fragment = document.createDocumentFragment();
@@ -211,9 +248,8 @@ function renderAutocomplete(listId, type, results, show, activeIdx) {
             li.setAttribute('role', 'option');
             li.setAttribute('aria-selected', String(i === activeIdx));
             
-            li.textContent = type === 'place' 
-                ? (item.display_name || item.name) 
-                : (item.preferred_common_name ? `${item.preferred_common_name} (${item.name})` : item.name);
+            // Utilize the decoupled formatting function
+            li.textContent = formatDisplay(item);
             
             fragment.appendChild(li);
         });
