@@ -32,23 +32,35 @@ class RequestQueue {
 
     enqueue(url, options = {}) {
         return new Promise((resolve, reject) => {
-            const task = { url, options, resolve, reject };
-            
-            // 1. Add task to the queue
-            this.queue.push(task);
-            
-            // 2. If the request is aborted while sitting in the queue, remove it to save API calls
+            // Check if signal was already aborted before enqueuing
+            if (options.signal?.aborted) {
+                return reject(new DOMException('Aborted before execution', 'AbortError'));
+            }
+
+            const task = { url, options, resolve, reject, cleanup: () => {} };
+
+            // Set up explicit event listener with a cleanup mechanism
             if (options.signal) {
-                options.signal.addEventListener('abort', () => {
+                const abortHandler = () => {
                     const index = this.queue.indexOf(task);
                     if (index > -1) {
                         this.queue.splice(index, 1);
-                        reject(new DOMException('Aborted before execution', 'AbortError'));
                     }
-                });
+                    task.cleanup();
+                    reject(new DOMException('Aborted before execution', 'AbortError'));
+                };
+
+                task.cleanup = () => {
+                    options.signal.removeEventListener('abort', abortHandler);
+                };
+
+                options.signal.addEventListener('abort', abortHandler);
             }
-            
-            // 3. Start processing if not already running
+
+            // 1. Add task to the queue
+            this.queue.push(task);
+
+            // 2. Start processing if not already running
             this.processQueue();
         });
     }
@@ -60,30 +72,34 @@ class RequestQueue {
         while (this.queue.length > 0) {
             const now = Date.now();
             const timeSinceLast = now - this.lastRequestTime;
-            
+
             // Wait if the interval hasn't passed yet
             if (timeSinceLast < this.interval) {
                 await new Promise(r => setTimeout(r, this.interval - timeSinceLast));
             }
 
             const task = this.queue.shift();
-            
+
             // Double check if aborted right before fetching
             if (task.options.signal && task.options.signal.aborted) {
+                task.cleanup();
                 task.reject(new DOMException('Aborted', 'AbortError'));
                 continue;
             }
 
             this.lastRequestTime = Date.now();
-            
+
             try {
                 const response = await fetch(task.url, task.options);
                 task.resolve(response);
             } catch (error) {
                 task.reject(error);
+            } finally {
+                // Guaranteed listener removal regardless of fetch success or failure
+                task.cleanup();
             }
         }
-        
+
         this.isProcessing = false;
     }
 }
