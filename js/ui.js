@@ -91,7 +91,7 @@ export function render(state) {
         
         const isReadyForMedia = hasObservation && !hasError;
         
-        document.getElementById('quiz-counter').textContent = `Question ${state.currentIndex + 1} of ${state.config.questionLimit}`;
+        document.getElementById('quiz-counter').textContent = `Question ${state.currentIndex + 1} of ${state.questions.length}`;
         document.getElementById('quiz-score').textContent = `Score: ${formatPoints(state.score)}`;
 
         // Loading Overlay
@@ -145,7 +145,7 @@ export function render(state) {
         btnSkip.style.display = (!isAnswered && isReadyForMedia) ? 'block' : 'none';
         btnSkip.disabled = state.ui.isCheckingAnswer || (state.form.answerInput || '').trim().length > 0;
         
-        document.getElementById('clear-answer').style.display = (!isAnswered && isReadyForMedia && (state.form.answerInput || '').length > 0) ? 'block' : 'none';
+        document.getElementById('clear-answer').style.display = (!isAnswered && !state.ui.isCheckingAnswer && isReadyForMedia && (state.form.answerInput || '').length > 0) ? 'block' : 'none';
 
         document.getElementById('btn-next').style.display = isAnswered ? 'block' : 'none';
         document.getElementById('btn-retry').style.display = hasError ? 'block' : 'none';

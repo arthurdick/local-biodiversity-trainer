@@ -92,7 +92,13 @@ function loadPreferences() {
                  prop === 'questionLimit' ? 'input-questions' : `input-${prop.replace('Input', '')}`;
     
     const el = document.getElementById(elId);
-    if (el) el.addEventListener('input', (e) => setState({ form: { ...getState().form, [prop]: e.target.value } }));
+    if (el) el.addEventListener('input', (e) => {
+        const updates = { [prop]: e.target.value };
+        // Immediately clear the associated ID to prevent stale validation
+        if (prop === 'placeName') updates.placeId = null;
+        if (prop === 'taxonName') updates.taxonId = null;
+        setState({ form: { ...getState().form, ...updates } });
+    });
 });
 
 ['wantsPhotos', 'wantsSounds', 'preventDuplicates', 'isRarityMode'].forEach(prop => {
@@ -332,6 +338,11 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
             }
             pool = engine.generateWeightedPool(data.results, updatedState.config.questionLimit, updatedState.config.preventDuplicates, updatedState.config.isRarityMode);
         }
+        
+        if (pool.length === 0) {
+            setState({ ui: { ...getState().ui, isLoadingQuizPool: false, setupError: "No observations found matching these strict filters. Try adjusting your settings." } });
+            return;
+        }
 
         setState({
             config: { ...updatedState.config, expertTotalSpecies: expertCount },
@@ -385,12 +396,15 @@ document.getElementById('btn-close-modal').addEventListener('click', () => setSt
 document.getElementById('zoom-modal-img').addEventListener('click', (e) => {
     const s = getState();
     const willZoomIn = !s.ui.isZoomedIn;
+    const zoomImg = document.getElementById('zoom-modal-img');
+    
+    // Capture the bounding rect BEFORE modifying state and forcing a re-render
+    const rect = zoomImg.getBoundingClientRect();
+    
     setState({ ui: { ...s.ui, isZoomedIn: willZoomIn } });
     
     if (willZoomIn) {
-        const zoomImg = document.getElementById('zoom-modal-img');
         const zoomScroll = document.getElementById('zoom-modal-scroll');
-        const rect = zoomImg.getBoundingClientRect();
         
         requestAnimationFrame(() => {
             const targetX = zoomImg.offsetLeft + (zoomImg.offsetWidth * ((e.clientX - rect.left) / rect.width));
