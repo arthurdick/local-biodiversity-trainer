@@ -217,8 +217,19 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 }
 .autocomplete-list.show { display: block; }
 .autocomplete-list li { padding: 10px; cursor: pointer; border-bottom: 1px solid var(--border); }
+.autocomplete-list li:hover,
 .autocomplete-list li.active { 
-    background: var(--bg-color); outline: 2px solid var(--primary); outline-offset: -2px;
+    background: var(--bg-color);
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+}
+.autocomplete-list:not(.using-keyboard):hover li.active:not(:hover) {
+    background: transparent;
+    outline: none;
+}
+.autocomplete-list.using-keyboard li:hover:not(.active) {
+    background: transparent;
+    outline: none;
 }
 
 /* ==========================================================================

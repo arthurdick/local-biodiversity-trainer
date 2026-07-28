@@ -174,6 +174,9 @@ function setupAutocomplete(inputId, type, fetchDataFn) {
         
         if (!s.ui[uiKey]) return;
         
+        // Track keyboard intent
+        document.getElementById(`list-${type}`).classList.add('using-keyboard');
+        
         let newIdx = s.ui[activeKey];
         const total = s.ui[dataKey].length;
         
@@ -200,14 +203,8 @@ function setupAutocomplete(inputId, type, fetchDataFn) {
         }
     });
 
-    // Hover Delegation
     document.getElementById(`list-${type}`).addEventListener('mousemove', (e) => {
-        const li = e.target.closest('li');
-        if (li) {
-            const idx = parseInt(li.id.split('-').pop(), 10);
-            const activeKey = type === 'place' ? 'activePlaceIdx' : 'activeTaxonIdx';
-            if (getState().ui[activeKey] !== idx) setState({ ui: { ...getState().ui, [activeKey]: idx } });
-        }
+        e.currentTarget.classList.remove('using-keyboard');
     });
 
     // Click Delegation
