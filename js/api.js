@@ -70,6 +70,8 @@ class RequestQueue {
         this.isProcessing = true;
 
         while (this.queue.length > 0) {
+            const task = this.queue.shift();
+            
             const now = Date.now();
             const timeSinceLast = now - this.lastRequestTime;
 
@@ -77,8 +79,6 @@ class RequestQueue {
             if (timeSinceLast < this.interval) {
                 await new Promise(r => setTimeout(r, this.interval - timeSinceLast));
             }
-
-            const task = this.queue.shift();
 
             // Double check if aborted right before fetching
             if (task.options.signal && task.options.signal.aborted) {
