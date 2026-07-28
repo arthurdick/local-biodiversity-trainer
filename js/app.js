@@ -220,6 +220,26 @@ function setupAutocomplete(inputId, type, fetchDataFn) {
             document.getElementById(inputId).focus();
         }
     });
+    
+    document.getElementById(inputId).addEventListener('focus', (e) => {
+        const s = getState();
+        const uiKey = type === 'place' ? 'showPlaceList' : 'showTaxonList';
+        const dataKey = type === 'place' ? 'placeResults' : 'taxonResults';
+        const errorKey = type === 'place' ? 'placeError' : 'taxonError';
+        const idKey = type === 'place' ? 'placeId' : 'taxonId';
+        
+        // We only want to show the list if they haven't locked in a valid ID
+        const hasNoSelection = !s.form[idKey];
+        const shouldShowList = hasNoSelection && e.target.value.length >= 3 && s.ui[dataKey].length > 0;
+
+        setState({
+            ui: {
+                ...s.ui,
+                [errorKey]: null, // Instantly clear any validation errors
+                [uiKey]: shouldShowList
+            }
+        });
+    });
 }
 
 setupAutocomplete('input-place', 'place', api.fetchPlaces);
