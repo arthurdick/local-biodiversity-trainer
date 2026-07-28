@@ -591,7 +591,15 @@ function triggerQuestionReady() {
         document.getElementById('input-answer').disabled = false; 
         document.getElementById('input-answer').focus();
         document.getElementById('btn-submit').style.display = 'block';
-        document.getElementById('btn-skip').style.display = 'block';
+        
+        // Ensure skip is visible and enabled for the new question
+        const btnSkip = document.getElementById('btn-skip');
+        btnSkip.style.display = 'block';
+        btnSkip.disabled = false; 
+
+        // Sync the clear button state (will hide it since input is empty)
+        ui.toggleClearButton('input-answer', 'clear-answer');
+        
         observationService.loadObservationForQuestion(s.currentIndex + 1);
     }
 }
@@ -694,6 +702,28 @@ zoomImg.addEventListener('click', (e) => {
 });
 
 // --- ANSWER LOGIC ---
+const inputAnswer = document.getElementById('input-answer');
+const btnSkip = document.getElementById('btn-skip');
+const btnClearAnswer = document.getElementById('clear-answer');
+
+// Toggle skip button and clear button based on input presence
+inputAnswer.addEventListener('input', (e) => {
+    const hasText = e.target.value.trim().length > 0;
+    ui.toggleClearButton('input-answer', 'clear-answer');
+    
+    // Disable skip button natively if text is present (screen-reader accessible)
+    btnSkip.disabled = hasText;
+});
+
+// Handle clearing the answer accessibly
+btnClearAnswer.addEventListener('click', () => {
+    inputAnswer.value = '';
+    ui.toggleClearButton('input-answer', 'clear-answer');
+    btnSkip.disabled = false;
+    
+    inputAnswer.focus(); 
+});
+
 document.getElementById('btn-submit').addEventListener('click', async () => {
     const inputStr = document.getElementById('input-answer').value.trim();
     const guessedRank = document.getElementById('input-rank').value;
@@ -707,6 +737,7 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
     document.getElementById('input-answer').disabled = true;
     document.getElementById('input-rank').disabled = true;
     document.getElementById('btn-skip').style.display = 'none';
+    document.getElementById('clear-answer').style.display = 'none';
     btnSubmit.disabled = true;
     btnSubmit.textContent = "Checking...";
 
@@ -748,6 +779,7 @@ document.getElementById('btn-skip').addEventListener('click', () => {
     document.getElementById('input-rank').disabled = true;
     document.getElementById('btn-submit').style.display = 'none';
     document.getElementById('btn-skip').style.display = 'none';
+    document.getElementById('clear-answer').style.display = 'none';
 
     const mediaInfo = engine.getQuestionThumbnail(q, selectCurrentMedia(s));
 

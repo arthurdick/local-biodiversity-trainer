@@ -191,7 +191,10 @@
                         <option value="family">Family</option>
                         <option value="order">Order</option>
                     </select>
-                    <input type="text" id="input-answer" placeholder="Common or scientific name..." autocomplete="off">
+                    <div class="input-relative-wrapper" style="flex: 1;">
+                        <input type="text" id="input-answer" placeholder="Common or scientific name..." autocomplete="off">
+                        <button type="button" id="clear-answer" class="btn-clear" aria-label="Clear answer input" title="Clear input">&times;</button>
+                    </div>
                 </div>
                 <div class="answer-buttons-row">
                     <button type="button" id="btn-submit">Check Answer</button>
