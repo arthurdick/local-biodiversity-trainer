@@ -2,6 +2,15 @@ import { selectCurrentMedia, selectCurrentMeta } from './state.js';
 
 export const formatPoints = (points) => Number((points / 10).toFixed(1));
 
+// Helper to safely pause and reset audio playback
+function stopAudio() {
+    const audioPlayer = document.getElementById('quiz-audio-player');
+    if (audioPlayer && !audioPlayer.paused) {
+        audioPlayer.pause();
+        audioPlayer.currentTime = 0;
+    }
+}
+
 // Safe text input sync (prevents cursor jumping)
 export function syncInput(id, value) {
     const el = document.getElementById(id);
@@ -21,6 +30,11 @@ export function syncCheckbox(id, checked) {
 export function render(state) {
     // 1. View Routing
     document.querySelectorAll('.view').forEach(el => el.classList.toggle('active', el.id === state.ui.activeView));
+
+    // Stop audio if navigating away from the quiz view
+    if (state.ui.activeView !== 'quiz-view') {
+        stopAudio();
+    }
 
     // 2. Setup View
     if (state.ui.activeView === 'setup-view') {
@@ -72,25 +86,32 @@ export function render(state) {
         const q = state.questions[state.currentIndex];
         const isAnswered = q?.isAnswered;
         
-        // Decouple data readiness from media bytes downloading to break the loading deadlock
         const hasObservation = !!q?.observation;
         const hasError = !!state.ui.quizError || !!q?.observation?.error;
         
         const isReadyForMedia = hasObservation && !hasError;
-        const isReadyForInput = isReadyForMedia && state.ui.isMediaLoaded;
         
         document.getElementById('quiz-counter').textContent = `Question ${state.currentIndex + 1} of ${state.config.questionLimit}`;
         document.getElementById('quiz-score').textContent = `Score: ${formatPoints(state.score)}`;
 
-        // Media & Errors
-        document.getElementById('quiz-loading').style.display = (!hasObservation && !hasError) ? 'block' : 'none';
-        
+        // Loading Overlay
+        const loadingEl = document.getElementById('quiz-loading');
+        if (!hasObservation && !hasError) {
+            loadingEl.style.display = 'block';
+            loadingEl.textContent = 'Fetching random observation...';
+        } else if (hasObservation && !hasError && !state.ui.isMediaLoaded) {
+            loadingEl.style.display = 'block';
+            loadingEl.textContent = 'Loading media...';
+        } else {
+            loadingEl.style.display = 'none';
+        }
+
         const errDiv = document.getElementById('quiz-error');
         if (hasError) {
             errDiv.style.display = 'block';
             errDiv.replaceChildren(); 
             
-            const isMissing = state.ui.quizError?.isMissingMedia;
+            const isMissing = state.ui.isMissingMedia || state.ui.quizError?.isMissingMedia;
             const mainText = document.createTextNode(isMissing ? '❌ Observation missing media data.' : '❌ Failed to load observation data.');
             errDiv.appendChild(mainText);
             errDiv.appendChild(document.createElement('br'));
@@ -111,20 +132,20 @@ export function render(state) {
         syncInput('input-answer', state.form.answerInput);
         syncInput('input-rank', state.form.rankInput);
 
-        const inputDisabled = isAnswered || !isReadyForInput || state.ui.isCheckingAnswer;
+        const inputDisabled = isAnswered || !isReadyForMedia || state.ui.isCheckingAnswer;
         document.getElementById('input-answer').disabled = inputDisabled;
         document.getElementById('input-rank').disabled = inputDisabled;
         
         const btnSubmit = document.getElementById('btn-submit');
-        btnSubmit.style.display = (!isAnswered && isReadyForInput) ? 'block' : 'none';
+        btnSubmit.style.display = (!isAnswered && isReadyForMedia) ? 'block' : 'none';
         btnSubmit.disabled = state.ui.isCheckingAnswer;
         btnSubmit.textContent = state.ui.isCheckingAnswer ? "Checking..." : "Check Answer";
 
         const btnSkip = document.getElementById('btn-skip');
-        btnSkip.style.display = (!isAnswered && isReadyForInput) ? 'block' : 'none';
+        btnSkip.style.display = (!isAnswered && isReadyForMedia) ? 'block' : 'none';
         btnSkip.disabled = state.ui.isCheckingAnswer || (state.form.answerInput || '').trim().length > 0;
         
-        document.getElementById('clear-answer').style.display = (!isAnswered && isReadyForInput && (state.form.answerInput || '').length > 0) ? 'block' : 'none';
+        document.getElementById('clear-answer').style.display = (!isAnswered && isReadyForMedia && (state.form.answerInput || '').length > 0) ? 'block' : 'none';
 
         document.getElementById('btn-next').style.display = isAnswered ? 'block' : 'none';
         document.getElementById('btn-retry').style.display = hasError ? 'block' : 'none';
@@ -261,23 +282,25 @@ function renderQuizMedia(state, isReadyForMedia) {
 
     if (media && isReadyForMedia) {
         if (media.type === 'photo') {
+            stopAudio();
             audioContainer.style.display = 'none';
-            zoomBtn.style.display = state.ui.isMediaLoaded ? 'flex' : 'none';
-            imgEl.style.display = state.ui.isMediaLoaded ? 'block' : 'none';
+            zoomBtn.style.display = 'flex';
+            imgEl.style.display = 'block';
+            imgEl.style.opacity = state.ui.isMediaLoaded ? '1' : '0.3';
             
             if (imgEl.dataset.src !== media.mediumUrl) {
-                imgEl.removeAttribute('src'); 
                 imgEl.dataset.src = media.mediumUrl;
                 imgEl.src = media.mediumUrl;
             }
         } else if (media.type === 'sound') {
             zoomBtn.style.display = 'none';
             imgEl.style.display = 'none';
-            audioContainer.style.display = 'flex';
+            audioContainer.style.display = state.ui.isMediaLoaded ? 'flex' : 'none';
             
             if (audioPlayer.dataset.src !== media.fileUrl) {
-                audioPlayer.src = media.fileUrl;
+                stopAudio();
                 audioPlayer.dataset.src = media.fileUrl;
+                audioPlayer.src = media.fileUrl;
             }
         }
         
@@ -295,6 +318,7 @@ function renderQuizMedia(state, isReadyForMedia) {
             controls.style.display = 'none';
         }
     } else {
+        stopAudio();
         zoomBtn.style.display = 'none';
         imgEl.style.display = 'none';
         audioContainer.style.display = 'none';

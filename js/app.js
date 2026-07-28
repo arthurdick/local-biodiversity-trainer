@@ -11,7 +11,25 @@ subscribe((newState) => {
     // 1. Execute purely declarative DOM sync
     ui.render(newState);
 
-    // 2. Fetch Network Side-Effects
+    // 2. Sync cached media readiness (Controller check)
+    if (newState.ui.activeView === 'quiz-view' && !newState.ui.isMediaLoaded) {
+        const mediaArray = selectCurrentMedia(newState);
+        const currentMedia = mediaArray[newState.currentMediaIndex];
+
+        if (currentMedia?.type === 'photo') {
+            const imgEl = document.getElementById('quiz-image');
+            if (imgEl && imgEl.complete && imgEl.naturalWidth > 0) {
+                setState({ ui: { ...newState.ui, isMediaLoaded: true } });
+            }
+        } else if (currentMedia?.type === 'sound') {
+            const audioPlayer = document.getElementById('quiz-audio-player');
+            if (audioPlayer && audioPlayer.readyState >= 2) {
+                setState({ ui: { ...newState.ui, isMediaLoaded: true } });
+            }
+        }
+    }
+
+    // 3. Fetch Network Side-Effects
     const isNewQuiz = prevState.ui.activeView !== 'quiz-view' && newState.ui.activeView === 'quiz-view';
     const isNextQuestion = prevState.currentIndex !== newState.currentIndex && newState.currentIndex < newState.questions.length;
     
@@ -19,7 +37,7 @@ subscribe((newState) => {
         observationService.loadObservationForQuestion(newState.currentIndex);
     }
 
-    // 3. React to newly arrived observation data
+    // 4. React to newly arrived observation data
     const prevQ = prevState.questions[prevState.currentIndex];
     const currentQ = newState.questions[newState.currentIndex];
 
@@ -333,7 +351,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
 document.getElementById('quiz-image').onload = (e) => {
     const s = getState();
     const media = selectCurrentMedia(s)[s.currentMediaIndex];
-    if (media && e.target.dataset.src === new URL(media.mediumUrl, window.location.href).href) {
+    if (media && e.target.dataset.src === media.mediumUrl) {
         setState({ ui: { ...s.ui, isMediaLoaded: true } });
         observationService.loadObservationForQuestion(s.currentIndex + 1); // Prefetch next
     }
@@ -341,7 +359,13 @@ document.getElementById('quiz-image').onload = (e) => {
 
 document.getElementById('quiz-image').onerror = () => setState({ ui: { ...getState().ui, isMediaLoaded: true, quizError: { isMissingMedia: false } } });
 document.getElementById('quiz-audio-player').onerror = () => setState({ ui: { ...getState().ui, isMediaLoaded: true, quizError: { isMissingMedia: false } } });
-document.getElementById('quiz-audio-player').oncanplay = () => setState({ ui: { ...getState().ui, isMediaLoaded: true } });
+document.getElementById('quiz-audio-player').oncanplay = () => {
+    const s = getState();
+    const media = selectCurrentMedia(s)[s.currentMediaIndex];
+    if (media && media.type === 'sound') {
+        setState({ ui: { ...s.ui, isMediaLoaded: true } });
+    }
+};
 
 document.getElementById('btn-prev-media').addEventListener('click', () => {
     if (getState().currentMediaIndex > 0) setState({ currentMediaIndex: getState().currentMediaIndex - 1, ui: { ...getState().ui, isMediaLoaded: false } });

@@ -147,17 +147,20 @@
                 <span id="quiz-target-badge" class="target-badge" aria-live="polite"></span>
             </div>
             
+            <!-- Quiz Media Container -->
             <div class="quiz-media-container">
-                <div id="quiz-loading" aria-live="assertive">Fetching random observation...</div>
-                <div id="quiz-error" aria-live="assertive"></div>
-                
-                <button type="button" id="btn-zoom-image" aria-label="View full resolution image" title="Click to view full resolution">
-                    <img id="quiz-image" src="" alt="Observation photo">
-                </button>
-                
-                <div id="quiz-audio-container" class="audio-player-wrapper">
-                    <div class="audio-icon" aria-hidden="true">🎧</div>
-                    <audio id="quiz-audio-player" controls preload="auto"></audio>
+                <div class="quiz-media-stage">
+                    <div id="quiz-loading" aria-live="assertive">Fetching random observation...</div>
+                    <div id="quiz-error" aria-live="assertive"></div>
+                    
+                    <button type="button" id="btn-zoom-image" aria-label="View full resolution image" title="Click to view full resolution">
+                        <img id="quiz-image" src="" alt="Observation photo">
+                    </button>
+                    
+                    <div id="quiz-audio-container" class="audio-player-wrapper">
+                        <div class="audio-icon" aria-hidden="true">🎧</div>
+                        <audio id="quiz-audio-player" controls preload="auto"></audio>
+                    </div>
                 </div>
                 
                 <span id="quiz-attribution" class="attribution"></span>
