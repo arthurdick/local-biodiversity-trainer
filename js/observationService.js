@@ -49,7 +49,7 @@ export async function loadObservationForQuestion(index) {
 
     const fetchPromise = (async () => {
         const q = getState().questions[index]; // Fetch fresh copy
-        const currentConfig = getState().config;
+        const currentConfig = getState().config; // Config holds the snapshot of form data
         
         // Mode detection
         const isStandardExpert = currentConfig.difficulty === 'all' && !currentConfig.isRarityMode;
@@ -74,11 +74,11 @@ export async function loadObservationForQuestion(index) {
                     wantsPhotos: currentConfig.wantsPhotos,
                     wantsSounds: currentConfig.wantsSounds,
                     months: currentConfig.months,
-                    placeId: s.placeId,
-                    lat: s.lat,
-                    lng: s.lng,
-                    radius: s.radius,
-                    taxonId: s.taxonId
+                    placeId: currentConfig.placeId,
+                    lat: currentConfig.lat,
+                    lng: currentConfig.lng,
+                    radius: currentConfig.radius,
+                    taxonId: currentConfig.taxonId
                 }, controller.signal);
 
                 if (deepData.results && deepData.results.length > 0) {
@@ -156,12 +156,12 @@ export async function loadObservationForQuestion(index) {
                 wantsPhotos: currentConfig.wantsPhotos,
                 wantsSounds: currentConfig.wantsSounds,
                 months: currentConfig.months,
-                placeId: s.placeId,
-                lat: s.lat,
-                lng: s.lng,
-                radius: s.radius,
+                placeId: currentConfig.placeId,
+                lat: currentConfig.lat,
+                lng: currentConfig.lng,
+                radius: currentConfig.radius,
                 difficulty: isStandardExpert ? 'all' : 'specific',
-                taxonId: isStandardExpert ? s.taxonId : targetTaxon?.id,
+                taxonId: isStandardExpert ? currentConfig.taxonId : targetTaxon?.id,
                 withoutTaxonIds,
                 notObsIds
             }, controller.signal);

@@ -1,12 +1,26 @@
 const initialState = {
-    // 1. Setup & Configuration Snapshot
-    locMode: 'search',
-    placeId: null,
-    lat: null,
-    lng: null,
-    radius: 10,
-    taxonId: null,
-    taxonName: null,
+    // 1. Single Source of Truth for Form Inputs
+    form: {
+        locMode: 'search',
+        placeId: null,
+        placeName: '',
+        lat: null,
+        lng: null,
+        radius: 10,
+        taxonId: null,
+        taxonName: '',
+        wantsPhotos: true,
+        wantsSounds: false,
+        months: ['1','2','3','4','5','6','7','8','9','10','11','12'],
+        difficulty: '50',
+        questionLimit: 10,
+        preventDuplicates: true,
+        isRarityMode: false,
+        answerInput: '',
+        rankInput: 'species'
+    },
+
+    // 2. Snapshot of configuration when the game starts
     config: {
         wantsPhotos: true,
         wantsSounds: false,
@@ -14,30 +28,51 @@ const initialState = {
         difficulty: '50',
         preventDuplicates: true,
         isRarityMode: false,
-        expertTotalSpecies: 0
+        expertTotalSpecies: 0,
+        questionLimit: 10
+    },
+
+    // 3. Centralized UI & View Flags
+    ui: {
+        activeView: 'setup-view', // 'setup-view', 'quiz-view', 'results-view'
+        
+        // Setup state
+        isLocatingGps: false,
+        isLoadingQuizPool: false,
+        setupError: null,
+        placeError: null,
+        taxonError: null,
+        
+        // Autocomplete lists
+        placeResults: [],
+        showPlaceList: false,
+        activePlaceIdx: -1,
+        taxonResults: [],
+        showTaxonList: false,
+        activeTaxonIdx: -1,
+        
+        // Quiz state
+        quizError: null,
+        isCheckingAnswer: false,
+        isHintVisible: false,
+        isMediaLoaded: false,
+        
+        // Modal state
+        zoomMediaUrl: null,
+        isZoomedIn: false
     },
     
-    // 2. Core Game Data
+    // 4. Core Game Data
     questions: [],
-    
-    // 3. Current Run Progress
     currentIndex: 0,
     score: 0,
-    currentMediaIndex: 0,
-    isQuestionLoaded: false
+    currentMediaIndex: 0
 };
 
-// Detect local development based on the hostname
 const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-/**
- * Helper utility to deeply freeze objects.
- * Guarantees nested structures are immutable, but only runs during development.
- */
 function deepFreeze(obj) {
-    // Bypass freezing entirely in production to prevent main-thread blocking
     if (!isDevelopment) return obj;
-
     Object.keys(obj).forEach(prop => {
         if (typeof obj[prop] === 'object' && obj[prop] !== null && !Object.isFrozen(obj[prop])) {
             deepFreeze(obj[prop]);
@@ -46,7 +81,6 @@ function deepFreeze(obj) {
     return Object.freeze(obj);
 }
 
-// Initialize state
 let state = deepFreeze(structuredClone(initialState));
 const listeners = new Set();
 
@@ -72,3 +106,51 @@ export const subscribe = (listener) => {
     listeners.add(listener);
     return () => listeners.delete(listener);
 };
+
+// --- SELECTORS ---
+export function selectCurrentMedia(currentState) {
+    const q = currentState.questions[currentState.currentIndex];
+    const obs = q?.observation;
+    if (!obs || obs.error) return [];
+    
+    const media = [];
+    if (currentState.config.wantsPhotos && obs.photos) {
+        obs.photos.forEach(p => {
+            if (p.license_code) {
+                media.push({
+                    type: 'photo',
+                    mediumUrl: p.url.replace('square', 'medium'),
+                    originalUrl: p.url.replace('square', 'original'),
+                    attribution: p.attribution,
+                    license: p.license_code.toUpperCase()
+                });
+            }
+        });
+    }
+    
+    if (currentState.config.wantsSounds && obs.sounds) {
+        obs.sounds.forEach(s => {
+            if (s.license_code) {
+                media.push({
+                    type: 'sound',
+                    fileUrl: s.file_url,
+                    attribution: s.attribution,
+                    license: s.license_code.toUpperCase()
+                });
+            }
+        });
+    }
+    return media;
+}
+
+export function selectCurrentMeta(currentState) {
+    const obs = currentState.questions[currentState.currentIndex]?.observation;
+    if (!obs || obs.error) return null;
+    return {
+        date: obs.observed_on,
+        locationText: obs.place_guess,
+        coordinates: obs.location,
+        observer: obs.user?.name || obs.user?.login || 'Unknown Observer',
+        license: obs.license_code ? obs.license_code.toUpperCase() : 'All Rights Reserved'
+    };
+}
