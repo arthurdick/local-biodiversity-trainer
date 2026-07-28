@@ -18,12 +18,12 @@ subscribe((newState) => {
 
         if (currentMedia?.type === 'photo') {
             const imgEl = document.getElementById('quiz-image');
-            if (imgEl && imgEl.complete && imgEl.naturalWidth > 0) {
+            if (imgEl && imgEl.complete && imgEl.naturalWidth > 0 && imgEl.dataset.src === currentMedia.mediumUrl) {
                 setState({ ui: { ...newState.ui, isMediaLoaded: true } });
             }
         } else if (currentMedia?.type === 'sound') {
             const audioPlayer = document.getElementById('quiz-audio-player');
-            if (audioPlayer && audioPlayer.readyState >= 2) {
+            if (audioPlayer && audioPlayer.readyState >= 2 && audioPlayer.dataset.src === currentMedia.fileUrl) {
                 setState({ ui: { ...newState.ui, isMediaLoaded: true } });
             }
         }

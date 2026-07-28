@@ -279,23 +279,33 @@ function renderQuizMedia(state, isReadyForMedia) {
     const audioContainer = document.getElementById('quiz-audio-container');
     const audioPlayer = document.getElementById('quiz-audio-player');
     const controls = document.getElementById('media-controls');
+    const attrEl = document.getElementById('quiz-attribution');
 
     if (media && isReadyForMedia) {
         if (media.type === 'photo') {
             stopAudio();
+            if (audioPlayer.dataset.src) {
+                audioPlayer.removeAttribute('src');
+                delete audioPlayer.dataset.src;
+            }
             audioContainer.style.display = 'none';
             zoomBtn.style.display = 'flex';
             imgEl.style.display = 'block';
-            imgEl.style.opacity = state.ui.isMediaLoaded ? '1' : '0.3';
+            imgEl.style.opacity = state.ui.isMediaLoaded ? '1' : '0';
             
             if (imgEl.dataset.src !== media.mediumUrl) {
                 imgEl.dataset.src = media.mediumUrl;
                 imgEl.src = media.mediumUrl;
             }
         } else if (media.type === 'sound') {
+            if (imgEl.dataset.src) {
+                imgEl.removeAttribute('src');
+                delete imgEl.dataset.src;
+            }
             zoomBtn.style.display = 'none';
             imgEl.style.display = 'none';
-            audioContainer.style.display = state.ui.isMediaLoaded ? 'flex' : 'none';
+            audioContainer.style.display = 'flex';
+            audioContainer.style.opacity = state.ui.isMediaLoaded ? '1' : '0.5';
             
             if (audioPlayer.dataset.src !== media.fileUrl) {
                 stopAudio();
@@ -304,8 +314,8 @@ function renderQuizMedia(state, isReadyForMedia) {
             }
         }
         
-        document.getElementById('quiz-attribution').style.display = 'block';
-        document.getElementById('quiz-attribution').textContent = media.type === 'photo' 
+        attrEl.style.display = 'block';
+        attrEl.textContent = media.type === 'photo' 
             ? `Photo: ${media.attribution}` 
             : `Sound: ${media.attribution || 'iNaturalist Contributor'}`;
             
@@ -319,11 +329,19 @@ function renderQuizMedia(state, isReadyForMedia) {
         }
     } else {
         stopAudio();
+        if (imgEl.dataset.src) {
+            imgEl.removeAttribute('src');
+            delete imgEl.dataset.src;
+        }
+        if (audioPlayer.dataset.src) {
+            audioPlayer.removeAttribute('src');
+            delete audioPlayer.dataset.src;
+        }
         zoomBtn.style.display = 'none';
         imgEl.style.display = 'none';
         audioContainer.style.display = 'none';
         controls.style.display = 'none';
-        document.getElementById('quiz-attribution').style.display = 'none';
+        attrEl.style.display = 'none';
     }
 }
 
