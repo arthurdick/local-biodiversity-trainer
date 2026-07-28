@@ -90,7 +90,12 @@ function savePreferences() {
         chkRarity: document.getElementById('chk-rarity').checked,
         months: Array.from(document.querySelectorAll('#month-filters input:checked')).map(cb => cb.value)
     };
-    localStorage.setItem('bio_trainer_prefs', JSON.stringify(prefs));
+    
+    try {
+        localStorage.setItem('bio_trainer_prefs', JSON.stringify(prefs));
+    } catch (e) {
+        console.warn("Could not save preferences to local storage:", e);
+    }
 }
 
 function loadPreferences() {
