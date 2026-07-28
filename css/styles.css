@@ -473,7 +473,6 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    pointer-events: none;
 }
 
 .missed-card-name { font-weight: bold; color: var(--text-main); line-height: 1.2; margin-bottom: 2px; }
