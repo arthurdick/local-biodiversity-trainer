@@ -378,6 +378,9 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
         if (isNaN(manualLat) || isNaN(manualLng)) {
             ui.showGeneralError("Please enter valid latitude and longitude coordinates, or use GPS.");
             hasError = true;
+        } else if (manualLat < -90 || manualLat > 90 || manualLng < -180 || manualLng > 180) {
+            ui.showGeneralError("Latitude must be between -90 and 90, and Longitude between -180 and 180.");
+            hasError = true;
         } else {
             setState({ lat: manualLat, lng: manualLng, placeId: null, radius: radius });
         }
