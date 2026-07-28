@@ -140,9 +140,23 @@ export async function loadObservationForQuestion(index) {
                 ? getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined)
                 : [];
                 
-            const notObsIds = getState().questions
-                .map(quest => quest.observation?.uuid)
-                .filter(uuid => uuid !== undefined);
+            let notObsIds = [];
+            
+            if (isStandardExpert && currentConfig.preventDuplicates) {
+                // The without_taxon_id parameter handles deduplication entirely; no observation UUIDs needed.
+                notObsIds = [];
+            } else if (targetTaxon) {
+                // Specific taxon mode: only exclude previous observation UUIDs for THIS specific taxon.
+                notObsIds = getState().questions
+                    .filter(quest => quest.taxon?.id === targetTaxon.id)
+                    .map(quest => quest.observation?.uuid)
+                    .filter(uuid => uuid !== undefined);
+            } else {
+                // Standard Expert with duplicates allowed: map all previous UUIDs as a fallback.
+                notObsIds = getState().questions
+                    .map(quest => quest.observation?.uuid)
+                    .filter(uuid => uuid !== undefined);
+            }
 
             const data = await api.fetchObservation({
                 wantsPhotos: currentConfig.wantsPhotos,
