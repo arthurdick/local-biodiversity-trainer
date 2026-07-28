@@ -45,9 +45,9 @@ class RequestQueue {
                     const index = this.queue.indexOf(task);
                     if (index > -1) {
                         this.queue.splice(index, 1);
+                        task.cleanup();
+                        reject(new DOMException('Aborted before execution', 'AbortError'));
                     }
-                    task.cleanup();
-                    reject(new DOMException('Aborted before execution', 'AbortError'));
                 };
 
                 task.cleanup = () => {
