@@ -393,9 +393,20 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
         placeError = "⚠️ Please search and select a location."; hasError = true;
     }
     if (s.form.locMode === 'coords') {
-        const lat = parseFloat(s.form.lat); const lng = parseFloat(s.form.lng);
-        if (isNaN(lat) || isNaN(lng)) { setupError = "Please enter valid latitude and longitude coordinates, or use GPS."; hasError = true; }
-        else if (lat < -90 || lat > 90 || lng < -180 || lng > 180) { setupError = "Latitude must be between -90 and 90, and Longitude between -180 and 180."; hasError = true; }
+        const lat = parseFloat(s.form.lat);
+        const lng = parseFloat(s.form.lng);
+        const radius = parseFloat(s.form.radius);
+
+        if (isNaN(lat) || isNaN(lng)) {
+            setupError = "Please enter valid latitude and longitude coordinates, or use GPS.";
+            hasError = true;
+        } else if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            setupError = "Latitude must be between -90 and 90, and Longitude between -180 and 180.";
+            hasError = true;
+        } else if (isNaN(radius) || radius < 1 || radius > 100) {
+            setupError = "Radius must be between 1 and 100 km.";
+            hasError = true;
+        }
     }
 
     if ((s.form.taxonName || '').trim() !== '' && !s.form.taxonId) { taxonError = "⚠️ Please select a valid target taxon from the list, or clear this field."; hasError = true; }
