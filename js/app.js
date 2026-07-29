@@ -120,10 +120,11 @@ function loadPreferences() {
 }
 
 // --- DECLARATIVE FORM TWO-WAY BINDING ---
-['lat', 'lng', 'radius', 'difficulty', 'questionLimit', 'answerInput', 'rankInput', 'weightingMethod'].forEach(prop => {
+['lat', 'lng', 'radius', 'difficulty', 'questionLimit', 'answerInput', 'rankInput', 'weightingMethod', 'establishmentStatus'].forEach(prop => {
     let elId = `input-${prop.replace('Input', '')}`;
     if (prop === 'questionLimit') elId = 'input-questions';
     if (prop === 'weightingMethod') elId = 'input-weighting';
+    if (prop === 'establishmentStatus') elId = 'input-establishment';
     
     const el = document.getElementById(elId);
     if (el) el.addEventListener('input', (e) => {
@@ -395,7 +396,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
         
         if (isExpert && updatedState.config.isRarityMode) {
             const preFlightData = await api.fetchSpeciesPool({
-                perPage: 1, wantsPhotos: updatedState.config.wantsPhotos, wantsSounds: updatedState.config.wantsSounds, months: updatedState.config.months, placeId: updatedState.form.placeId, lat: updatedState.form.lat, lng: updatedState.form.lng, radius: updatedState.form.radius, taxonId: updatedState.form.taxonId
+                perPage: 1, wantsPhotos: updatedState.config.wantsPhotos, wantsSounds: updatedState.config.wantsSounds, months: updatedState.config.months, placeId: updatedState.form.placeId, lat: updatedState.form.lat, lng: updatedState.form.lng, radius: updatedState.form.radius, taxonId: updatedState.form.taxonId, establishmentStatus: updatedState.config.establishmentStatus
             });
             expertCount = preFlightData.total_results || 0;
             
@@ -410,7 +411,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
             pool = Array.from({ length: updatedState.config.questionLimit }, () => ({ taxon: null, observation: null }));
         } else {
             const data = await api.fetchSpeciesPool({
-                difficulty: updatedState.config.difficulty, wantsPhotos: updatedState.config.wantsPhotos, wantsSounds: updatedState.config.wantsSounds, months: updatedState.config.months, placeId: updatedState.form.placeId, lat: updatedState.form.lat, lng: updatedState.form.lng, radius: updatedState.form.radius, taxonId: updatedState.form.taxonId
+                difficulty: updatedState.config.difficulty, wantsPhotos: updatedState.config.wantsPhotos, wantsSounds: updatedState.config.wantsSounds, months: updatedState.config.months, placeId: updatedState.form.placeId, lat: updatedState.form.lat, lng: updatedState.form.lng, radius: updatedState.form.radius, taxonId: updatedState.form.taxonId, establishmentStatus: updatedState.config.establishmentStatus
             });
             if (!data.results || data.results.length === 0) {
                 setState({ ui: { ...getState().ui, isLoadingQuizPool: false, setupError: "No research-grade observations found. Try a broader search." } });

@@ -162,6 +162,12 @@ const appendMonthParams = (params, months) => {
     }
 };
 
+const appendEstablishmentParams = (params, status) => {
+    if (status === 'native') params.set('native', 'true');
+    if (status === 'introduced') params.set('introduced', 'true');
+    if (status === 'endemic') params.set('endemic', 'true');
+};
+
 export const fetchPlaces = async (query, signal, locale = getLocale()) => {
     const params = new URLSearchParams({
         q: query,
@@ -188,7 +194,7 @@ export const fetchTaxaAutocomplete = async (query, signal, locale = getLocale())
     return res.json();
 };
 
-export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, taxonId, page = 1, perPage = null, locale = getLocale() }, signal) => {
+export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, taxonId, establishmentStatus, page = 1, perPage = null, locale = getLocale() }, signal) => {
     // If perPage is explicitly passed, use it; otherwise fallback to difficulty string mapping
     const limit = perPage !== null ? String(perPage) : String(difficulty);
     
@@ -204,6 +210,7 @@ export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, m
 
     appendMediaParams(params, wantsPhotos, wantsSounds);
     appendMonthParams(params, months);
+    appendEstablishmentParams(params, establishmentStatus);
 
     if (placeId) {
         params.set('place_id', String(placeId));
@@ -222,7 +229,7 @@ export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, m
     return res.json();
 };
 
-export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, difficulty, taxonId, withoutTaxonIds = [], notObsIds = [], locale = getLocale() }, signal) => {
+export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, difficulty, taxonId, establishmentStatus, withoutTaxonIds = [], notObsIds = [], locale = getLocale() }, signal) => {
     const params = new URLSearchParams({
         quality_grade: 'research',
         captive: 'false',
@@ -234,6 +241,7 @@ export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, place
 
     appendMediaParams(params, wantsPhotos, wantsSounds);
     appendMonthParams(params, months);
+    appendEstablishmentParams(params, establishmentStatus);
 
     if (placeId) {
         params.set('place_id', String(placeId));

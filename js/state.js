@@ -18,6 +18,7 @@ const initialState = {
         preventDuplicates: true,
         isRarityMode: false,
         weightingMethod: 'linear',
+        establishmentStatus: 'any',
         answerInput: '',
         rankInput: 'species'
     },
@@ -34,6 +35,7 @@ const initialState = {
         expertTotalSpecies: 0,
         questionLimit: 10,
         weightingMethod: 'linear',
+        establishmentStatus: 'any'
     },
 
     // 3. Centralized UI & View Flags

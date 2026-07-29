@@ -78,7 +78,8 @@ export async function loadObservationForQuestion(index) {
                     lat: currentConfig.lat,
                     lng: currentConfig.lng,
                     radius: currentConfig.radius,
-                    taxonId: currentConfig.taxonId
+                    taxonId: currentConfig.taxonId,
+                    establishmentStatus: currentConfig.establishmentStatus
                 }, controller.signal);
 
                 if (deepData.results && deepData.results.length > 0) {
@@ -162,6 +163,7 @@ export async function loadObservationForQuestion(index) {
                 radius: currentConfig.radius,
                 difficulty: isStandardExpert ? 'all' : 'specific',
                 taxonId: isStandardExpert ? currentConfig.taxonId : targetTaxon?.id,
+                establishmentStatus: currentConfig.establishmentStatus,
                 withoutTaxonIds,
                 notObsIds
             }, controller.signal);
