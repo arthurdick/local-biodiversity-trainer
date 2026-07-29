@@ -51,7 +51,6 @@ subscribeSelector(
                 setState({ ui: { ...newState.ui, quizError: { isMissingMedia: true } } });
             } else if (mediaArray[0].type === 'sound') {
                 setState({ ui: { ...newState.ui, isMediaLoaded: true } });
-                observationService.loadObservationForQuestion(newState.currentIndex + 1);
             }
         }
     }
@@ -88,6 +87,17 @@ subscribeSelector(
               a.isMediaLoaded === b.isMediaLoaded &&
               a.currentIndex === b.currentIndex &&
               a.mediaIndex === b.mediaIndex
+);
+
+// 5. Sequential Prefetch Trigger
+// Ensures the next observation is prefetched only after the current media finishes loading (cached or network)
+subscribeSelector(
+    (s) => s.ui.isMediaLoaded,
+    (isLoaded, prevLoaded, newState) => {
+        if (isLoaded && !prevLoaded && newState.ui.activeView === 'quiz-view') {
+            observationService.loadObservationForQuestion(newState.currentIndex + 1);
+        }
+    }
 );
 
 // --- STORAGE ---
@@ -420,7 +430,6 @@ document.getElementById('quiz-image').onload = (e) => {
     const media = selectCurrentMedia(s)[s.currentMediaIndex];
     if (media && e.target.dataset.src === media.mediumUrl) {
         setState({ ui: { ...s.ui, isMediaLoaded: true } });
-        observationService.loadObservationForQuestion(s.currentIndex + 1); // Prefetch next
     }
 };
 
