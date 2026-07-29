@@ -31,7 +31,8 @@ const autocompleteConfigs = [
 ];
 
 /**
- * Redacts the taxon's scientific and common names (and common plurals) from a string.
+ * Redacts the taxon's scientific name (genus, specific epithets, subspecies), 
+ * common names, and common plurals from field note strings.
  */
 function redactSpoilers(text, taxon) {
     if (!text || !taxon) return text;
@@ -39,10 +40,17 @@ function redactSpoilers(text, taxon) {
     const scientificTerms = new Set();
     const commonTerms = new Set();
 
-    // 1. Add Scientific Name & Genus (Do NOT pluralize these)
+    // 1. Add Full Scientific Name, Genus, & Epithets (Do NOT pluralize these)
     if (taxon.name) {
         scientificTerms.add(taxon.name);
-        scientificTerms.add(taxon.name.split(' ')[0]); // Isolate Genus
+        
+        // Split binomial/trinomial names into individual terms (e.g., "Canis", "lupus")
+        const nameParts = taxon.name.split(/[\s-]+/);
+        nameParts.forEach(part => {
+            if (part.length > 2) {
+                scientificTerms.add(part);
+            }
+        });
     }
 
     // 2. Add Common Name & Significant Fragments (These will be pluralized)
