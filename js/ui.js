@@ -1,5 +1,8 @@
 import { selectCurrentMedia, selectCurrentMeta } from './state.js';
 
+let currentView = null;
+let lastFocusedQuestionIndex = -1;
+
 const autocompleteConfigs = [
     {
         type: 'place',
@@ -56,7 +59,21 @@ export function syncCheckbox(id, checked) {
  */
 export function render(state) {
     // 1. View Routing
+    const isNewView = currentView !== state.ui.activeView;
+    
     document.querySelectorAll('.view').forEach(el => el.classList.toggle('active', el.id === state.ui.activeView));
+    
+    if (isNewView) {
+        currentView = state.ui.activeView;
+        
+        // Derives 'setup-heading' from 'setup-view', etc.
+        const headingId = currentView.replace('-view', '-heading');
+        const headingEl = document.getElementById(headingId);
+        
+        if (headingEl) {
+            headingEl.focus();
+        }
+    }
 
     // Stop audio if navigating away from the quiz view
     if (state.ui.activeView !== 'quiz-view') {
@@ -65,6 +82,8 @@ export function render(state) {
 
     // 2. Setup View
     if (state.ui.activeView === 'setup-view') {
+        lastFocusedQuestionIndex = -1;
+        
         syncInput('input-place', state.form.placeName || '');
         syncInput('input-taxon', state.form.taxonName || '');
         syncInput('input-lat', state.form.lat ?? '');
@@ -169,8 +188,18 @@ export function render(state) {
         syncInput('input-rank', state.form.rankInput);
 
         const inputDisabled = isAnswered || !isReadyForMedia || state.ui.isCheckingAnswer;
-        document.getElementById('input-answer').disabled = inputDisabled;
-        document.getElementById('input-rank').disabled = inputDisabled;
+        const answerInput = document.getElementById('input-answer');
+        const rankInput = document.getElementById('input-rank');
+        
+        if (answerInput) answerInput.disabled = inputDisabled;
+        if (rankInput) rankInput.disabled = inputDisabled;
+        
+        if (isReadyForMedia && !isAnswered && !state.ui.isCheckingAnswer) {
+            if (lastFocusedQuestionIndex !== state.currentIndex) {
+                lastFocusedQuestionIndex = state.currentIndex;
+                if (answerInput) answerInput.focus();
+            }
+        }
         
         const btnSubmit = document.getElementById('btn-submit');
         btnSubmit.style.display = (!isAnswered && isReadyForMedia) ? 'block' : 'none';
@@ -358,8 +387,21 @@ function renderQuizMedia(state, isReadyForMedia) {
         if (mediaArray.length > 1) {
             controls.style.display = 'flex';
             document.getElementById('media-counter').textContent = `${state.currentMediaIndex + 1} / ${mediaArray.length}`;
-            document.getElementById('btn-prev-media').disabled = state.currentMediaIndex === 0;
-            document.getElementById('btn-next-media').disabled = state.currentMediaIndex === mediaArray.length - 1;
+            
+            const prevBtn = document.getElementById('btn-prev-media');
+            const nextBtn = document.getElementById('btn-next-media');
+            const isNextDisabled = state.currentMediaIndex === mediaArray.length - 1;
+            const isPrevDisabled = state.currentMediaIndex === 0;
+
+            // If the button being clicked is about to be disabled, shift focus to the sibling button
+            if (isNextDisabled && document.activeElement === nextBtn) {
+                prevBtn.focus();
+            } else if (isPrevDisabled && document.activeElement === prevBtn) {
+                nextBtn.focus();
+            }
+
+            prevBtn.disabled = isPrevDisabled;
+            nextBtn.disabled = isNextDisabled;
         } else {
             controls.style.display = 'none';
         }
