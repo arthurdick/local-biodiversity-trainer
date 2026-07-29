@@ -373,6 +373,9 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     }
 
     savePreferences();
+    
+    observationService.clearCache();
+    
     setState({ 
         config: { ...s.form, questionLimit: parseInt(s.form.questionLimit, 10), expertTotalSpecies: 0 },
         ui: { ...s.ui, isLoadingQuizPool: true, setupError: null, placeError: null, taxonError: null } 
