@@ -281,7 +281,33 @@ export function render(state) {
         const btnSubmit = document.getElementById('btn-submit');
         btnSubmit.style.display = (!isAnswered && isReadyForMedia) ? 'block' : 'none';
         btnSubmit.disabled = state.ui.isCheckingAnswer;
-        btnSubmit.textContent = state.ui.isCheckingAnswer ? "Checking..." : "Check Answer";
+        
+        let answerErrEl = document.getElementById('answer-error');
+        if (!answerErrEl) {
+            answerErrEl = document.createElement('div');
+            answerErrEl.id = 'answer-error';
+            answerErrEl.className = 'inline-error';
+            answerErrEl.style.marginBottom = '10px';
+            answerErrEl.setAttribute('aria-live', 'assertive');
+            
+            const buttonsRow = document.querySelector('.answer-buttons-row');
+            if (buttonsRow) buttonsRow.parentNode.insertBefore(answerErrEl, buttonsRow);
+        }
+        
+        if (state.ui.answerError) {
+            answerErrEl.textContent = state.ui.answerError;
+            answerErrEl.style.display = 'block';
+        } else {
+            answerErrEl.style.display = 'none';
+        }
+
+        if (state.ui.isCheckingAnswer) {
+            btnSubmit.textContent = "Checking...";
+        } else if (state.ui.answerError) {
+            btnSubmit.textContent = "↻ Retry Submission";
+        } else {
+            btnSubmit.textContent = "Check Answer";
+        }
 
         const btnSkip = document.getElementById('btn-skip');
         btnSkip.style.display = (!isAnswered && isReadyForMedia) ? 'block' : 'none';

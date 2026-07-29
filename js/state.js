@@ -59,6 +59,7 @@ const initialState = {
         
         // Quiz state
         quizError: null,
+        answerError: null,
         isCheckingAnswer: false,
         isHintVisible: false,
         isMediaLoaded: false,

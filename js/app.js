@@ -146,7 +146,16 @@ function loadPreferences() {
     const el = document.getElementById(elId);
     if (el) el.addEventListener('input', (e) => {
         const updates = { [prop]: e.target.value };
-        setState({ form: { ...getState().form, ...updates } });
+        const uiUpdates = {};
+        
+        if (prop === 'answerInput' || prop === 'rankInput') {
+            uiUpdates.answerError = null;
+        }
+        
+        setState({
+            form: { ...getState().form, ...updates },
+            ui: { ...getState().ui, ...uiUpdates }
+        });
     });
 });
 
@@ -556,11 +565,22 @@ document.getElementById('answer-form').addEventListener('submit', async (e) => {
     const inputStr = (s.form.answerInput || '').trim();
     if (!inputStr) return;
 
-    setState({ ui: { ...s.ui, isCheckingAnswer: true } });
+    setState({ ui: { ...s.ui, isCheckingAnswer: true, answerError: null } });
 
-    const { isCorrect, pointsEarned, matchedNameDisplay } = await engine.evaluateAnswer(
+    const { isCorrect, pointsEarned, matchedNameDisplay, networkError } = await engine.evaluateAnswer(
         inputStr, s.form.rankInput, q.observation?.taxon || q.taxon, observationService.getDynamicNetworkTimeout
     );
+    
+    if (networkError) {
+        setState({
+            ui: {
+                ...getState().ui,
+                isCheckingAnswer: false,
+                answerError: "⚠️ Offline: Unable to verify your answer with the database. Check your connection to try again, or skip."
+            }
+        });
+        return;
+    }
     
     const mediaInfo = engine.getQuestionThumbnail(q, selectCurrentMedia(getState()));
     

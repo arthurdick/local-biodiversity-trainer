@@ -181,6 +181,7 @@ export function getPointsForRank(rank) {
 export async function evaluateAnswer(inputStr, guessedRank, taxon, getTimeoutFn) {
     let { isCorrect, matchedNameDisplay, normalizedInput } = checkExactMatch(inputStr, taxon);
     let pointsEarned = 0;
+    let networkError = false;
 
     if (guessedRank !== 'species') {
         isCorrect = false;
@@ -220,8 +221,11 @@ export async function evaluateAnswer(inputStr, guessedRank, taxon, getTimeoutFn)
                     }
                 }
             }
-        } catch (error) { console.warn("API check failed. Relying on local strict match."); }
+        } catch (error) {
+            console.warn("API check failed. Relying on local strict match.");
+            networkError = true;
+        }
     }
 
-    return { isCorrect, pointsEarned, matchedNameDisplay };
+    return { isCorrect, pointsEarned, matchedNameDisplay, networkError };
 }
