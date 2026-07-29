@@ -505,8 +505,17 @@ function renderQuizMeta(state, isReadyForMedia) {
     if (meta) {
         document.getElementById('meta-date').textContent = `📅 ${new Date(meta.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`;
         const locLink = document.getElementById('meta-location');
-        locLink.textContent = `📍 ${meta.locationText || 'Unknown Location'}`;
-        if (meta.coordinates) {
+        
+        if (meta.isObscured) {
+            locLink.textContent = `📍 ${meta.locationText || 'Unknown Location'} (Obscured)`;
+            locLink.title = "Exact coordinates are obscured.";
+        } else {
+            locLink.textContent = `📍 ${meta.locationText || 'Unknown Location'}`;
+            locLink.removeAttribute('title');
+        }
+
+        // Adjust routing: If obscured, skip GPS mapping and force a text-based search
+        if (meta.coordinates && !meta.isObscured) {
             locLink.href = `https://www.google.com/maps/search/?api=1&query=${meta.coordinates}`;
             locLink.className = 'enabled-link';
         } else if (meta.locationText) {
@@ -516,6 +525,7 @@ function renderQuizMeta(state, isReadyForMedia) {
             locLink.href = "#";
             locLink.className = 'disabled-link';
         }
+        
         document.getElementById('meta-observer').textContent = `👤 ${meta.observer} (${meta.license})`;
     }
 

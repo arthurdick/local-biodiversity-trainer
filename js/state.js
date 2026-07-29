@@ -174,6 +174,7 @@ export function selectCurrentMeta(currentState) {
         locationText: obs.place_guess,
         coordinates: obs.location,
         observer: obs.user?.name || obs.user?.login || 'Unknown Observer',
-        license: obs.license_code ? obs.license_code.toUpperCase() : 'All Rights Reserved'
+        license: obs.license_code ? obs.license_code.toUpperCase() : 'All Rights Reserved',
+        isObscured: obs.geoprivacy === 'obscured' || obs.taxon_geoprivacy === 'obscured' || obs.geoprivacy === 'private' || obs.taxon_geoprivacy === 'private'
     };
 }
