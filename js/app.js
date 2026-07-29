@@ -1,53 +1,41 @@
-import { getState, setState, updateQuestion, resetState, subscribe, selectCurrentMedia } from './state.js';
+import { getState, setState, updateQuestion, resetState, subscribe, subscribeSelector, selectCurrentMedia } from './state.js';
 import * as api from './api.js';
 import * as engine from './quizEngine.js';
 import * as ui from './ui.js';
 import * as observationService from './observationService.js';
 
-// --- REACTIVE RENDERING & SIDE EFFECTS ---
-let prevState = getState();
+// ==========================================================================
+// DECOUPLED STATE SUBSCRIBERS
+// ==========================================================================
 
+// 1. Pure Declarative DOM Rendering
+// Fires on state updates to sync the UI without triggering side-effects
 subscribe((newState) => {
-    // 1. Compute Deltas FIRST to prevent stale state references
-    const isNewQuiz = prevState.ui.activeView !== 'quiz-view' && newState.ui.activeView === 'quiz-view';
-    const isNextQuestion = prevState.currentIndex !== newState.currentIndex && newState.currentIndex < newState.questions.length;
-    
-    const prevQ = prevState.questions[prevState.currentIndex];
-    const currentQ = newState.questions[newState.currentIndex];
-    const newObservationArrived = currentQ?.observation && !prevQ?.observation;
-
-    // 2. IMMEDIATELY update prevState to prevent nested staleness and infinite loops
-    prevState = newState;
-
-    // 3. Execute purely declarative DOM sync
     ui.render(newState);
+});
 
-    // 4. Sync cached media readiness (Controller check)
-    if (newState.ui.activeView === 'quiz-view' && !newState.ui.isMediaLoaded) {
-        const mediaArray = selectCurrentMedia(newState);
-        const currentMedia = mediaArray[newState.currentMediaIndex];
+// 2. Question Navigation & JIT Prefetch Trigger
+// Triggers observation fetching ONLY when entering a quiz or advancing questions
+subscribeSelector(
+    (s) => ({ activeView: s.ui.activeView, index: s.currentIndex }),
+    ({ activeView, index }, prev) => {
+        const isNewQuiz = prev.activeView !== 'quiz-view' && activeView === 'quiz-view';
+        const isNextQuestion = index !== prev.index;
 
-        if (currentMedia?.type === 'photo') {
-            const imgEl = document.getElementById('quiz-image');
-            if (imgEl && imgEl.complete && imgEl.naturalWidth > 0 && imgEl.dataset.src === currentMedia.mediumUrl) {
-                setState({ ui: { ...newState.ui, isMediaLoaded: true } });
-            }
-        } else if (currentMedia?.type === 'sound') {
-            const audioPlayer = document.getElementById('quiz-audio-player');
-            if (audioPlayer && audioPlayer.readyState >= 2 && audioPlayer.dataset.src === currentMedia.fileUrl) {
-                setState({ ui: { ...newState.ui, isMediaLoaded: true } });
-            }
+        if (activeView === 'quiz-view' && (isNewQuiz || isNextQuestion)) {
+            observationService.loadObservationForQuestion(index);
         }
-    }
+    },
+    (a, b) => a.activeView === b.activeView && a.index === b.index
+);
 
-    // 5. Fetch Network Side-Effects
-    if (isNewQuiz || isNextQuestion) {
-        observationService.loadObservationForQuestion(newState.currentIndex);
-    }
+// 3. Observation Data Arrival Reaction
+// Reacts strictly when new observation data lands on the current active question
+subscribeSelector(
+    (s) => s.questions[s.currentIndex]?.observation,
+    (obs, prevObs, newState) => {
+        if (!obs || obs === prevObs) return;
 
-    // 6. React to newly arrived observation data
-    if (newObservationArrived) {
-        const obs = currentQ.observation;
         if (obs.error) {
             if (obs.emptyPool && newState.config.difficulty === 'all') {
                 setState({ 
@@ -67,7 +55,40 @@ subscribe((newState) => {
             }
         }
     }
-});
+);
+
+// 4. Cached Media Readiness Controller
+// Checks image element `.complete` or audio `.readyState` for pre-cached assets
+subscribeSelector(
+    (s) => ({
+        activeView: s.ui.activeView,
+        isMediaLoaded: s.ui.isMediaLoaded,
+        currentIndex: s.currentIndex,
+        mediaIndex: s.currentMediaIndex
+    }),
+    ({ activeView, isMediaLoaded, mediaIndex }, _, newState) => {
+        if (activeView !== 'quiz-view' || isMediaLoaded) return;
+
+        const mediaArray = selectCurrentMedia(newState);
+        const currentMedia = mediaArray[mediaIndex];
+
+        if (currentMedia?.type === 'photo') {
+            const imgEl = document.getElementById('quiz-image');
+            if (imgEl && imgEl.complete && imgEl.naturalWidth > 0 && imgEl.dataset.src === currentMedia.mediumUrl) {
+                setState({ ui: { ...newState.ui, isMediaLoaded: true } });
+            }
+        } else if (currentMedia?.type === 'sound') {
+            const audioPlayer = document.getElementById('quiz-audio-player');
+            if (audioPlayer && audioPlayer.readyState >= 2 && audioPlayer.dataset.src === currentMedia.fileUrl) {
+                setState({ ui: { ...newState.ui, isMediaLoaded: true } });
+            }
+        }
+    },
+    (a, b) => a.activeView === b.activeView &&
+              a.isMediaLoaded === b.isMediaLoaded &&
+              a.currentIndex === b.currentIndex &&
+              a.mediaIndex === b.mediaIndex
+);
 
 // --- STORAGE ---
 function debounce(func, timeout = 250) {

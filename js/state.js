@@ -107,6 +107,23 @@ export const subscribe = (listener) => {
     return () => listeners.delete(listener);
 };
 
+/**
+ * Subscribes a listener to a specific state slice using a selector.
+ * The callback only fires when the selected value changes.
+ */
+export const subscribeSelector = (selector, callback, isEqual = (a, b) => a === b) => {
+    let currentSelected = selector(state);
+    
+    return subscribe((newState) => {
+        const nextSelected = selector(newState);
+        if (!isEqual(currentSelected, nextSelected)) {
+            const prevSelected = currentSelected;
+            currentSelected = nextSelected;
+            callback(nextSelected, prevSelected, newState);
+        }
+    });
+};
+
 // --- SELECTORS ---
 export function selectCurrentMedia(currentState) {
     const q = currentState.questions[currentState.currentIndex];
