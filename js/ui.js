@@ -388,60 +388,22 @@ export function render(state) {
 
 // --- SUB-RENDERERS ---
 
-function renderAutocomplete(config, results, show, activeIdx) {
-    const { listId, inputId, type, formatDisplay } = config;
-    const list = document.getElementById(listId);
-    const input = document.getElementById(inputId);
-    
-    // Hide and clear if needed
-    if (!show || results.length === 0) {
-        if (list.childNodes.length > 0) list.replaceChildren();
-        list.classList.remove('show');
-        input.setAttribute('aria-expanded', 'false');
-        input.removeAttribute('aria-activedescendant');
-        list._lastResults = null; // Clear cache
-        return;
-    }
+function renderAutocomplete(config, results) {
+    const list = document.getElementById(config.listId);
+    if (!list) return;
 
-    // 1. Content Rendering: Only rebuild DOM if the underlying data reference changed
-    if (list._lastResults !== results) {
-        const fragment = document.createDocumentFragment();
-        
-        results.forEach((item, i) => {
-            const li = document.createElement('li');
-            li.id = `opt-${type}-${i}`;
-            li.setAttribute('role', 'option');
-            li.textContent = formatDisplay(item);
-            fragment.appendChild(li);
-        });
-        
-        list.replaceChildren(fragment);
-        list._lastResults = results; // Cache the immutable reference
-    }
+    // Skip DOM updates if results haven't changed
+    if (list._lastResults === results) return;
+    list._lastResults = results;
 
-    // 2. State Rendering: Always update visibility and active indices
-    list.classList.add('show');
-    input.setAttribute('aria-expanded', 'true');
-    
-    // Reset previously active items
-    const prevActive = list.querySelector('.active');
-    if (prevActive) {
-        prevActive.classList.remove('active');
-        prevActive.setAttribute('aria-selected', 'false');
-    }
+    const fragment = document.createDocumentFragment();
+    results.forEach(item => {
+        const option = document.createElement('option');
+        option.value = config.formatDisplay(item);
+        fragment.appendChild(option);
+    });
 
-    // Apply new active item
-    if (activeIdx >= 0) {
-        input.setAttribute('aria-activedescendant', `opt-${type}-${activeIdx}`);
-        const activeLi = document.getElementById(`opt-${type}-${activeIdx}`);
-        if (activeLi) {
-            activeLi.classList.add('active');
-            activeLi.setAttribute('aria-selected', 'true');
-            activeLi.scrollIntoView({ block: 'nearest' });
-        }
-    } else {
-        input.removeAttribute('aria-activedescendant');
-    }
+    list.replaceChildren(fragment);
 }
 
 function renderError(id, msg) {

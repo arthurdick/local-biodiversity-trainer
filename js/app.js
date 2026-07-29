@@ -195,13 +195,12 @@ document.querySelectorAll('input[name="loc-mode"]').forEach(radio => {
 function setupAutocomplete(config) {
     const {
         inputId, listId, clearBtnId, fetchDataFn,
-        stateKeys: { id, name, error, results, showList, activeIdx },
+        stateKeys: { id, name, error, results },
         formatDisplay, validateOnBlur, errorMsg
     } = config;
 
     let abortController = null;
     const inputEl = document.getElementById(inputId);
-    const listEl = document.getElementById(listId);
     const clearBtn = document.getElementById(clearBtnId);
 
     const performSearch = debounce(async (query) => {
@@ -209,112 +208,61 @@ function setupAutocomplete(config) {
         abortController = new AbortController();
 
         if (query.length < 3) {
-            setState(prev => ({ ui: { ...prev.ui, [showList]: false } }));
+            setState(prev => ({ ui: { ...prev.ui, [results]: [] } }));
             return;
         }
 
         try {
             const data = await fetchDataFn(query, abortController.signal);
-            setState(prev => ({ ui: { ...prev.ui, [results]: data.results, [showList]: data.results.length > 0 } }));
+            setState(prev => ({ ui: { ...prev.ui, [results]: data.results } }));
         } catch(err) {
             if (err.name !== 'AbortError') console.warn(`${inputId} search offline`);
         }
     }, 250);
 
+    // 1. Input Event: Match typed value against fetched options
     inputEl.addEventListener('input', (e) => {
         const query = e.target.value;
+        const currentResults = getState().ui[results];
 
-        // 1. Update state immediately on keystroke so DOM and state never desync
+        // Match typed text against fetched results to see if the user selected a valid option
+        const selectedItem = currentResults.find(item => formatDisplay(item) === query);
+
         setState(prev => ({
-            form: { ...prev.form, [id]: null, [name]: query },
-            ui: { ...prev.ui, [activeIdx]: -1, [error]: null }
+            form: {
+                ...prev.form,
+                [id]: selectedItem ? selectedItem.id : null,
+                [name]: query
+            },
+            ui: { ...prev.ui, [error]: null }
         }));
 
-        // 2. Trigger debounced API search
-        performSearch(query);
+        if (!selectedItem) {
+            performSearch(query);
+        }
     });
 
-    // 2. Focus Event (Re-open & Clear Error)
-    inputEl.addEventListener('focus', (e) => {
-        const s = getState();
-        const hasNoSelection = !s.form[id];
-        const shouldShow = hasNoSelection && e.target.value.length >= 3 && s.ui[results].length > 0;
-        setState(prev => ({ ui: { ...prev.ui, [error]: null, [showList]: shouldShow } }));
+    // 2. Focus Event: Clear previous error message when user re-enters input
+    inputEl.addEventListener('focus', () => {
+        setState(prev => ({ ui: { ...prev.ui, [error]: null } }));
     });
 
-    // 3. Blur Event (Validation)
+    // 3. Blur Event: Validate whether typed text yielded a valid selected ID
     inputEl.addEventListener('blur', () => {
         const s = getState();
-        // Use custom validation if provided, otherwise default to checking if the ID exists
         const isValid = validateOnBlur ? validateOnBlur(s) : !!s.form[id];
 
         if ((s.form[name] || '').trim() !== '' && !isValid) {
-            setState(prev => ({ ui: { ...prev.ui, [error]: errorMsg, [showList]: false } }));
-        } else if (s.ui[showList]) {
-            setState(prev => ({ ui: { ...prev.ui, [showList]: false } }));
+            setState(prev => ({ ui: { ...prev.ui, [error]: errorMsg } }));
         }
     });
 
-    // 4. Keyboard Navigation
-    inputEl.addEventListener('keydown', (e) => {
-        const s = getState();
-        if (!s.ui[showList]) return;
-
-        listEl.classList.add('using-keyboard');
-
-        let newIdx = s.ui[activeIdx];
-        const total = s.ui[results].length;
-
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            newIdx = (newIdx < total - 1) ? newIdx + 1 : 0;
-            setState(prev => ({ ui: { ...prev.ui, [activeIdx]: newIdx } }));
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            newIdx = (newIdx > 0) ? newIdx - 1 : total - 1;
-            setState(prev => ({ ui: { ...prev.ui, [activeIdx]: newIdx } }));
-        } else if (e.key === 'Enter') {
-            e.preventDefault();
-            if (newIdx >= 0 && newIdx < total) {
-                const item = s.ui[results][newIdx];
-                setState(prev => ({
-                    form: { ...prev.form, [id]: item.id, [name]: formatDisplay(item) },
-                    ui: { ...prev.ui, [showList]: false, [error]: null }
-                }));
-            }
-        } else if (e.key === 'Escape') {
-            e.preventDefault();
-            setState(prev => ({ ui: { ...prev.ui, [showList]: false } }));
-        }
-    });
-
-    // 5. Mouse Intent Tracking
-    listEl.addEventListener('mousemove', (e) => e.currentTarget.classList.remove('using-keyboard'));
-
-    // 6. Pointerdown Delegation
-    listEl.addEventListener('pointerdown', (e) => {
-        const li = e.target.closest('li');
-        if (li) {
-            e.preventDefault();
-
-            const idx = parseInt(li.id.split('-').pop(), 10);
-            const item = getState().ui[results][idx];
-
-            setState(prev => ({
-                form: { ...prev.form, [id]: item.id, [name]: formatDisplay(item) },
-                ui: { ...prev.ui, [showList]: false, [error]: null }
-            }));
-
-            inputEl.focus();
-        }
-    });
-
-    // 7. Clear Button Action
+    // 4. Clear Button Action
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
             setState(prev => ({
                 form: { ...prev.form, [id]: null, [name]: '' },
-                ui: { ...prev.ui, [showList]: false, [error]: null }
+                ui: { ...prev.ui, [results]: [], [error]: null }
             }));
             inputEl.focus();
         });
@@ -330,12 +278,11 @@ setupAutocomplete({
     clearBtnId: 'clear-place',
     fetchDataFn: api.fetchPlaces,
     stateKeys: {
-        id: 'placeId', name: 'placeName', error: 'placeError',
-        results: 'placeResults', showList: 'showPlaceList', activeIdx: 'activePlaceIdx'
+        id: 'placeId', name: 'placeName', error: 'placeError', results: 'placeResults'
     },
     formatDisplay: (item) => item.display_name || item.name,
     validateOnBlur: (s) => s.form.locMode === 'search' ? !!s.form.placeId : (s.form.lat !== null && s.form.lng !== null),
-    errorMsg: "⚠️ Please select a location from the dropdown list."
+    errorMsg: "⚠️ Please select a location from the suggestions list."
 });
 
 setupAutocomplete({
@@ -344,12 +291,11 @@ setupAutocomplete({
     clearBtnId: 'clear-taxon',
     fetchDataFn: api.fetchTaxaAutocomplete,
     stateKeys: {
-        id: 'taxonId', name: 'taxonName', error: 'taxonError',
-        results: 'taxonResults', showList: 'showTaxonList', activeIdx: 'activeTaxonIdx'
+        id: 'taxonId', name: 'taxonName', error: 'taxonError', results: 'taxonResults'
     },
     formatDisplay: (item) => item.preferred_common_name ? `${item.preferred_common_name} (${item.name})` : item.name,
     validateOnBlur: (s) => !!s.form.taxonId,
-    errorMsg: "⚠️ Please select a valid target taxon from the list."
+    errorMsg: "⚠️ Please select a valid target taxon from the suggestions list."
 });
 
 document.addEventListener('click', (e) => {

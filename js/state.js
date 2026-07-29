@@ -49,13 +49,9 @@ const initialState = {
         placeError: null,
         taxonError: null,
 
-        // Autocomplete lists
+        // Autocomplete search result pools
         placeResults: [],
-        showPlaceList: false,
-        activePlaceIdx: -1,
         taxonResults: [],
-        showTaxonList: false,
-        activeTaxonIdx: -1,
 
         // Quiz state
         quizError: null,

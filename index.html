@@ -28,12 +28,12 @@
                     </div>
 
                     <!-- Search Mode Section -->
-                    <div id="section-search" class="location-section active autocomplete-wrapper">
+                    <div id="section-search" class="location-section active">
                         <div class="input-relative-wrapper">
-                            <input type="text" id="input-place" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="list-place" aria-haspopup="listbox" placeholder="Search a city, park, or country..." autocomplete="off">
+                            <input type="text" id="input-place" list="list-place" placeholder="Search a city, park, or country..." autocomplete="off">
                             <button type="button" id="clear-place" class="btn-clear" aria-label="Clear location input" title="Clear location">&times;</button>
                         </div>
-                        <ul id="list-place" class="autocomplete-list" role="listbox"></ul>
+                        <datalist id="list-place"></datalist>
                     </div>
 
                     <!-- Coordinate Mode Section -->
@@ -56,13 +56,13 @@
                     </div>
                 </fieldset>
 
-                <div class="form-group z-mid autocomplete-wrapper">
+                <div class="form-group">
                     <label for="input-taxon">2. Target Taxon (Optional)</label>
                     <div class="input-relative-wrapper">
-                        <input type="text" id="input-taxon" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="list-taxon" aria-haspopup="listbox" placeholder="e.g., Birds, Fungi, Owls..." autocomplete="off">
+                        <input type="text" id="input-taxon" list="list-taxon" placeholder="e.g., Birds, Fungi, Owls..." autocomplete="off">
                         <button type="button" id="clear-taxon" class="btn-clear" aria-label="Clear target taxon input" title="Clear taxon">&times;</button>
                     </div>
-                    <ul id="list-taxon" class="autocomplete-list" role="listbox"></ul>
+                    <datalist id="list-taxon"></datalist>
                 </div>
 
                 <fieldset class="form-group fieldset-reset">
