@@ -92,12 +92,16 @@ subscribeSelector(
 // 5. Sequential Prefetch Trigger
 // Ensures the next observation is prefetched only after the current media finishes loading (cached or network)
 subscribeSelector(
-    (s) => s.ui.isMediaLoaded,
-    (isLoaded, prevLoaded, newState) => {
-        if (isLoaded && !prevLoaded && newState.ui.activeView === 'quiz-view') {
-            observationService.loadObservationForQuestion(newState.currentIndex + 1);
+    (s) => ({
+        isLoaded: s.ui.isMediaLoaded,
+        index: s.currentIndex
+    }),
+    ({ isLoaded, index }, prev, newState) => {
+        if (isLoaded && newState.ui.activeView === 'quiz-view') {
+            observationService.loadObservationForQuestion(index + 1);
         }
-    }
+    },
+    (a, b) => a.isLoaded === b.isLoaded && a.index === b.index
 );
 
 // --- NAVIGATION PROTECTION ---
