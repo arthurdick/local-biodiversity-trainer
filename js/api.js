@@ -20,7 +20,8 @@ export const getLocale = () => {
 
 /**
  * Global Request Throttler
- * Ensures requests to the API are spaced by at least `interval` milliseconds.
+ * Ensures requests to the API are spaced by at least `interval` milliseconds,
+ * while allowing aborted requests to instantly unblock the queue.
  */
 class RequestQueue {
     constructor(interval = 1000) {
@@ -44,6 +45,7 @@ class RequestQueue {
                 const abortHandler = () => {
                     const index = this.queue.indexOf(task);
                     if (index > -1) {
+                        // Remove from the pending queue if it hasn't started processing
                         this.queue.splice(index, 1);
                         task.cleanup();
                         reject(new DOMException('Aborted before execution', 'AbortError'));
@@ -75,16 +77,39 @@ class RequestQueue {
             const now = Date.now();
             const timeSinceLast = now - this.lastRequestTime;
 
-            // Wait if the interval hasn't passed yet
+            // Wait if the interval hasn't passed yet, but make the wait cancelable
             if (timeSinceLast < this.interval) {
-                await new Promise(r => setTimeout(r, this.interval - timeSinceLast));
+                await new Promise(resolve => {
+                    let timeoutId;
+                    
+                    // Function to immediately break the sleep
+                    const wakeUp = () => {
+                        clearTimeout(timeoutId);
+                        if (task.options.signal) {
+                            task.options.signal.removeEventListener('abort', wakeUp);
+                        }
+                        resolve();
+                    };
+
+                    // If already aborted, wake up immediately
+                    if (task.options.signal?.aborted) {
+                        return resolve();
+                    }
+
+                    // Listen for abort to interrupt the sleep and unblock the queue
+                    if (task.options.signal) {
+                        task.options.signal.addEventListener('abort', wakeUp);
+                    }
+                    
+                    timeoutId = setTimeout(wakeUp, this.interval - timeSinceLast);
+                });
             }
 
             // Double check if aborted right before fetching
-            if (task.options.signal && task.options.signal.aborted) {
+            if (task.options.signal?.aborted) {
                 task.cleanup();
                 task.reject(new DOMException('Aborted', 'AbortError'));
-                continue;
+                continue; // Skip fetch and immediately proceed to the next queued item
             }
 
             this.lastRequestTime = Date.now();
