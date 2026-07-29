@@ -190,9 +190,15 @@ export async function loadObservationForQuestion(index) {
             }
         } catch(e) {
             const errorData = { error: true };
-            if (e.name !== 'AbortError') {
-                updateQuestion(index, { observation: errorData });
+            
+            if (e.name === 'AbortError') {
+                console.warn(`Question ${index + 1}: Network request timed out.`);
+            } else {
+                console.error(`Question ${index + 1}: Fetch failed`, e);
             }
+
+            updateQuestion(index, { observation: errorData });
+            
             return errorData;
         } finally {
             pendingFetches.delete(index);
