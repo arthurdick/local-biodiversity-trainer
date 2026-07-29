@@ -30,6 +30,58 @@ const autocompleteConfigs = [
     }
 ];
 
+/**
+ * Redacts the taxon's scientific and common names (and common plurals) from a string.
+ */
+function redactSpoilers(text, taxon) {
+    if (!text || !taxon) return text;
+
+    const scientificTerms = new Set();
+    const commonTerms = new Set();
+
+    // 1. Add Scientific Name & Genus (Do NOT pluralize these)
+    if (taxon.name) {
+        scientificTerms.add(taxon.name);
+        scientificTerms.add(taxon.name.split(' ')[0]); // Isolate Genus
+    }
+
+    // 2. Add Common Name & Significant Fragments (These will be pluralized)
+    if (taxon.preferred_common_name) {
+        commonTerms.add(taxon.preferred_common_name);
+        
+        const fragments = taxon.preferred_common_name.split(/[\s-]+/);
+        fragments.forEach(fragment => {
+            if (fragment.length > 2) {
+                commonTerms.add(fragment);
+            }
+        });
+    }
+
+    // 3. Generate common pluralizations ONLY for common terms
+    const termsToRedact = new Set([...scientificTerms, ...commonTerms]);
+    
+    commonTerms.forEach(term => {
+        termsToRedact.add(term + 's');
+        termsToRedact.add(term + 'es');
+        
+        // Handle words ending in 'y' (e.g., Butterfly -> Butterflies)
+        if (term.toLowerCase().endsWith('y')) {
+            termsToRedact.add(term.slice(0, -1) + 'ies');
+        }
+    });
+
+    // 4. Sort descending by length so full phrases/plurals match before single words
+    const sortedTerms = Array.from(termsToRedact)
+        .sort((a, b) => b.length - a.length)
+        .map(term => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+
+    if (sortedTerms.length === 0) return text;
+
+    // 5. Replace terms globally and case-insensitively using word boundaries
+    const regex = new RegExp(`\\b(${sortedTerms.join('|')})\\b`, 'gi');
+    return text.replace(regex, '[REDACTED]');
+}
+
 export const formatPoints = (points) => Number((points / 10).toFixed(1));
 
 // Helper to safely pause and reset audio playback
@@ -457,11 +509,13 @@ function renderQuizMeta(state, isReadyForMedia) {
     }
 
     // Field Notes Hint
-    const desc = q?.observation?.description?.trim();
+    let desc = q?.observation?.description?.trim();
     const hintBtn = document.getElementById('btn-toggle-hint');
     const hintContent = document.getElementById('quiz-hint-content');
     
     if (isReadyForMedia && desc) {
+        desc = redactSpoilers(desc, taxon);
+        
         hintBtn.style.display = 'inline-block';
         hintBtn.textContent = state.ui.isHintVisible ? '🙈 Hide Field Notes' : '💡 Show Field Notes (Hint)';
         hintBtn.setAttribute('aria-expanded', String(state.ui.isHintVisible));
