@@ -4,11 +4,11 @@ export function normalize(str) {
     if (!str) return '';
     return str
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[\u0300-\u036f]/g, '') // Strip diacritics/accents
         .toLowerCase()
-        .replace(/-/g, ' ')
-        .replace(/[^\w\s]/g, '')
-        .replace(/\s+/g, ' ')
+        .replace(/[-—–]/g, ' ')          // Convert ALL hyphens and dashes to spaces
+        .replace(/[^\w\s]/g, '')         // Strip all remaining punctuation (including apostrophes)
+        .replace(/\s+/g, ' ')            // Condense multiple spaces into one
         .trim();
 }
 
