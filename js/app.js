@@ -244,17 +244,15 @@ function setupAutocomplete(config) {
 
     // 3. Blur Event (Validation)
     inputEl.addEventListener('blur', () => {
-        setTimeout(() => {
-            const s = getState();
-            // Use custom validation if provided, otherwise default to checking if the ID exists
-            const isValid = validateOnBlur ? validateOnBlur(s) : !!s.form[id];
-            
-            if ((s.form[name] || '').trim() !== '' && !isValid) {
-                setState({ ui: { ...s.ui, [error]: errorMsg, [showList]: false } });
-            } else if (s.ui[showList]) {
-                setState({ ui: { ...s.ui, [showList]: false } });
-            }
-        }, 200);
+        const s = getState();
+        // Use custom validation if provided, otherwise default to checking if the ID exists
+        const isValid = validateOnBlur ? validateOnBlur(s) : !!s.form[id];
+        
+        if ((s.form[name] || '').trim() !== '' && !isValid) {
+            setState({ ui: { ...s.ui, [error]: errorMsg, [showList]: false } });
+        } else if (s.ui[showList]) {
+            setState({ ui: { ...s.ui, [showList]: false } });
+        }
     });
 
     // 4. Keyboard Navigation
@@ -293,16 +291,21 @@ function setupAutocomplete(config) {
     // 5. Mouse Intent Tracking
     listEl.addEventListener('mousemove', (e) => e.currentTarget.classList.remove('using-keyboard'));
 
-    // 6. Click Delegation
-    listEl.addEventListener('click', (e) => {
+    // 6. Pointerdown Delegation
+    listEl.addEventListener('pointerdown', (e) => {
         const li = e.target.closest('li');
         if (li) {
+            // Prevent the input from losing focus, avoiding premature blur validation
+            e.preventDefault();
+            
             const idx = parseInt(li.id.split('-').pop(), 10);
             const item = getState().ui[results][idx];
+            
             setState({ 
                 form: { ...getState().form, [id]: item.id, [name]: formatDisplay(item) },
                 ui: { ...getState().ui, [showList]: false, [error]: null }
             });
+            
             inputEl.focus();
         }
     });
