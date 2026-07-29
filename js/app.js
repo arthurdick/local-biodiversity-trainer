@@ -631,6 +631,7 @@ document.getElementById('btn-retry').addEventListener('click', () => {
 });
 
 document.getElementById('btn-skip-end').addEventListener('click', () => {
+    observationService.clearCache();
     setState({ 
         questions: getState().questions.slice(0, getState().currentIndex),
         ui: { ...getState().ui, activeView: 'results-view' }
