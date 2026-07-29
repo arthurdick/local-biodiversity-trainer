@@ -132,9 +132,11 @@ function loadPreferences() {
     });
 });
 
-['wantsPhotos', 'wantsSounds', 'preventDuplicates', 'isRarityMode'].forEach(prop => {
+['wantsPhotos', 'wantsSounds', 'preventDuplicates', 'isRarityMode', 'showIconicTaxonBadge'].forEach(prop => {
     const elId = prop === 'preventDuplicates' ? 'chk-unique' : 
-                 prop === 'isRarityMode' ? 'chk-rarity' : `chk-${prop.replace('wants', '').toLowerCase()}`;
+                 prop === 'isRarityMode' ? 'chk-rarity' :
+                 prop === 'showIconicTaxonBadge' ? 'chk-badge' :
+                 `chk-${prop.replace('wants', '').toLowerCase()}`;
                  
     const el = document.getElementById(elId);
     if (el) el.addEventListener('change', (e) => setState({ form: { ...getState().form, [prop]: e.target.checked } }));

@@ -157,6 +157,7 @@ export function render(state) {
 
         syncCheckbox('chk-photos', state.form.wantsPhotos);
         syncCheckbox('chk-sounds', state.form.wantsSounds);
+        syncCheckbox('chk-badge', state.form.showIconicTaxonBadge);
         syncCheckbox('chk-unique', state.form.preventDuplicates);
         syncCheckbox('chk-rarity', state.form.isRarityMode);
 
@@ -491,7 +492,7 @@ function renderQuizMeta(state, isReadyForMedia) {
 
     // Target Badge
     const badge = document.getElementById('quiz-target-badge');
-    if (taxon && taxon.iconic_taxon_name) {
+    if (state.config.showIconicTaxonBadge && taxon && taxon.iconic_taxon_name) {
         badge.textContent = `🎯 Target: ${taxon.iconic_taxon_name}`;
         badge.style.display = 'inline-block';
     } else {
