@@ -289,7 +289,13 @@ export function render(state) {
         
         document.getElementById('clear-answer').style.display = (!isAnswered && !state.ui.isCheckingAnswer && isReadyForMedia && (state.form.answerInput || '').length > 0) ? 'block' : 'none';
 
-        document.getElementById('btn-next').style.display = isAnswered ? 'block' : 'none';
+        const btnNext = document.getElementById('btn-next');
+        btnNext.style.display = isAnswered ? 'block' : 'none';
+        if (isAnswered) {
+            const isLastQuestion = state.currentIndex === state.questions.length - 1;
+            btnNext.textContent = isLastQuestion ? 'View Results ➔' : 'Next Observation ➔';
+        }
+
         document.getElementById('btn-retry').style.display = hasError ? 'block' : 'none';
         document.getElementById('btn-skip-end').style.display = hasError ? 'block' : 'none';
 
