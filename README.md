@@ -8,19 +8,24 @@ An interactive web application designed to help users test and improve their ide
 
 ## Key Features
 
-* **Location-Based Quizzing:** Practice identifying species specific to any region by searching for a city, park, or country, or by using exact GPS coordinates.
-* **Taxon Filtering:** Focus your training on specific groups of organisms, such as Birds, Fungi, or Owls.
-* **Media Type Selection:** Choose to train with photo observations, audio sound clips, or both.
-* **Seasonality & Month Filtering:** Filter species observations by specific months of the year to practice seasonal species identification.
-* **Customizable Difficulty & Length:** Select pool sizes ranging from Top 15 (Beginner) to Top 500 (Hard), or test yourself in **Expert Mode** sampling directly from all regional observations. Choose quiz lengths between 5 and 50 questions.
-* **Duplicate Species Prevention:** Toggle setting to enforce unique species per quiz session or allow repeating frequent species.
-* **Real-World Frequency Sampling:** Questions are weighted according to actual observation counts in the selected area. *Note:* Frequently observed species heavily reflect **synanthropic bias** (species adapted to human environments) and human population density.
-* **Rare Mode:** Enable Rare Mode to focus on infrequent observations by inverting the frequency weighting. *Note:* While Rare Mode samples less frequently reported species, it does not eliminate underlying observer or geographic sampling biases.
-* **Unified Media Carousel & Context:** Cycle through observation photos (with full-resolution viewing) and playable audio recordings per question, complete with date observed, attribution, and map location links.
-* **Smart Answer Checking & Partial Credit:** Supports common names, scientific names, and taxonomical aliases validated against iNaturalist taxonomy. Users can select a taxonomic rank (Species, Genus, Family, or Order) for their guess, earning partial credit (up to 1.0 points for Species, down to 0.2 for Order) if the guess is a valid ancestor of the target.
-* **Performance & Reliability:** The app features a Just-In-Time (JIT) runtime cache for prefetching observations to ensure seamless transitions. It calculates dynamic network timeouts based on user connection speed (detecting slow 2G/3G networks) and includes a manual retry mechanism if network requests fail.
-* **Missed Species Review:** Review missed questions and partial-credit answers at the end of each session with visual/audio cards and direct links to the taxon and specific observation on iNaturalist.
-* **Preference Memory:** Automatically remembers your chosen location, taxon, media options, seasonal months, duplicate/rare preferences, and quiz settings between sessions using local storage.
+* **Location-Based Quizzing:** Practice identifying species specific to any region by searching for a city, park, or country, or by using exact GPS/custom coordinates with customizable search radiuses. Handles obscured or private location geoprivacy by falling back gracefully to text-based map links.
+* **Taxon Filtering & Target Badges:** Focus training on specific groups of organisms (e.g., Birds, Fungi, Owls) with target taxon autocomplete, and toggle an iconic taxon badge overlay (e.g., *Aves*, *Insecta*) on active quiz cards.
+* **Establishment Status Filtering:** Filter species selection by establishment status—train specifically on **Native**, **Introduced**, or **Endemic** species, or include all taxa.
+* **Weighting Method Selection:** Select between **Linear** weighting (reflecting true relative observation counts) and **Logarithmic** weighting (flattening relative counts so common species do not completely dominate the pool).
+* **Media Type Selection:** Train using high-resolution observation photos, recorded audio clips, or both.
+* **Interactive Full-Resolution Photo Zoom:** Zoom into observation photos using an accessible modal dialog (`<dialog>`), complete with click-centered panning and keyboard controls.
+* **Seasonality & Month Filtering:** Select specific months (Jan–Dec) to practice identifying seasonal species in your local ecosystem.
+* **Customizable Difficulty & Length:** Choose pool sizes from Top 15 (Beginner) to Top 500 (Hard), or test yourself in **Expert Mode** sampling directly from all regional observations. Select quiz lengths of 5, 10, 20, or 50 questions.
+* **Duplicate Species Prevention:** Enforce unique species per session or allow repeating frequent species based on observation count thresholds.
+* **Rare Mode & Deep-Paging Algorithm:** Invert frequency weighting to focus on infrequent local species. In Expert Rare Mode, a log-weighted deep-paging algorithm dynamically samples species down to page 200 of regional observation data.
+* **Spoiler-Free Field Notes (Hints):** Reveal observation notes as hints with an automatic redaction system that strips out scientific names, binomial epithets, common names, and common plurals to prevent spoiling the answer.
+* **Smart Answer Checking & Partial Credit:** Supports common names, scientific names, and taxonomical aliases validated against iNaturalist taxonomy. Users can select a taxonomic rank (Species, Genus, Family, or Order) for their guess, earning partial credit (up to 1.0 points for Species down to 0.2 for Order) if the guess is a valid ancestor of the target.
+* **Performance, Throttling & Network Reliability:**
+  * **Global Request Throttler:** Enforces a minimum 1000ms delay between API requests to prevent HTTP 429 rate limit errors, with full support for cancelable requests via `AbortController`.
+  * **JIT Runtime Cache:** Prefetches upcoming question observations seamlessly in the background.
+  * **Connection-Aware Network Timeouts:** Automatically detects slow connections (2G/3G) and extends network request timeouts up to 30 seconds. Includes a manual retry mechanism if network calls fail.
+* **Missed & Partial Credit Species Review:** Review missed or partially correct species at the end of each session with thumbnail cards, audio indicators, guess comparison, and direct links to iNaturalist taxon and observation pages.
+* **Preference Memory:** Automatically remembers location, taxon, media options, seasonality filters, weighting methods, establishment status, and quiz difficulty settings between sessions using `localStorage`.
 
 ---
 
@@ -36,18 +41,28 @@ This application weights species selection based on community observation data f
 
 ## How to Use
 
-1. **Configure Setup:** Choose your target location, optional taxon filter, preferred media types (photos/sounds), month filters, pool size, question count, and duplicate/rare species preferences.
-2. **Take the Quiz:** Examine research-grade observation images or listen to recorded audio clips fetched dynamically.
-3. **Submit Answers:** Select your confidence rank and type common or scientific names to check your answer against the database.
+1. **Configure Setup:** Choose your target location, optional target taxon, establishment status filter, weighting method (Linear/Logarithmic), media types (photos/sounds), month filters, pool size, question limit, and duplicate/rare preferences.
+2. **Take the Quiz:** Examine research-grade observation images or listen to recorded audio clips fetched dynamically. Use the full-resolution image zoom or toggle field note hints if needed.
+3. **Submit Answers:** Select your confidence rank (Species, Genus, Family, Order) and type common or scientific names to check your answer against the database.
 4. **Review:** Analyze missed or partially correct species at the end of the session with direct references to strengthen your local ecological knowledge.
 
 ---
 
-## 🛠️ Local Development
+## 🛠️ Project Architecture & Local Development
 
-Because this project relies on **ES Modules** (`type="module"`), standard browser security rules (CORS) prevent loading the JavaScript files directly via the `file://` protocol. The app must be served over a local HTTP server.
+This project is built using vanilla JavaScript with modular **ES Modules** (`type="module"`), strict state isolation, and declarative UI rendering.
+
+### Architecture Highlights
+* `js/state.js`: Single source of truth state store with deep freezing (`Object.freeze`) in development mode, immutable state updates, and fine-grained pub/sub selector subscriptions (`subscribeSelector`).
+* `js/api.js`: Low-level wrapper for the iNaturalist v2 API featuring a custom `RequestQueue` throttler, parameter builders, and taxa verification.
+* `js/observationService.js`: Prefetching pipeline, connection-aware network timeout calculator, and deep-paging selection manager.
+* `js/quizEngine.js`: Core domain algorithms for frequency weighting, deep page calculations, exact/alias taxonomic matching, answer evaluation, and hint spoiler redaction.
+* `js/ui.js`: Pure declarative rendering layer mapping state trees directly to DOM nodes without innerHTML interpolation vulnerabilities.
+* `js/app.js`: Application entry point tying state subscribers, event listeners, user preferences, and autocomplete controllers together.
 
 ### Quick Start with Python
+
+Because this project relies on ES Modules, browser CORS security rules require serving the application over an HTTP server rather than opening `index.html` directly via `file://`.
 
 Python comes pre-installed on most macOS and Linux systems. You can spin up a lightweight, zero-dependency local server directly from your terminal:
 
@@ -64,5 +79,5 @@ Go to [http://localhost:8000](http://localhost:8000) to test the app.
 
 ## Data Attribution
 
-Species data, sound clips, and photos are provided by [iNaturalist](https://www.inaturalist.org). This application is an independent open-source project and is not officially affiliated with iNaturalist.
+Species data, sound clips, and photos are provided by [iNaturalist](https://www.inaturalist.org) under Creative Commons licenses. This application is an independent open-source project and is not officially affiliated with iNaturalist.
 
