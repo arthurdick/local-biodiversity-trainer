@@ -519,18 +519,24 @@ document.getElementById('zoom-modal-img').addEventListener('click', (e) => {
     const s = getState();
     const willZoomIn = !s.ui.isZoomedIn;
     const zoomImg = document.getElementById('zoom-modal-img');
+    const zoomScroll = document.getElementById('zoom-modal-scroll');
     
-    // Capture the bounding rect BEFORE modifying state and forcing a re-render
+    // 1. Capture the percentage of where the user clicked BEFORE it resizes
     const rect = zoomImg.getBoundingClientRect();
+    const clickXPercent = (e.clientX - rect.left) / rect.width;
+    const clickYPercent = (e.clientY - rect.top) / rect.height;
     
+    // 2. Trigger the UI state change (which adds the .zoomed-in class via ui.js)
     setState({ ui: { ...s.ui, isZoomedIn: willZoomIn } });
     
+    // 3. Center the scrollbars on the click coordinates
     if (willZoomIn) {
-        const zoomScroll = document.getElementById('zoom-modal-scroll');
-        
         requestAnimationFrame(() => {
-            const targetX = zoomImg.offsetLeft + (zoomImg.offsetWidth * ((e.clientX - rect.left) / rect.width));
-            const targetY = zoomImg.offsetTop + (zoomImg.offsetHeight * ((e.clientY - rect.top) / rect.height));
+            // Find the exact pixel coordinate on the newly expanded full-size image
+            const targetX = zoomImg.offsetWidth * clickXPercent;
+            const targetY = zoomImg.offsetHeight * clickYPercent;
+            
+            // Shift the scroll container to place that point in the middle of the screen
             zoomScroll.scrollLeft = targetX - (zoomScroll.clientWidth / 2);
             zoomScroll.scrollTop = targetY - (zoomScroll.clientHeight / 2);
         });
