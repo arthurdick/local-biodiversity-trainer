@@ -390,7 +390,13 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
                 perPage: 1, wantsPhotos: updatedState.config.wantsPhotos, wantsSounds: updatedState.config.wantsSounds, months: updatedState.config.months, placeId: updatedState.form.placeId, lat: updatedState.form.lat, lng: updatedState.form.lng, radius: updatedState.form.radius, taxonId: updatedState.form.taxonId
             });
             expertCount = preFlightData.total_results || 0;
-            const size = updatedState.config.preventDuplicates && expertCount > 0 ? Math.min(updatedState.config.questionLimit, expertCount) : updatedState.config.questionLimit;
+            
+            if (expertCount === 0) {
+                setState({ ui: { ...getState().ui, isLoadingQuizPool: false, setupError: "No observations found matching these strict filters. Try adjusting your settings." } });
+                return;
+            }
+
+            const size = updatedState.config.preventDuplicates ? Math.min(updatedState.config.questionLimit, expertCount) : updatedState.config.questionLimit;
             pool = Array.from({ length: size }, () => ({ taxon: null, observation: null }));
         } else if (isExpert) {
             pool = Array.from({ length: updatedState.config.questionLimit }, () => ({ taxon: null, observation: null }));
