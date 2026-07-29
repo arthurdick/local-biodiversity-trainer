@@ -120,17 +120,12 @@ function loadPreferences() {
 }
 
 // --- DECLARATIVE FORM TWO-WAY BINDING ---
-['placeName', 'taxonName', 'lat', 'lng', 'radius', 'difficulty', 'questionLimit', 'answerInput', 'rankInput'].forEach(prop => {
-    const elId = prop === 'placeName' ? 'input-place' : 
-                 prop === 'taxonName' ? 'input-taxon' : 
-                 prop === 'questionLimit' ? 'input-questions' : `input-${prop.replace('Input', '')}`;
+['lat', 'lng', 'radius', 'difficulty', 'questionLimit', 'answerInput', 'rankInput'].forEach(prop => {
+    const elId = prop === 'questionLimit' ? 'input-questions' : `input-${prop.replace('Input', '')}`;
     
     const el = document.getElementById(elId);
     if (el) el.addEventListener('input', (e) => {
         const updates = { [prop]: e.target.value };
-        // Immediately clear the associated ID to prevent stale validation
-        if (prop === 'placeName') updates.placeId = null;
-        if (prop === 'taxonName') updates.taxonId = null;
         setState({ form: { ...getState().form, ...updates } });
     });
 });
