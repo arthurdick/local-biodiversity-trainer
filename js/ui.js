@@ -227,20 +227,24 @@ export function render(state) {
         const errDiv = document.getElementById('quiz-error');
         if (hasError) {
             errDiv.style.display = 'block';
-            errDiv.replaceChildren(); 
             
-            const isMissing = state.ui.isMissingMedia || state.ui.quizError?.isMissingMedia;
-            const mainText = document.createTextNode(isMissing ? '❌ Observation missing media data.' : '❌ Failed to load observation data.');
-            errDiv.appendChild(mainText);
-            errDiv.appendChild(document.createElement('br'));
-            errDiv.appendChild(document.createElement('br'));
-            
-            const hint = document.createElement('span');
-            hint.className = 'error-hint';
-            hint.textContent = isMissing ? 'This occasionally happens in the iNaturalist database.' : 'Please check your internet connection or filters.';
-            errDiv.appendChild(hint);
+            // Only build the error nodes if the container is empty
+            if (!errDiv.hasChildNodes()) {
+                const isMissing = state.ui.isMissingMedia || state.ui.quizError?.isMissingMedia;
+                const mainText = document.createTextNode(isMissing ? '❌ Observation missing media data.' : '❌ Failed to load observation data.');
+                
+                const hint = document.createElement('span');
+                hint.className = 'error-hint';
+                hint.textContent = isMissing ? 'This occasionally happens in the iNaturalist database.' : 'Please check your internet connection or filters.';
+                
+                errDiv.replaceChildren(mainText, document.createElement('br'), document.createElement('br'), hint);
+            }
         } else {
             errDiv.style.display = 'none';
+            // Clean up when the error clears
+            if (errDiv.hasChildNodes()) {
+                errDiv.replaceChildren();
+            }
         }
 
         renderQuizMedia(state, isReadyForMedia);
@@ -284,10 +288,18 @@ export function render(state) {
         if (isAnswered) {
             feedback.style.display = 'block';
             feedback.className = q.isCorrect ? 'correct' : 'incorrect';
-            buildFeedbackDom(q, feedback);
+            
+            // Only rebuild the DOM if we moved to a new question
+            if (feedback._lastQuestionIndex !== state.currentIndex) {
+                buildFeedbackDom(q, feedback);
+                feedback._lastQuestionIndex = state.currentIndex;
+            }
         } else {
             feedback.style.display = 'none';
-            feedback.replaceChildren();
+            if (feedback.hasChildNodes()) {
+                feedback.replaceChildren();
+            }
+            feedback._lastQuestionIndex = -1;
         }
     }
 
@@ -330,37 +342,53 @@ function renderAutocomplete(config, results, show, activeIdx) {
     const list = document.getElementById(listId);
     const input = document.getElementById(inputId);
     
-    if (show && results.length > 0) {
+    // Hide and clear if needed
+    if (!show || results.length === 0) {
+        if (list.childNodes.length > 0) list.replaceChildren();
+        list.classList.remove('show');
+        input.setAttribute('aria-expanded', 'false');
+        input.removeAttribute('aria-activedescendant');
+        list._lastResults = null; // Clear cache
+        return;
+    }
+
+    // 1. Content Rendering: Only rebuild DOM if the underlying data reference changed
+    if (list._lastResults !== results) {
         const fragment = document.createDocumentFragment();
         
         results.forEach((item, i) => {
             const li = document.createElement('li');
             li.id = `opt-${type}-${i}`;
-            if (i === activeIdx) li.className = 'active';
             li.setAttribute('role', 'option');
-            li.setAttribute('aria-selected', String(i === activeIdx));
-            
-            // Utilize the decoupled formatting function
             li.textContent = formatDisplay(item);
-            
             fragment.appendChild(li);
         });
         
         list.replaceChildren(fragment);
-        list.classList.add('show');
-        input.setAttribute('aria-expanded', 'true');
-        
-        if (activeIdx >= 0) {
-            input.setAttribute('aria-activedescendant', `opt-${type}-${activeIdx}`);
-            const activeLi = document.getElementById(`opt-${type}-${activeIdx}`);
-            if (activeLi) activeLi.scrollIntoView({ block: 'nearest' });
-        } else {
-            input.removeAttribute('aria-activedescendant');
+        list._lastResults = results; // Cache the immutable reference
+    }
+
+    // 2. State Rendering: Always update visibility and active indices
+    list.classList.add('show');
+    input.setAttribute('aria-expanded', 'true');
+    
+    // Reset previously active items
+    const prevActive = list.querySelector('.active');
+    if (prevActive) {
+        prevActive.classList.remove('active');
+        prevActive.setAttribute('aria-selected', 'false');
+    }
+
+    // Apply new active item
+    if (activeIdx >= 0) {
+        input.setAttribute('aria-activedescendant', `opt-${type}-${activeIdx}`);
+        const activeLi = document.getElementById(`opt-${type}-${activeIdx}`);
+        if (activeLi) {
+            activeLi.classList.add('active');
+            activeLi.setAttribute('aria-selected', 'true');
+            activeLi.scrollIntoView({ block: 'nearest' });
         }
     } else {
-        list.replaceChildren();
-        list.classList.remove('show');
-        input.setAttribute('aria-expanded', 'false');
         input.removeAttribute('aria-activedescendant');
     }
 }
