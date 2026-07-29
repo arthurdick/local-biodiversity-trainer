@@ -100,6 +100,16 @@ subscribeSelector(
     }
 );
 
+// --- NAVIGATION PROTECTION ---
+window.addEventListener('beforeunload', (e) => {
+    const s = getState();
+    if (s.ui.activeView === 'quiz-view') {
+        e.preventDefault();
+        e.returnValue = ''; // Triggers standard browser exit confirmation modal
+        return '';
+    }
+});
+
 // --- STORAGE ---
 function debounce(func, timeout = 250) {
     let timer;
