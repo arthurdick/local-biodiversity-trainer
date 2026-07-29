@@ -780,4 +780,5 @@ function buildResultsDom(questions, container) {
     });
     
     container.appendChild(gridDiv);
+    gridDiv.scrollTop = 0;
 }
