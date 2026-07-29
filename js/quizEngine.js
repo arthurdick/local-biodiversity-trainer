@@ -33,24 +33,27 @@ export function getQuestionThumbnail(q, currentMediaArray) {
 }
 
 /**
- * Standardizes logarithmic weighting mathematically to reduce API skewing.
+ * Standardizes weighting to either flatten API skewing (logarithmic) or reflect true ecological abundance (linear).
  */
-export function getLogWeight(count) {
+export function getWeight(count, method = 'linear') {
+    if (method === 'linear') {
+        return Math.max(1, count);
+    }
     return Math.log10(Math.max(1, count) + 1);
 }
 
-export function generateWeightedPool(dataResults, questionLimit, preventDuplicates, isRarityMode = false) {
+export function generateWeightedPool(dataResults, questionLimit, preventDuplicates, isRarityMode = false, weightingMethod = 'linear') {
     const questions = [];
     
     // Create a working pool using the standardized weights
     let availablePool = dataResults.map(r => {
         const count = Math.max(1, r.count || 1); 
-        const logWeight = getLogWeight(count);
+        const rawWeight = getWeight(count, weightingMethod);
         
         return {
             taxon: r.taxon,
             count: count,
-            weight: isRarityMode ? (1 / logWeight) : logWeight
+            weight: isRarityMode ? (1 / rawWeight) : rawWeight
         };
     });
     
@@ -135,14 +138,14 @@ export function calculateDeepPage(totalSpecies) {
 }
 
 /**
- * Selects a rare taxon utilizing inverse logarithmic weighting for isolated small pools.
+ * Selects a rare taxon utilizing inverse weighting for isolated small pools.
  */
-export function selectRareTaxonFromPool(validResults) {
+export function selectRareTaxonFromPool(validResults, weightingMethod = 'linear') {
     let totalWeight = 0;
     const weightedResults = validResults.map(r => {
         const count = Math.max(1, r.count || 1);
-        const logWeight = getLogWeight(count);
-        const weight = 1 / logWeight;
+        const rawWeight = getWeight(count, weightingMethod);
+        const weight = 1 / rawWeight; // Inverse for rarity
         totalWeight += weight;
         return { item: r, threshold: totalWeight };
     });

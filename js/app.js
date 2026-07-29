@@ -120,8 +120,10 @@ function loadPreferences() {
 }
 
 // --- DECLARATIVE FORM TWO-WAY BINDING ---
-['lat', 'lng', 'radius', 'difficulty', 'questionLimit', 'answerInput', 'rankInput'].forEach(prop => {
-    const elId = prop === 'questionLimit' ? 'input-questions' : `input-${prop.replace('Input', '')}`;
+['lat', 'lng', 'radius', 'difficulty', 'questionLimit', 'answerInput', 'rankInput', 'weightingMethod'].forEach(prop => {
+    let elId = `input-${prop.replace('Input', '')}`;
+    if (prop === 'questionLimit') elId = 'input-questions';
+    if (prop === 'weightingMethod') elId = 'input-weighting';
     
     const el = document.getElementById(elId);
     if (el) el.addEventListener('input', (e) => {
@@ -412,7 +414,13 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
                 setState({ ui: { ...getState().ui, isLoadingQuizPool: false, setupError: "No research-grade observations found. Try a broader search." } });
                 return;
             }
-            pool = engine.generateWeightedPool(data.results, updatedState.config.questionLimit, updatedState.config.preventDuplicates, updatedState.config.isRarityMode);
+            pool = engine.generateWeightedPool(
+                data.results,
+                updatedState.config.questionLimit,
+                updatedState.config.preventDuplicates,
+                updatedState.config.isRarityMode,
+                updatedState.config.weightingMethod
+            );
         }
         
         if (pool.length === 0) {

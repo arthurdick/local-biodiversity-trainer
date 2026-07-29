@@ -159,6 +159,7 @@ export function render(state) {
         
         syncInput('input-difficulty', state.form.difficulty);
         syncInput('input-questions', state.form.questionLimit);
+        syncInput('input-weighting', state.form.weightingMethod);
 
         const btnStart = document.getElementById('btn-start');
         btnStart.disabled = state.ui.isLoadingQuizPool;

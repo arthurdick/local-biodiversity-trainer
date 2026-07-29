@@ -115,7 +115,7 @@ export async function loadObservationForQuestion(index) {
 
                     // Standardized small pool calculations handled strictly by the engine
                     if (totalSpecies <= 50) {
-                        randomItem = engine.selectRareTaxonFromPool(validResults);
+                        randomItem = engine.selectRareTaxonFromPool(validResults, currentConfig.weightingMethod);
                     } else {
                         randomItem = validResults[Math.floor(Math.random() * validResults.length)];
                     }
