@@ -48,8 +48,8 @@ export async function loadObservationForQuestion(index) {
     activeControllers.set(index, controller);
 
     const fetchPromise = (async () => {
-        const q = getState().questions[index]; // Fetch fresh copy
-        const currentConfig = getState().config; // Config holds the snapshot of form data
+        const q = getState().questions[index];
+        const currentConfig = getState().config;
         
         // Mode detection
         const isStandardExpert = currentConfig.difficulty === 'all' && !currentConfig.isRarityMode;
@@ -66,62 +66,68 @@ export async function loadObservationForQuestion(index) {
                 const totalSpecies = currentConfig.expertTotalSpecies || 0;
                 
                 // Abstracted math into the engine to standardize weighting
-                const deepPage = engine.calculateDeepPage(totalSpecies);
+                let deepPage = engine.calculateDeepPage(totalSpecies);
+                let validResults = [];
+                let attempts = 0;
+                const maxAttempts = 2; // Only 1 retry is needed since pages hold 50 species and max quiz size is 50
 
-                const deepData = await api.fetchSpeciesPool({
-                    perPage: 50,
-                    page: deepPage,
-                    wantsPhotos: currentConfig.wantsPhotos,
-                    wantsSounds: currentConfig.wantsSounds,
-                    months: currentConfig.months,
-                    placeId: currentConfig.placeId,
-                    lat: currentConfig.lat,
-                    lng: currentConfig.lng,
-                    radius: currentConfig.radius,
-                    taxonId: currentConfig.taxonId,
-                    establishmentStatus: currentConfig.establishmentStatus
-                }, controller.signal);
+                // Retry loop: step backwards exactly once if the rare tail is completely exhausted
+                while (validResults.length === 0 && attempts < maxAttempts && deepPage >= 1) {
+                    attempts++;
 
-                if (deepData.results && deepData.results.length > 0) {
-                    let validResults = deepData.results;
-                    
-                    if (currentConfig.preventDuplicates) {
-                        const existingIds = getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined);
-                        validResults = deepData.results.filter(r => !existingIds.includes(r.taxon.id));
-                    } else {
-                        // Calculate how many times each taxon has already been queued
-                        const existingIdCounts = {};
-                        getState().questions.forEach(quest => {
-                            if (quest.taxon?.id) {
-                                existingIdCounts[quest.taxon.id] = (existingIdCounts[quest.taxon.id] || 0) + 1;
-                            }
-                        });
-                        
-                        // Filter out taxa where the selected count meets or exceeds total available observations
-                        validResults = deepData.results.filter(r => {
-                            const selectedCount = existingIdCounts[r.taxon.id] || 0;
-                            const totalAvailable = Math.max(1, r.count || 1);
-                            return selectedCount < totalAvailable;
-                        });
+                    const deepData = await api.fetchSpeciesPool({
+                        perPage: 50,
+                        page: deepPage,
+                        wantsPhotos: currentConfig.wantsPhotos,
+                        wantsSounds: currentConfig.wantsSounds,
+                        months: currentConfig.months,
+                        placeId: currentConfig.placeId,
+                        lat: currentConfig.lat,
+                        lng: currentConfig.lng,
+                        radius: currentConfig.radius,
+                        taxonId: currentConfig.taxonId,
+                        establishmentStatus: currentConfig.establishmentStatus
+                    }, controller.signal);
+
+                    if (deepData.results && deepData.results.length > 0) {
+                        if (currentConfig.preventDuplicates) {
+                            const existingIds = getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined);
+                            validResults = deepData.results.filter(r => !existingIds.includes(r.taxon.id));
+                        } else {
+                            // Calculate how many times each taxon has already been queued
+                            const existingIdCounts = {};
+                            getState().questions.forEach(quest => {
+                                if (quest.taxon?.id) {
+                                    existingIdCounts[quest.taxon.id] = (existingIdCounts[quest.taxon.id] || 0) + 1;
+                                }
+                            });
+                            
+                            // Filter out taxa where the selected count meets or exceeds total available observations
+                            validResults = deepData.results.filter(r => {
+                                const selectedCount = existingIdCounts[r.taxon.id] || 0;
+                                const totalAvailable = Math.max(1, r.count || 1);
+                                return selectedCount < totalAvailable;
+                            });
+                        }
                     }
                     
+                    // If exhausted, decrement the page to search slightly more common species on the retry
                     if (validResults.length === 0) {
-                        clearTimeout(timeoutId);
-                        const emptyData = { error: true, emptyPool: true };
-                        updateQuestion(index, { observation: emptyData });
-                        return emptyData;
+                        deepPage--;
                     }
-
-                    const randomItem = engine.selectRareTaxonFromPool(validResults, currentConfig.weightingMethod);
-
-                    targetTaxon = randomItem.taxon;
-                    updateQuestion(index, { taxon: targetTaxon });
-                } else {
+                }
+                
+                if (validResults.length === 0) {
                     clearTimeout(timeoutId);
                     const emptyData = { error: true, emptyPool: true };
                     updateQuestion(index, { observation: emptyData });
                     return emptyData;
                 }
+
+                const randomItem = engine.selectRareTaxonFromPool(validResults, currentConfig.weightingMethod);
+
+                targetTaxon = randomItem.taxon;
+                updateQuestion(index, { taxon: targetTaxon });
             }
             
             const withoutTaxonIds = (isStandardExpert && currentConfig.preventDuplicates)
