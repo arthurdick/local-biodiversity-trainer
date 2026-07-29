@@ -38,25 +38,32 @@ const autocompleteConfigs = [
 function redactSpoilers(text, taxon) {
     if (!text || !taxon) return text;
 
+    // 1. Normalize typographic quotes and dashes in both the text and taxonomy.
+    const normalizeTypography = (str) => str.replace(/[’‘´`]/g, "'").replace(/[—–]/g, "-");
+    
+    let safeText = normalizeTypography(text);
+
     const scientificTerms = new Set();
     const commonTerms = new Set();
 
-    // 1. Add Full Scientific Name & Genus/Epithet parts
+    // 2. Add Full Scientific Name & Genus/Epithet parts
     if (taxon.name) {
-        scientificTerms.add(taxon.name);
+        const safeSciName = normalizeTypography(taxon.name);
+        scientificTerms.add(safeSciName);
         
-        const nameParts = taxon.name.split(/[\s-]+/);
+        const nameParts = safeSciName.split(/[\s-]+/);
         nameParts.forEach(part => {
             if (part.length > 2) scientificTerms.add(part);
         });
     }
 
-    // 2. Add Full Preferred Common Name
+    // 3. Add Full Preferred Common Name
     if (taxon.preferred_common_name) {
-        commonTerms.add(taxon.preferred_common_name);
+        const safeCommonName = normalizeTypography(taxon.preferred_common_name);
+        commonTerms.add(safeCommonName);
         
-        // 3. Extract & filter fragments using the stop-word dictionary
-        const fragments = taxon.preferred_common_name.split(/[\s-]+/);
+        // Extract & filter fragments using the stop-word dictionary
+        const fragments = safeCommonName.split(/[\s-]+/);
         const significantFragments = filterSignificantFragments(fragments, 3);
         
         significantFragments.forEach(fragment => {
@@ -81,11 +88,13 @@ function redactSpoilers(text, taxon) {
         .sort((a, b) => b.length - a.length)
         .map(term => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
 
-    if (sortedTerms.length === 0) return text;
+    if (sortedTerms.length === 0) return safeText;
 
-    // 6. Global, case-insensitive redaction using word boundaries
-    const regex = new RegExp(`\\b(${sortedTerms.join('|')})\\b`, 'gi');
-    return text.replace(regex, '[REDACTED]');
+    // 6. Global, case-insensitive redaction
+    // Swapping \b for lookarounds (?<=\W|^) and (?=\W|$) ensures that names
+    // starting or ending with punctuation (e.g., 'Io) redact properly as well.
+    const regex = new RegExp(`(?<=\\W|^)(${sortedTerms.join('|')})(?=\\W|$)`, 'gi');
+    return safeText.replace(regex, '[REDACTED]');
 }
 
 export const formatPoints = (points) => Number((points / 10).toFixed(1));
