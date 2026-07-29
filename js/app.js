@@ -173,14 +173,7 @@ function setupAutocomplete(config) {
     const listEl = document.getElementById(listId);
     const clearBtn = document.getElementById(clearBtnId);
 
-    // 1. Input Event (Debounced Fetch)
-    inputEl.addEventListener('input', debounce(async (e) => {
-        const query = e.target.value;
-        setState({ 
-            form: { ...getState().form, [id]: null, [name]: query },
-            ui: { ...getState().ui, [activeIdx]: -1, [error]: null }
-        });
-        
+    const performSearch = debounce(async (query) => {
         if (query.length < 3) {
             setState({ ui: { ...getState().ui, [showList]: false } });
             return;
@@ -195,7 +188,20 @@ function setupAutocomplete(config) {
         } catch(err) {
             if (err.name !== 'AbortError') console.warn(`${inputId} search offline`);
         }
-    }));
+    }, 250);
+
+    inputEl.addEventListener('input', (e) => {
+        const query = e.target.value;
+        
+        // 1. Update state immediately on keystroke so DOM and state never desync
+        setState({ 
+            form: { ...getState().form, [id]: null, [name]: query },
+            ui: { ...getState().ui, [activeIdx]: -1, [error]: null }
+        });
+
+        // 2. Trigger debounced API search
+        performSearch(query);
+    });
 
     // 2. Focus Event (Re-open & Clear Error)
     inputEl.addEventListener('focus', (e) => {
