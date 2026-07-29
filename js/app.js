@@ -196,13 +196,13 @@ function setupAutocomplete(config) {
     const clearBtn = document.getElementById(clearBtnId);
 
     const performSearch = debounce(async (query) => {
+        if (abortController) abortController.abort();
+        abortController = new AbortController();
+        
         if (query.length < 3) {
             setState({ ui: { ...getState().ui, [showList]: false } });
             return;
         }
-
-        if (abortController) abortController.abort();
-        abortController = new AbortController();
 
         try {
             const data = await fetchDataFn(query, abortController.signal);
