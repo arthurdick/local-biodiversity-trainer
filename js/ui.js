@@ -1,4 +1,5 @@
 import { selectCurrentMedia, selectCurrentMeta } from './state.js';
+import { filterSignificantFragments } from './stopwords.js';
 
 let currentView = null;
 let lastFocusedQuestionIndex = -1;
@@ -31,8 +32,8 @@ const autocompleteConfigs = [
 ];
 
 /**
- * Redacts the taxon's scientific name (genus, specific epithets, subspecies), 
- * common names, and common plurals from field note strings.
+ * Redacts the taxon's scientific name, common names, and significant fragments
+ * from field note strings while protecting generic stop-words from over-redaction.
  */
 function redactSpoilers(text, taxon) {
     if (!text || !taxon) return text;
@@ -40,52 +41,49 @@ function redactSpoilers(text, taxon) {
     const scientificTerms = new Set();
     const commonTerms = new Set();
 
-    // 1. Add Full Scientific Name, Genus, & Epithets (Do NOT pluralize these)
+    // 1. Add Full Scientific Name & Genus/Epithet parts
     if (taxon.name) {
         scientificTerms.add(taxon.name);
         
-        // Split binomial/trinomial names into individual terms (e.g., "Canis", "lupus")
         const nameParts = taxon.name.split(/[\s-]+/);
         nameParts.forEach(part => {
-            if (part.length > 2) {
-                scientificTerms.add(part);
-            }
+            if (part.length > 2) scientificTerms.add(part);
         });
     }
 
-    // 2. Add Common Name & Significant Fragments (These will be pluralized)
+    // 2. Add Full Preferred Common Name
     if (taxon.preferred_common_name) {
         commonTerms.add(taxon.preferred_common_name);
         
+        // 3. Extract & filter fragments using the stop-word dictionary
         const fragments = taxon.preferred_common_name.split(/[\s-]+/);
-        fragments.forEach(fragment => {
-            if (fragment.length > 2) {
-                commonTerms.add(fragment);
-            }
+        const significantFragments = filterSignificantFragments(fragments, 3);
+        
+        significantFragments.forEach(fragment => {
+            commonTerms.add(fragment);
         });
     }
 
-    // 3. Generate common pluralizations ONLY for common terms
+    // 4. Pluralize ONLY significant common terms (e.g., "Falcon" -> "Falcons")
     const termsToRedact = new Set([...scientificTerms, ...commonTerms]);
     
     commonTerms.forEach(term => {
         termsToRedact.add(term + 's');
         termsToRedact.add(term + 'es');
         
-        // Handle words ending in 'y' (e.g., Butterfly -> Butterflies)
         if (term.toLowerCase().endsWith('y')) {
             termsToRedact.add(term.slice(0, -1) + 'ies');
         }
     });
 
-    // 4. Sort descending by length so full phrases/plurals match before single words
+    // 5. Sort descending by length so full phrases match before single words
     const sortedTerms = Array.from(termsToRedact)
         .sort((a, b) => b.length - a.length)
         .map(term => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
 
     if (sortedTerms.length === 0) return text;
 
-    // 5. Replace terms globally and case-insensitively using word boundaries
+    // 6. Global, case-insensitive redaction using word boundaries
     const regex = new RegExp(`\\b(${sortedTerms.join('|')})\\b`, 'gi');
     return text.replace(regex, '[REDACTED]');
 }
