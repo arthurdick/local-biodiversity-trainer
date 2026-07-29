@@ -490,10 +490,10 @@ document.getElementById('quiz-image').onload = (e) => {
 
 document.getElementById('quiz-image').onerror = () => setState({ ui: { ...getState().ui, isMediaLoaded: true, quizError: { isMissingMedia: false } } });
 document.getElementById('quiz-audio-player').onerror = () => setState({ ui: { ...getState().ui, isMediaLoaded: true, quizError: { isMissingMedia: false } } });
-document.getElementById('quiz-audio-player').oncanplay = () => {
+document.getElementById('quiz-audio-player').oncanplay = (e) => {
     const s = getState();
     const media = selectCurrentMedia(s)[s.currentMediaIndex];
-    if (media && media.type === 'sound') {
+    if (media && media.type === 'sound' && e.target.dataset.src === media.fileUrl) {
         setState({ ui: { ...s.ui, isMediaLoaded: true } });
     }
 };
