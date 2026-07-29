@@ -184,7 +184,10 @@ export async function loadObservationForQuestion(index) {
         } catch(e) {
             const errorData = { error: true };
             
-            if (e.name === 'AbortError') {
+            if (e.status === 429) {
+                errorData.isRateLimited = true;
+                console.warn(`Question ${index + 1}: Rate limited (HTTP 429).`);
+            } else if (e.name === 'AbortError') {
                 console.warn(`Question ${index + 1}: Network request timed out.`);
             } else {
                 console.error(`Question ${index + 1}: Fetch failed`, e);

@@ -453,7 +453,12 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
             ui: { ...updatedState.ui, isLoadingQuizPool: false, activeView: 'quiz-view', quizError: null, isCheckingAnswer: false, isHintVisible: false, isMediaLoaded: false }
         });
     } catch (error) {
-        setState({ ui: { ...getState().ui, isLoadingQuizPool: false, setupError: "Error loading species data. Please check your internet connection." } });
+        const isRateLimit = error.status === 429;
+        const setupError = isRateLimit 
+            ? "⏳ Rate limit exceeded. Please wait a minute before starting a new quiz."
+            : "Error loading species data. Please check your internet connection.";
+            
+        setState({ ui: { ...getState().ui, isLoadingQuizPool: false, setupError } });
     }
 });
 

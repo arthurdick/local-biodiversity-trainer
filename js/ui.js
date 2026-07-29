@@ -231,11 +231,23 @@ export function render(state) {
             // Only build the error nodes if the container is empty
             if (!errDiv.hasChildNodes()) {
                 const isMissing = state.ui.isMissingMedia || state.ui.quizError?.isMissingMedia;
-                const mainText = document.createTextNode(isMissing ? '❌ Observation missing media data.' : '❌ Failed to load observation data.');
+                const isRateLimited = q?.observation?.isRateLimited || state.ui.quizError?.isRateLimited;
                 
+                let mainTextContent = '❌ Failed to load observation data.';
+                let hintTextContent = 'Please check your internet connection or filters.';
+
+                if (isRateLimited) {
+                    mainTextContent = '⏳ Too Many Requests (Rate Limited).';
+                    hintTextContent = 'You have hit the iNaturalist API limits. Please wait a minute before retrying.';
+                } else if (isMissing) {
+                    mainTextContent = '❌ Observation missing media data.';
+                    hintTextContent = 'This occasionally happens in the iNaturalist database.';
+                }
+                
+                const mainText = document.createTextNode(mainTextContent);
                 const hint = document.createElement('span');
                 hint.className = 'error-hint';
-                hint.textContent = isMissing ? 'This occasionally happens in the iNaturalist database.' : 'Please check your internet connection or filters.';
+                hint.textContent = hintTextContent;
                 
                 errDiv.replaceChildren(mainText, document.createElement('br'), document.createElement('br'), hint);
             }

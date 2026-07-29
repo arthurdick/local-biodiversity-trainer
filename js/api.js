@@ -225,7 +225,11 @@ export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, m
     }
 
     const res = await apiQueue.enqueue(`${API_BASE}/observations/species_counts?${params}`, { signal });
-    if (!res.ok) throw new Error('Failed to fetch species pool');
+    if (!res.ok) {
+        const err = new Error('Failed to fetch species pool');
+        err.status = res.status;
+        throw err;
+    }
     return res.json();
 };
 
@@ -266,7 +270,11 @@ export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, place
     }
 
     const res = await apiQueue.enqueue(`${API_BASE}/observations?${params}`, { cache: 'no-store', signal });
-    if (!res.ok) throw new Error('Failed to fetch observation');
+    if (!res.ok) {
+        const err = new Error('Failed to fetch observation');
+        err.status = res.status;
+        throw err;
+    }
     return res.json();
 };
 
