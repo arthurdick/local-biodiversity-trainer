@@ -41,14 +41,14 @@ const initialState = {
     // 3. Centralized UI & View Flags
     ui: {
         activeView: 'setup-view', // 'setup-view', 'quiz-view', 'results-view'
-        
+
         // Setup state
         isLocatingGps: false,
         isLoadingQuizPool: false,
         setupError: null,
         placeError: null,
         taxonError: null,
-        
+
         // Autocomplete lists
         placeResults: [],
         showPlaceList: false,
@@ -56,19 +56,19 @@ const initialState = {
         taxonResults: [],
         showTaxonList: false,
         activeTaxonIdx: -1,
-        
+
         // Quiz state
         quizError: null,
         answerError: null,
         isCheckingAnswer: false,
         isHintVisible: false,
         isMediaLoaded: false,
-        
+
         // Modal state
         zoomMediaUrl: null,
         isZoomedIn: false
     },
-    
+
     // 4. Core Game Data
     questions: [],
     currentIndex: 0,
@@ -93,15 +93,21 @@ const listeners = new Set();
 
 export const getState = () => state;
 
-export const setState = (updates) => {
-    state = deepFreeze({ ...state, ...updates });
+// Enforce functional state updates to prevent race conditions
+export const setState = (updater) => {
+    if (typeof updater !== 'function') {
+        throw new Error('setState strictly requires an updater function (e.g., prevState => newState) to prevent race conditions.');
+    }
+    state = deepFreeze({ ...state, ...updater(state) });
     listeners.forEach(listener => listener(state));
 };
 
 export const updateQuestion = (index, updates) => {
-    const newQuestions = [...state.questions];
-    newQuestions[index] = deepFreeze({ ...newQuestions[index], ...updates });
-    setState({ questions: newQuestions });
+    setState(prevState => {
+        const newQuestions = [...prevState.questions];
+        newQuestions[index] = deepFreeze({ ...newQuestions[index], ...updates });
+        return { questions: newQuestions };
+    });
 };
 
 export const resetState = () => {
@@ -120,7 +126,7 @@ export const subscribe = (listener) => {
  */
 export const subscribeSelector = (selector, callback, isEqual = (a, b) => a === b) => {
     let currentSelected = selector(state);
-    
+
     return subscribe((newState) => {
         const nextSelected = selector(newState);
         if (!isEqual(currentSelected, nextSelected)) {
@@ -136,7 +142,7 @@ export function selectCurrentMedia(currentState) {
     const q = currentState.questions[currentState.currentIndex];
     const obs = q?.observation;
     if (!obs || obs.error) return [];
-    
+
     const media = [];
     if (currentState.config.wantsPhotos && obs.photos) {
         obs.photos.forEach(p => {
@@ -151,7 +157,7 @@ export function selectCurrentMedia(currentState) {
             }
         });
     }
-    
+
     if (currentState.config.wantsSounds && obs.sounds) {
         obs.sounds.forEach(s => {
             if (s.license_code) {

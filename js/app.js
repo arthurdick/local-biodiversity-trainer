@@ -38,19 +38,19 @@ subscribeSelector(
 
         if (obs.error) {
             if (obs.emptyPool && newState.config.difficulty === 'all') {
-                setState({ 
-                    questions: newState.questions.slice(0, newState.currentIndex),
-                    ui: { ...newState.ui, activeView: 'results-view' }
-                });
+                setState(prev => ({
+                    questions: prev.questions.slice(0, prev.currentIndex),
+                    ui: { ...prev.ui, activeView: 'results-view' }
+                }));
             } else {
-                setState({ ui: { ...newState.ui, quizError: { isMissingMedia: false } } });
+                setState(prev => ({ ui: { ...prev.ui, quizError: { isMissingMedia: false } } }));
             }
         } else {
             const mediaArray = selectCurrentMedia(newState);
             if (mediaArray.length === 0) {
-                setState({ ui: { ...newState.ui, quizError: { isMissingMedia: true } } });
+                setState(prev => ({ ui: { ...prev.ui, quizError: { isMissingMedia: true } } }));
             } else if (mediaArray[0].type === 'sound') {
-                setState({ ui: { ...newState.ui, isMediaLoaded: true } });
+                setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true } }));
             }
         }
     }
@@ -74,12 +74,12 @@ subscribeSelector(
         if (currentMedia?.type === 'photo') {
             const imgEl = document.getElementById('quiz-image');
             if (imgEl && imgEl.complete && imgEl.naturalWidth > 0 && imgEl.dataset.src === currentMedia.mediumUrl) {
-                setState({ ui: { ...newState.ui, isMediaLoaded: true } });
+                setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true } }));
             }
         } else if (currentMedia?.type === 'sound') {
             const audioPlayer = document.getElementById('quiz-audio-player');
             if (audioPlayer && audioPlayer.readyState >= 2 && audioPlayer.dataset.src === currentMedia.fileUrl) {
-                setState({ ui: { ...newState.ui, isMediaLoaded: true } });
+                setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true } }));
             }
         }
     },
@@ -117,9 +117,9 @@ window.addEventListener('beforeunload', (e) => {
 // --- STORAGE ---
 function debounce(func, timeout = 250) {
     let timer;
-    return function(...args) { 
-        clearTimeout(timer); 
-        timer = setTimeout(() => { func.apply(this, args); }, timeout); 
+    return function(...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => { func.apply(this, args); }, timeout);
     };
 }
 
@@ -130,7 +130,7 @@ function savePreferences() {
 function loadPreferences() {
     try {
         const saved = localStorage.getItem('bio_trainer_prefs');
-        if (saved) setState({ form: { ...getState().form, ...JSON.parse(saved) } });
+        if (saved) setState(prev => ({ form: { ...prev.form, ...JSON.parse(saved) } }));
     } catch (e) {
         console.warn("Could not load preferences");
     }
@@ -142,52 +142,52 @@ function loadPreferences() {
     if (prop === 'questionLimit') elId = 'input-questions';
     if (prop === 'weightingMethod') elId = 'input-weighting';
     if (prop === 'establishmentStatus') elId = 'input-establishment';
-    
+
     const el = document.getElementById(elId);
     if (el) el.addEventListener('input', (e) => {
         const updates = { [prop]: e.target.value };
         const uiUpdates = {};
-        
+
         if (prop === 'answerInput' || prop === 'rankInput') {
             uiUpdates.answerError = null;
         }
-        
-        setState({
-            form: { ...getState().form, ...updates },
-            ui: { ...getState().ui, ...uiUpdates }
-        });
+
+        setState(prev => ({
+            form: { ...prev.form, ...updates },
+            ui: { ...prev.ui, ...uiUpdates }
+        }));
     });
 });
 
 ['wantsPhotos', 'wantsSounds', 'preventDuplicates', 'isRarityMode', 'showIconicTaxonBadge'].forEach(prop => {
-    const elId = prop === 'preventDuplicates' ? 'chk-unique' : 
+    const elId = prop === 'preventDuplicates' ? 'chk-unique' :
                  prop === 'isRarityMode' ? 'chk-rarity' :
                  prop === 'showIconicTaxonBadge' ? 'chk-badge' :
                  `chk-${prop.replace('wants', '').toLowerCase()}`;
-                 
+
     const el = document.getElementById(elId);
-    if (el) el.addEventListener('change', (e) => setState({ form: { ...getState().form, [prop]: e.target.checked } }));
+    if (el) el.addEventListener('change', (e) => setState(prev => ({ form: { ...prev.form, [prop]: e.target.checked } })));
 });
 
 document.getElementById('month-filters').addEventListener('change', () => {
     const months = Array.from(document.querySelectorAll('#month-filters input:checked')).map(cb => cb.value);
-    setState({ form: { ...getState().form, months } });
+    setState(prev => ({ form: { ...prev.form, months } }));
 });
 
 document.getElementById('btn-months-all').addEventListener('click', () => {
-    setState({ form: { ...getState().form, months: ['1','2','3','4','5','6','7','8','9','10','11','12'] } });
+    setState(prev => ({ form: { ...prev.form, months: ['1','2','3','4','5','6','7','8','9','10','11','12'] } }));
 });
 
 document.getElementById('btn-months-none').addEventListener('click', () => {
-    setState({ form: { ...getState().form, months: [] } });
+    setState(prev => ({ form: { ...prev.form, months: [] } }));
 });
 
 document.querySelectorAll('input[name="loc-mode"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
-        setState({ 
-            form: { ...getState().form, locMode: e.target.value, lat: null, lng: null, placeId: null, placeName: '' },
-            ui: { ...getState().ui, setupError: null, placeError: null } 
-        });
+        setState(prev => ({
+            form: { ...prev.form, locMode: e.target.value, lat: null, lng: null, placeId: null, placeName: '' },
+            ui: { ...prev.ui, setupError: null, placeError: null }
+        }));
     });
 });
 
@@ -207,15 +207,15 @@ function setupAutocomplete(config) {
     const performSearch = debounce(async (query) => {
         if (abortController) abortController.abort();
         abortController = new AbortController();
-        
+
         if (query.length < 3) {
-            setState({ ui: { ...getState().ui, [showList]: false } });
+            setState(prev => ({ ui: { ...prev.ui, [showList]: false } }));
             return;
         }
 
         try {
             const data = await fetchDataFn(query, abortController.signal);
-            setState({ ui: { ...getState().ui, [results]: data.results, [showList]: data.results.length > 0 } });
+            setState(prev => ({ ui: { ...prev.ui, [results]: data.results, [showList]: data.results.length > 0 } }));
         } catch(err) {
             if (err.name !== 'AbortError') console.warn(`${inputId} search offline`);
         }
@@ -223,12 +223,12 @@ function setupAutocomplete(config) {
 
     inputEl.addEventListener('input', (e) => {
         const query = e.target.value;
-        
+
         // 1. Update state immediately on keystroke so DOM and state never desync
-        setState({ 
-            form: { ...getState().form, [id]: null, [name]: query },
-            ui: { ...getState().ui, [activeIdx]: -1, [error]: null }
-        });
+        setState(prev => ({
+            form: { ...prev.form, [id]: null, [name]: query },
+            ui: { ...prev.ui, [activeIdx]: -1, [error]: null }
+        }));
 
         // 2. Trigger debounced API search
         performSearch(query);
@@ -239,7 +239,7 @@ function setupAutocomplete(config) {
         const s = getState();
         const hasNoSelection = !s.form[id];
         const shouldShow = hasNoSelection && e.target.value.length >= 3 && s.ui[results].length > 0;
-        setState({ ui: { ...s.ui, [error]: null, [showList]: shouldShow } });
+        setState(prev => ({ ui: { ...prev.ui, [error]: null, [showList]: shouldShow } }));
     });
 
     // 3. Blur Event (Validation)
@@ -247,11 +247,11 @@ function setupAutocomplete(config) {
         const s = getState();
         // Use custom validation if provided, otherwise default to checking if the ID exists
         const isValid = validateOnBlur ? validateOnBlur(s) : !!s.form[id];
-        
+
         if ((s.form[name] || '').trim() !== '' && !isValid) {
-            setState({ ui: { ...s.ui, [error]: errorMsg, [showList]: false } });
+            setState(prev => ({ ui: { ...prev.ui, [error]: errorMsg, [showList]: false } }));
         } else if (s.ui[showList]) {
-            setState({ ui: { ...s.ui, [showList]: false } });
+            setState(prev => ({ ui: { ...prev.ui, [showList]: false } }));
         }
     });
 
@@ -259,32 +259,32 @@ function setupAutocomplete(config) {
     inputEl.addEventListener('keydown', (e) => {
         const s = getState();
         if (!s.ui[showList]) return;
-        
+
         listEl.classList.add('using-keyboard');
-        
+
         let newIdx = s.ui[activeIdx];
         const total = s.ui[results].length;
-        
+
         if (e.key === 'ArrowDown') {
             e.preventDefault();
             newIdx = (newIdx < total - 1) ? newIdx + 1 : 0;
-            setState({ ui: { ...s.ui, [activeIdx]: newIdx } });
+            setState(prev => ({ ui: { ...prev.ui, [activeIdx]: newIdx } }));
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             newIdx = (newIdx > 0) ? newIdx - 1 : total - 1;
-            setState({ ui: { ...s.ui, [activeIdx]: newIdx } });
+            setState(prev => ({ ui: { ...prev.ui, [activeIdx]: newIdx } }));
         } else if (e.key === 'Enter') {
             e.preventDefault();
             if (newIdx >= 0 && newIdx < total) {
                 const item = s.ui[results][newIdx];
-                setState({ 
-                    form: { ...s.form, [id]: item.id, [name]: formatDisplay(item) },
-                    ui: { ...s.ui, [showList]: false, [error]: null }
-                });
+                setState(prev => ({
+                    form: { ...prev.form, [id]: item.id, [name]: formatDisplay(item) },
+                    ui: { ...prev.ui, [showList]: false, [error]: null }
+                }));
             }
         } else if (e.key === 'Escape') {
             e.preventDefault();
-            setState({ ui: { ...s.ui, [showList]: false } });
+            setState(prev => ({ ui: { ...prev.ui, [showList]: false } }));
         }
     });
 
@@ -295,17 +295,16 @@ function setupAutocomplete(config) {
     listEl.addEventListener('pointerdown', (e) => {
         const li = e.target.closest('li');
         if (li) {
-            // Prevent the input from losing focus, avoiding premature blur validation
             e.preventDefault();
-            
+
             const idx = parseInt(li.id.split('-').pop(), 10);
             const item = getState().ui[results][idx];
-            
-            setState({ 
-                form: { ...getState().form, [id]: item.id, [name]: formatDisplay(item) },
-                ui: { ...getState().ui, [showList]: false, [error]: null }
-            });
-            
+
+            setState(prev => ({
+                form: { ...prev.form, [id]: item.id, [name]: formatDisplay(item) },
+                ui: { ...prev.ui, [showList]: false, [error]: null }
+            }));
+
             inputEl.focus();
         }
     });
@@ -313,10 +312,10 @@ function setupAutocomplete(config) {
     // 7. Clear Button Action
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
-            setState({
-                form: { ...getState().form, [id]: null, [name]: '' },
-                ui: { ...getState().ui, [showList]: false, [error]: null }
-            });
+            setState(prev => ({
+                form: { ...prev.form, [id]: null, [name]: '' },
+                ui: { ...prev.ui, [showList]: false, [error]: null }
+            }));
             inputEl.focus();
         });
     }
@@ -358,28 +357,28 @@ document.addEventListener('click', (e) => {
         const s = getState();
         const updates = {};
         let shouldUpdate = false;
-        
+
         activeDropdownKeys.forEach(key => {
             if (s.ui[key]) {
                 updates[key] = false;
                 shouldUpdate = true;
             }
         });
-        
-        if (shouldUpdate) setState({ ui: { ...s.ui, ...updates } });
+
+        if (shouldUpdate) setState(prev => ({ ui: { ...prev.ui, ...updates } }));
     }
 });
 
 document.getElementById('btn-gps').addEventListener('click', () => {
-    setState({ ui: { ...getState().ui, isLocatingGps: true } });
+    setState(prev => ({ ui: { ...prev.ui, isLocatingGps: true } }));
     navigator.geolocation.getCurrentPosition(
         (pos) => {
-            setState({
-                form: { ...getState().form, lat: pos.coords.latitude, lng: pos.coords.longitude, placeId: null, placeName: '' },
-                ui: { ...getState().ui, isLocatingGps: false }
-            });
+            setState(prev => ({
+                form: { ...prev.form, lat: pos.coords.latitude, lng: pos.coords.longitude, placeId: null, placeName: '' },
+                ui: { ...prev.ui, isLocatingGps: false }
+            }));
         },
-        () => setState({ ui: { ...getState().ui, isLocatingGps: false, setupError: 'Could not get location' } })
+        () => setState(prev => ({ ui: { ...prev.ui, isLocatingGps: false, setupError: 'Could not get location' } }))
     );
 });
 
@@ -395,26 +394,26 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     }
     if (s.form.locMode === 'coords') {
         const lat = parseFloat(s.form.lat); const lng = parseFloat(s.form.lng);
-        if (isNaN(lat) || isNaN(lng)) { setupError = "Please enter valid latitude and longitude coordinates, or use GPS."; hasError = true; } 
+        if (isNaN(lat) || isNaN(lng)) { setupError = "Please enter valid latitude and longitude coordinates, or use GPS."; hasError = true; }
         else if (lat < -90 || lat > 90 || lng < -180 || lng > 180) { setupError = "Latitude must be between -90 and 90, and Longitude between -180 and 180."; hasError = true; }
     }
-    
+
     if ((s.form.taxonName || '').trim() !== '' && !s.form.taxonId) { taxonError = "⚠️ Please select a valid target taxon from the list, or clear this field."; hasError = true; }
     if (!s.form.wantsPhotos && !s.form.wantsSounds) { setupError = "Please select at least one media type (Photos or Sounds)."; hasError = true; }
     if (s.form.months.length === 0) { setupError = "Please select at least one month for seasonality."; hasError = true; }
 
     if (hasError) {
-        setState({ ui: { ...s.ui, placeError, setupError, taxonError } }); return;
+        setState(prev => ({ ui: { ...prev.ui, placeError, setupError, taxonError } })); return;
     }
 
     savePreferences();
-    
+
     observationService.clearCache();
-    
-    setState({ 
-        config: { ...s.form, questionLimit: parseInt(s.form.questionLimit, 10), expertTotalSpecies: 0 },
-        ui: { ...s.ui, isLoadingQuizPool: true, setupError: null, placeError: null, taxonError: null } 
-    });
+
+    setState(prev => ({
+        config: { ...prev.form, questionLimit: parseInt(prev.form.questionLimit, 10), expertTotalSpecies: 0 },
+        ui: { ...prev.ui, isLoadingQuizPool: true, setupError: null, placeError: null, taxonError: null }
+    }));
 
     const updatedState = getState();
     const isExpert = updatedState.config.difficulty === 'all';
@@ -422,15 +421,15 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     try {
         let pool = [];
         let expertCount = 0;
-        
+
         if (isExpert && updatedState.config.isRarityMode) {
             const preFlightData = await api.fetchSpeciesPool({
                 perPage: 1, wantsPhotos: updatedState.config.wantsPhotos, wantsSounds: updatedState.config.wantsSounds, months: updatedState.config.months, placeId: updatedState.form.placeId, lat: updatedState.form.lat, lng: updatedState.form.lng, radius: updatedState.form.radius, taxonId: updatedState.form.taxonId, establishmentStatus: updatedState.config.establishmentStatus
             });
             expertCount = preFlightData.total_results || 0;
-            
+
             if (expertCount === 0) {
-                setState({ ui: { ...getState().ui, isLoadingQuizPool: false, setupError: "No observations found matching these strict filters. Try adjusting your settings." } });
+                setState(prev => ({ ui: { ...prev.ui, isLoadingQuizPool: false, setupError: "No observations found matching these strict filters. Try adjusting your settings." } }));
                 return;
             }
 
@@ -443,7 +442,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
                 difficulty: updatedState.config.difficulty, wantsPhotos: updatedState.config.wantsPhotos, wantsSounds: updatedState.config.wantsSounds, months: updatedState.config.months, placeId: updatedState.form.placeId, lat: updatedState.form.lat, lng: updatedState.form.lng, radius: updatedState.form.radius, taxonId: updatedState.form.taxonId, establishmentStatus: updatedState.config.establishmentStatus
             });
             if (!data.results || data.results.length === 0) {
-                setState({ ui: { ...getState().ui, isLoadingQuizPool: false, setupError: "No research-grade observations found. Try a broader search." } });
+                setState(prev => ({ ui: { ...prev.ui, isLoadingQuizPool: false, setupError: "No research-grade observations found. Try a broader search." } }));
                 return;
             }
             pool = engine.generateWeightedPool(
@@ -454,26 +453,26 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
                 updatedState.config.weightingMethod
             );
         }
-        
+
         if (pool.length === 0) {
-            setState({ ui: { ...getState().ui, isLoadingQuizPool: false, setupError: "No observations found matching these strict filters. Try adjusting your settings." } });
+            setState(prev => ({ ui: { ...prev.ui, isLoadingQuizPool: false, setupError: "No observations found matching these strict filters. Try adjusting your settings." } }));
             return;
         }
 
-        setState({
-            config: { ...updatedState.config, expertTotalSpecies: expertCount },
+        setState(prev => ({
+            config: { ...prev.config, expertTotalSpecies: expertCount },
             questions: pool,
             currentIndex: 0, score: 0, currentMediaIndex: 0,
-            form: { ...updatedState.form, answerInput: '', rankInput: 'species' },
-            ui: { ...updatedState.ui, isLoadingQuizPool: false, activeView: 'quiz-view', quizError: null, isCheckingAnswer: false, isHintVisible: false, isMediaLoaded: false }
-        });
+            form: { ...prev.form, answerInput: '', rankInput: 'species' },
+            ui: { ...prev.ui, isLoadingQuizPool: false, activeView: 'quiz-view', quizError: null, isCheckingAnswer: false, isHintVisible: false, isMediaLoaded: false }
+        }));
     } catch (error) {
         const isRateLimit = error.status === 429;
-        const setupError = isRateLimit 
+        const setupError = isRateLimit
             ? "⏳ Rate limit exceeded. Please wait a minute before starting a new quiz."
             : "Error loading species data. Please check your internet connection.";
-            
-        setState({ ui: { ...getState().ui, isLoadingQuizPool: false, setupError } });
+
+        setState(prev => ({ ui: { ...prev.ui, isLoadingQuizPool: false, setupError } }));
     }
 });
 
@@ -484,61 +483,61 @@ document.getElementById('quiz-image').onload = (e) => {
     const s = getState();
     const media = selectCurrentMedia(s)[s.currentMediaIndex];
     if (media && e.target.dataset.src === media.mediumUrl) {
-        setState({ ui: { ...s.ui, isMediaLoaded: true } });
+        setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true } }));
     }
 };
 
-document.getElementById('quiz-image').onerror = () => setState({ ui: { ...getState().ui, isMediaLoaded: true, quizError: { isMissingMedia: false } } });
-document.getElementById('quiz-audio-player').onerror = () => setState({ ui: { ...getState().ui, isMediaLoaded: true, quizError: { isMissingMedia: false } } });
+document.getElementById('quiz-image').onerror = () => setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true, quizError: { isMissingMedia: false } } }));
+document.getElementById('quiz-audio-player').onerror = () => setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true, quizError: { isMissingMedia: false } } }));
 document.getElementById('quiz-audio-player').oncanplay = (e) => {
     const s = getState();
     const media = selectCurrentMedia(s)[s.currentMediaIndex];
     if (media && media.type === 'sound' && e.target.dataset.src === media.fileUrl) {
-        setState({ ui: { ...s.ui, isMediaLoaded: true } });
+        setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true } }));
     }
 };
 
 document.getElementById('btn-prev-media').addEventListener('click', () => {
-    if (getState().currentMediaIndex > 0) setState({ currentMediaIndex: getState().currentMediaIndex - 1, ui: { ...getState().ui, isMediaLoaded: false } });
+    if (getState().currentMediaIndex > 0) setState(prev => ({ currentMediaIndex: prev.currentMediaIndex - 1, ui: { ...prev.ui, isMediaLoaded: false } }));
 });
 document.getElementById('btn-next-media').addEventListener('click', () => {
     const s = getState();
-    if (s.currentMediaIndex < selectCurrentMedia(s).length - 1) setState({ currentMediaIndex: s.currentMediaIndex + 1, ui: { ...s.ui, isMediaLoaded: false } });
+    if (s.currentMediaIndex < selectCurrentMedia(s).length - 1) setState(prev => ({ currentMediaIndex: prev.currentMediaIndex + 1, ui: { ...prev.ui, isMediaLoaded: false } }));
 });
-document.getElementById('btn-toggle-hint').addEventListener('click', () => setState({ ui: { ...getState().ui, isHintVisible: !getState().ui.isHintVisible } }));
+document.getElementById('btn-toggle-hint').addEventListener('click', () => setState(prev => ({ ui: { ...prev.ui, isHintVisible: !prev.ui.isHintVisible } })));
 
 // Modal Bindings
 document.getElementById('btn-zoom-image').addEventListener('click', () => {
     const media = selectCurrentMedia(getState())[getState().currentMediaIndex];
-    setState({ ui: { ...getState().ui, zoomMediaUrl: media.originalUrl, isZoomedIn: false } });
+    setState(prev => ({ ui: { ...prev.ui, zoomMediaUrl: media.originalUrl, isZoomedIn: false } }));
 });
 document.getElementById('zoom-modal').addEventListener('close', () => {
     if (getState().ui.zoomMediaUrl) {
-        setState({ ui: { ...getState().ui, zoomMediaUrl: null } });
+        setState(prev => ({ ui: { ...prev.ui, zoomMediaUrl: null } }));
     }
 });
-document.getElementById('btn-close-modal').addEventListener('click', () => setState({ ui: { ...getState().ui, zoomMediaUrl: null } }));
+document.getElementById('btn-close-modal').addEventListener('click', () => setState(prev => ({ ui: { ...prev.ui, zoomMediaUrl: null } })));
 document.getElementById('zoom-modal-img').addEventListener('click', (e) => {
     const s = getState();
     const willZoomIn = !s.ui.isZoomedIn;
     const zoomImg = document.getElementById('zoom-modal-img');
     const zoomScroll = document.getElementById('zoom-modal-scroll');
-    
+
     // 1. Capture the percentage of where the user clicked BEFORE it resizes
     const rect = zoomImg.getBoundingClientRect();
     const clickXPercent = (e.clientX - rect.left) / rect.width;
     const clickYPercent = (e.clientY - rect.top) / rect.height;
-    
+
     // 2. Trigger the UI state change (which adds the .zoomed-in class via ui.js)
-    setState({ ui: { ...s.ui, isZoomedIn: willZoomIn } });
-    
+    setState(prev => ({ ui: { ...prev.ui, isZoomedIn: willZoomIn } }));
+
     // 3. Center the scrollbars on the click coordinates
     if (willZoomIn) {
         requestAnimationFrame(() => {
             // Find the exact pixel coordinate on the newly expanded full-size image
             const targetX = zoomImg.offsetWidth * clickXPercent;
             const targetY = zoomImg.offsetHeight * clickYPercent;
-            
+
             // Shift the scroll container to place that point in the middle of the screen
             zoomScroll.scrollLeft = targetX - (zoomScroll.clientWidth / 2);
             zoomScroll.scrollTop = targetY - (zoomScroll.clientHeight / 2);
@@ -548,7 +547,7 @@ document.getElementById('zoom-modal-img').addEventListener('click', (e) => {
 
 // Answer Loop
 document.getElementById('clear-answer').addEventListener('click', () => {
-    setState({ form: { ...getState().form, answerInput: '' } });
+    setState(prev => ({ form: { ...prev.form, answerInput: '' } }));
     document.getElementById('input-answer').focus();
 });
 
@@ -564,49 +563,49 @@ document.getElementById('btn-skip').addEventListener('click', () => {
 
 document.getElementById('answer-form').addEventListener('submit', async (e) => {
     e.preventDefault(); // Prevent the page from actually reloading
-    
+
     const s = getState();
     const q = s.questions[s.currentIndex];
-    
+
     // DEFENSIVE GUARD: Prevent double-submits if already checking or already answered
-    if (s.ui.isCheckingAnswer || q.isAnswered) return; 
+    if (s.ui.isCheckingAnswer || q.isAnswered) return;
 
     const inputStr = (s.form.answerInput || '').trim();
     if (!inputStr) return;
 
-    setState({ ui: { ...s.ui, isCheckingAnswer: true, answerError: null } });
+    setState(prev => ({ ui: { ...prev.ui, isCheckingAnswer: true, answerError: null } }));
 
     const { isCorrect, pointsEarned, matchedNameDisplay, networkError } = await engine.evaluateAnswer(
         inputStr, s.form.rankInput, q.observation?.taxon || q.taxon, observationService.getDynamicNetworkTimeout
     );
-    
+
     if (networkError) {
-        setState({
+        setState(prev => ({
             ui: {
-                ...getState().ui,
+                ...prev.ui,
                 isCheckingAnswer: false,
                 answerError: "⚠️ Offline: Unable to verify your answer with the database. Check your connection to try again, or skip."
             }
-        });
+        }));
         return;
     }
-    
+
     const mediaInfo = engine.getQuestionThumbnail(q, selectCurrentMedia(getState()));
-    
+
     updateQuestion(s.currentIndex, {
-        isAnswered: true, 
-        userAnswer: `${inputStr} (${s.form.rankInput})`, 
-        guessedRank: s.form.rankInput, 
-        isCorrect, 
-        pointsEarned, 
-        thumbnailUrl: mediaInfo.url, 
-        mediaAttribution: mediaInfo.attribution, 
-        matchedNameDisplay, 
+        isAnswered: true,
+        userAnswer: `${inputStr} (${s.form.rankInput})`,
+        guessedRank: s.form.rankInput,
+        isCorrect,
+        pointsEarned,
+        thumbnailUrl: mediaInfo.url,
+        mediaAttribution: mediaInfo.attribution,
+        matchedNameDisplay,
         isSkipped: false
     });
-    
-    if (isCorrect) setState({ score: getState().score + pointsEarned });
-    setState({ ui: { ...getState().ui, isCheckingAnswer: false } });
+
+    if (isCorrect) setState(prev => ({ score: prev.score + pointsEarned }));
+    setState(prev => ({ ui: { ...prev.ui, isCheckingAnswer: false } }));
 });
 
 // Advancing State
@@ -614,28 +613,28 @@ document.getElementById('btn-next').addEventListener('click', () => {
     const s = getState();
     const nextIdx = s.currentIndex + 1;
     if (nextIdx >= s.questions.length) {
-        setState({ ui: { ...s.ui, activeView: 'results-view' } });
+        setState(prev => ({ ui: { ...prev.ui, activeView: 'results-view' } }));
     } else {
-        setState({ 
+        setState(prev => ({
             currentIndex: nextIdx, currentMediaIndex: 0,
-            form: { ...s.form, answerInput: '', rankInput: 'species' },
-            ui: { ...s.ui, isMediaLoaded: false, isCheckingAnswer: false, quizError: null, isHintVisible: false }
-        });
+            form: { ...prev.form, answerInput: '', rankInput: 'species' },
+            ui: { ...prev.ui, isMediaLoaded: false, isCheckingAnswer: false, quizError: null, isHintVisible: false }
+        }));
     }
 });
 
 document.getElementById('btn-retry').addEventListener('click', () => {
     updateQuestion(getState().currentIndex, { observation: null });
-    setState({ ui: { ...getState().ui, quizError: null, isMediaLoaded: false } });
+    setState(prev => ({ ui: { ...prev.ui, quizError: null, isMediaLoaded: false } }));
     observationService.loadObservationForQuestion(getState().currentIndex);
 });
 
 document.getElementById('btn-skip-end').addEventListener('click', () => {
     observationService.clearCache();
-    setState({ 
-        questions: getState().questions.slice(0, getState().currentIndex),
-        ui: { ...getState().ui, activeView: 'results-view' }
-    });
+    setState(prev => ({
+        questions: prev.questions.slice(0, prev.currentIndex),
+        ui: { ...prev.ui, activeView: 'results-view' }
+    }));
 });
 
 document.getElementById('btn-restart').addEventListener('click', () => {
