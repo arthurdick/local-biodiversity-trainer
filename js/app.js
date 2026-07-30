@@ -9,13 +9,11 @@ import * as observationService from './observationService.js';
 // ==========================================================================
 
 // 1. Pure Declarative DOM Rendering
-// Fires on state updates to sync the UI without triggering side-effects
 subscribe((newState) => {
     ui.render(newState);
 });
 
 // 2. Question Navigation & JIT Prefetch Trigger
-// Triggers observation fetching ONLY when entering a quiz or advancing questions
 subscribeSelector(
     (s) => ({ activeView: s.ui.activeView, index: s.currentIndex }),
     ({ activeView, index }, prev) => {
@@ -30,7 +28,6 @@ subscribeSelector(
 );
 
 // 3. Observation Data Arrival Reaction
-// Reacts strictly when new observation data lands on the current active question
 subscribeSelector(
     (s) => s.questions[s.currentIndex]?.observation,
     (obs, prevObs, newState) => {
@@ -57,7 +54,6 @@ subscribeSelector(
 );
 
 // 4. Cached Media Readiness Controller
-// Checks image element `.complete` or audio `.readyState` for pre-cached assets
 subscribeSelector(
     (s) => ({
         activeView: s.ui.activeView,
@@ -90,7 +86,6 @@ subscribeSelector(
 );
 
 // 5. Sequential Prefetch Trigger
-// Ensures the next observation is prefetched only after the current media finishes loading (cached or network)
 subscribeSelector(
     (s) => ({
         isLoaded: s.ui.isMediaLoaded,
@@ -109,7 +104,7 @@ window.addEventListener('beforeunload', (e) => {
     const s = getState();
     if (s.ui.activeView === 'quiz-view') {
         e.preventDefault();
-        e.returnValue = ''; // Triggers standard browser exit confirmation modal
+        e.returnValue = '';
         return '';
     }
 });
@@ -220,12 +215,10 @@ function setupAutocomplete(config) {
         }
     }, 250);
 
-    // 1. Input Event: Match typed value against fetched options
     inputEl.addEventListener('input', (e) => {
         const query = e.target.value;
         const currentResults = getState().ui[results];
 
-        // Match typed text against fetched results to see if the user selected a valid option
         const selectedItem = currentResults.find(item => formatDisplay(item) === query);
 
         setState(prev => ({
@@ -242,12 +235,10 @@ function setupAutocomplete(config) {
         }
     });
 
-    // 2. Focus Event: Clear previous error message when user re-enters input
     inputEl.addEventListener('focus', () => {
         setState(prev => ({ ui: { ...prev.ui, [error]: null } }));
     });
 
-    // 3. Blur Event: Validate whether typed text yielded a valid selected ID
     inputEl.addEventListener('blur', () => {
         const s = getState();
         const isValid = validateOnBlur ? validateOnBlur(s) : !!s.form[id];
@@ -257,7 +248,6 @@ function setupAutocomplete(config) {
         }
     });
 
-    // 4. Clear Button Action
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
             setState(prev => ({
@@ -268,9 +258,6 @@ function setupAutocomplete(config) {
         });
     }
 }
-
-// Register active dropdown UI keys to easily clear them globally
-const activeDropdownKeys = ['showPlaceList', 'showTaxonList'];
 
 setupAutocomplete({
     inputId: 'input-place',
@@ -296,23 +283,6 @@ setupAutocomplete({
     formatDisplay: (item) => item.preferred_common_name ? `${item.preferred_common_name} (${item.name})` : item.name,
     validateOnBlur: (s) => !!s.form.taxonId,
     errorMsg: "⚠️ Please select a valid target taxon from the suggestions list."
-});
-
-document.addEventListener('click', (e) => {
-    if (!e.target.closest('.autocomplete-wrapper')) {
-        const s = getState();
-        const updates = {};
-        let shouldUpdate = false;
-
-        activeDropdownKeys.forEach(key => {
-            if (s.ui[key]) {
-                updates[key] = false;
-                shouldUpdate = true;
-            }
-        });
-
-        if (shouldUpdate) setState(prev => ({ ui: { ...prev.ui, ...updates } }));
-    }
 });
 
 document.getElementById('btn-gps').addEventListener('click', () => {
@@ -364,7 +334,6 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     }
 
     savePreferences();
-
     observationService.clearCache();
 
     setState(prev => ({
@@ -435,7 +404,6 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
 
 // --- QUIZ ACTIONS & MEDIA CAPTURE ---
 
-// Track successful media loading
 document.getElementById('quiz-image').onload = (e) => {
     const s = getState();
     const media = selectCurrentMedia(s)[s.currentMediaIndex];
@@ -480,22 +448,17 @@ document.getElementById('zoom-modal-img').addEventListener('click', (e) => {
     const zoomImg = document.getElementById('zoom-modal-img');
     const zoomScroll = document.getElementById('zoom-modal-scroll');
 
-    // 1. Capture the percentage of where the user clicked BEFORE it resizes
     const rect = zoomImg.getBoundingClientRect();
     const clickXPercent = (e.clientX - rect.left) / rect.width;
     const clickYPercent = (e.clientY - rect.top) / rect.height;
 
-    // 2. Trigger the UI state change (which adds the .zoomed-in class via ui.js)
     setState(prev => ({ ui: { ...prev.ui, isZoomedIn: willZoomIn } }));
 
-    // 3. Center the scrollbars on the click coordinates
     if (willZoomIn) {
         requestAnimationFrame(() => {
-            // Find the exact pixel coordinate on the newly expanded full-size image
             const targetX = zoomImg.offsetWidth * clickXPercent;
             const targetY = zoomImg.offsetHeight * clickYPercent;
 
-            // Shift the scroll container to place that point in the middle of the screen
             zoomScroll.scrollLeft = targetX - (zoomScroll.clientWidth / 2);
             zoomScroll.scrollTop = targetY - (zoomScroll.clientHeight / 2);
         });
@@ -519,12 +482,11 @@ document.getElementById('btn-skip').addEventListener('click', () => {
 });
 
 document.getElementById('answer-form').addEventListener('submit', async (e) => {
-    e.preventDefault(); // Prevent the page from actually reloading
+    e.preventDefault();
 
     const s = getState();
     const q = s.questions[s.currentIndex];
 
-    // DEFENSIVE GUARD: Prevent double-submits if already checking or already answered
     if (s.ui.isCheckingAnswer || q.isAnswered) return;
 
     const inputStr = (s.form.answerInput || '').trim();
@@ -602,5 +564,4 @@ document.getElementById('btn-restart').addEventListener('click', () => {
 
 // Boot
 loadPreferences();
-// Manually fire render to paint initial state DOM
 ui.render(getState());

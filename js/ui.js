@@ -13,8 +13,6 @@ const autocompleteConfigs = [
         nameKey: 'placeName',
         errorKey: 'placeError',
         resultsKey: 'placeResults',
-        showKey: 'showPlaceList',
-        activeIdxKey: 'activePlaceIdx',
         formatDisplay: (item) => item.display_name || item.name
     },
     {
@@ -25,8 +23,6 @@ const autocompleteConfigs = [
         nameKey: 'taxonName',
         errorKey: 'taxonError',
         resultsKey: 'taxonResults',
-        showKey: 'showTaxonList',
-        activeIdxKey: 'activeTaxonIdx',
         formatDisplay: (item) => item.preferred_common_name ? `${item.preferred_common_name} (${item.name})` : item.name
     }
 ];
@@ -91,8 +87,6 @@ function redactSpoilers(text, taxon) {
     if (sortedTerms.length === 0) return safeText;
 
     // 6. Global, case-insensitive redaction
-    // Swapping \b for lookarounds (?<=\W|^) and (?=\W|$) ensures that names
-    // starting or ending with punctuation (e.g., 'Io) redact properly as well.
     const regex = new RegExp(`(?<=\\W|^)(${sortedTerms.join('|')})(?=\\W|$)`, 'gi');
     return safeText.replace(regex, '[REDACTED]');
 }
@@ -195,12 +189,7 @@ export function render(state) {
             
             renderInputError(config.inputId, state.ui[config.errorKey]);
             
-            renderAutocomplete(
-                config,
-                state.ui[config.resultsKey],
-                state.ui[config.showKey],
-                state.ui[config.activeIdxKey]
-            );
+            renderAutocomplete(config, state.ui[config.resultsKey]);
         });
 
         renderError('form-error-message', state.ui.setupError);
@@ -260,7 +249,6 @@ export function render(state) {
             }
         } else {
             errDiv.style.display = 'none';
-            // Clean up when the error clears
             if (errDiv.hasChildNodes()) {
                 errDiv.replaceChildren();
             }
@@ -340,7 +328,6 @@ export function render(state) {
             feedback.style.display = 'block';
             feedback.className = q.isCorrect ? 'correct' : 'incorrect';
             
-            // Only rebuild the DOM if we moved to a new question
             if (feedback._lastQuestionIndex !== state.currentIndex) {
                 buildFeedbackDom(q, feedback);
                 feedback._lastQuestionIndex = state.currentIndex;
@@ -392,7 +379,6 @@ function renderAutocomplete(config, results) {
     const list = document.getElementById(config.listId);
     if (!list) return;
 
-    // Skip DOM updates if results haven't changed
     if (list._lastResults === results) return;
     list._lastResults = results;
 
@@ -497,7 +483,6 @@ function renderQuizMedia(state, isReadyForMedia) {
             const isNextDisabled = state.currentMediaIndex === mediaArray.length - 1;
             const isPrevDisabled = state.currentMediaIndex === 0;
 
-            // If the button being clicked is about to be disabled, shift focus to the sibling button
             if (isNextDisabled && document.activeElement === nextBtn) {
                 prevBtn.focus();
             } else if (isPrevDisabled && document.activeElement === prevBtn) {
@@ -555,7 +540,6 @@ function renderQuizMeta(state, isReadyForMedia) {
             locLink.removeAttribute('title');
         }
 
-        // Adjust routing: If obscured, skip GPS mapping and force a text-based search
         if (meta.coordinates && !meta.isObscured) {
             locLink.href = `https://www.google.com/maps/search/?api=1&query=${meta.coordinates}`;
             locLink.className = 'enabled-link';
@@ -583,7 +567,7 @@ function renderQuizMeta(state, isReadyForMedia) {
         hintBtn.setAttribute('aria-expanded', String(state.ui.isHintVisible));
         
         hintContent.style.display = state.ui.isHintVisible ? 'block' : 'none';
-        if (hintContent.textContent !== desc) hintContent.textContent = desc; // Strictly textContent for sanitization
+        if (hintContent.textContent !== desc) hintContent.textContent = desc;
     } else {
         hintBtn.style.display = 'none';
         hintContent.style.display = 'none';
@@ -593,7 +577,7 @@ function renderQuizMeta(state, isReadyForMedia) {
 // --- PURE DOM ELEMENT GENERATORS ---
 
 function buildFeedbackDom(q, feedbackEl) {
-    feedbackEl.replaceChildren(); // Safely clear container
+    feedbackEl.replaceChildren();
     const taxon = q.observation?.taxon || q.taxon || { name: 'Unknown Species', id: '' };
     const primaryDisplayName = taxon.preferred_common_name ? `${taxon.preferred_common_name} (${taxon.name})` : taxon.name;
 
@@ -666,7 +650,7 @@ function buildFeedbackDom(q, feedbackEl) {
 }
 
 function buildResultsDom(questions, container) {
-    container.replaceChildren(); // Safely clear container
+    container.replaceChildren();
     const questionsToReview = questions.filter(q => q.pointsEarned !== 10);
 
     if (questionsToReview.length === 0) {
