@@ -280,10 +280,6 @@ export function render(state) {
         if (isReadyForMedia && !isAnswered && !state.ui.isCheckingAnswer) {
             if (lastFocusedQuestionIndex !== state.currentIndex) {
                 lastFocusedQuestionIndex = state.currentIndex;
-                const quizCounter = document.getElementById('quiz-counter');
-                if (quizCounter) {
-                    quizCounter.focus();
-                }
             }
         }
         
