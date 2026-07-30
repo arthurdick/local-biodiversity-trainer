@@ -122,10 +122,14 @@ window.addEventListener('beforeunload', (e) => {
 // --- STORAGE ---
 function debounce(func, timeout = 250) {
     let timer;
-    return function(...args) {
+    const debounced = function(...args) {
         clearTimeout(timer);
         timer = setTimeout(() => { func.apply(this, args); }, timeout);
     };
+    debounced.cancel = () => {
+        clearTimeout(timer);
+    };
+    return debounced;
 }
 
 function savePreferences() {
@@ -210,17 +214,22 @@ function setupAutocomplete(config) {
 
     // Debounced search trigger (250ms delay)
     const performSearch = debounce(async (query) => {
-        // Instantiate a new AbortController right before the fetch starts
-        abortController = new AbortController();
-
-        if (query.length < 3) {
+        // Defensive Check: Ensure the live input still matches the query
+        if (inputEl.value.trim() !== query.trim() || query.length < 3) {
             setState(prev => ({ ui: { ...prev.ui, [results]: [] } }));
             return;
         }
 
+        // Instantiate AbortController right before fetch execution
+        abortController = new AbortController();
+
         try {
             const data = await fetchDataFn(query, abortController.signal);
-            setState(prev => ({ ui: { ...prev.ui, [results]: data.results } }));
+            
+            // Double-check input match after fetch resolves before updating state
+            if (inputEl.value.trim() === query.trim()) {
+                setState(prev => ({ ui: { ...prev.ui, [results]: data.results } }));
+            }
         } catch (err) {
             if (err.name !== 'AbortError') {
                 console.warn(`${inputId} search offline`);
@@ -232,8 +241,8 @@ function setupAutocomplete(config) {
         const query = e.target.value;
         const currentResults = getState().ui[results];
 
-        // 1. IMMEDIATELY abort any active in-flight fetch as soon as the key is pressed,
-        // preventing older/slower API responses from resolving and overwriting the UI state.
+        // 1. Kill any pending debounced timer AND active in-flight request
+        performSearch.cancel();
         if (abortController) {
             abortController.abort();
             abortController = null;
@@ -251,7 +260,7 @@ function setupAutocomplete(config) {
             ui: { ...prev.ui, [error]: null }
         }));
 
-        // 3. Queue the debounced fetch if a suggested item wasn't selected
+        // 3. Queue search if query is not an explicit selection match
         if (!selectedItem) {
             performSearch(query);
         }
@@ -272,12 +281,16 @@ function setupAutocomplete(config) {
 
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
-            // Cancel any pending fetch when clearing input
+            // 1. Cancel pending debounced timer
+            performSearch.cancel();
+
+            // 2. Abort any active in-flight fetch request
             if (abortController) {
                 abortController.abort();
                 abortController = null;
             }
 
+            // 3. Reset form and results state
             setState(prev => ({
                 form: { ...prev.form, [id]: null, [name]: '' },
                 ui: { ...prev.ui, [results]: [], [error]: null }
