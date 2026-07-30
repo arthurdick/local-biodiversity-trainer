@@ -248,8 +248,10 @@
         <!-- Accessible Zoom Modal -->
         <dialog id="zoom-modal" class="zoom-modal" aria-label="Image zoom">
             <button type="button" id="btn-close-modal" class="btn-close-modal" aria-label="Close zoom modal">&times;</button>
-            <div id="zoom-modal-scroll" class="zoom-modal-content">
-                <img id="zoom-modal-img" src="" alt="Full resolution observation">
+            <div id="zoom-modal-scroll" class="zoom-modal-content" tabindex="0" aria-label="Scrollable image view">
+                <button type="button" id="btn-zoom-modal-toggle" class="btn-zoom-toggle" aria-label="Toggle image zoom size">
+                    <img id="zoom-modal-img" src="" alt="Full resolution observation">
+                </button>
             </div>
         </dialog>
     </main>

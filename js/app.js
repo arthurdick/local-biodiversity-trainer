@@ -487,15 +487,17 @@ document.getElementById('zoom-modal').addEventListener('close', () => {
     }
 });
 document.getElementById('btn-close-modal').addEventListener('click', () => setState(prev => ({ ui: { ...prev.ui, zoomMediaUrl: null } })));
-document.getElementById('zoom-modal-img').addEventListener('click', (e) => {
+document.getElementById('btn-zoom-modal-toggle').addEventListener('click', (e) => {
     const s = getState();
     const willZoomIn = !s.ui.isZoomedIn;
     const zoomImg = document.getElementById('zoom-modal-img');
     const zoomScroll = document.getElementById('zoom-modal-scroll');
 
     const rect = zoomImg.getBoundingClientRect();
-    const clickXPercent = (e.clientX - rect.left) / rect.width;
-    const clickYPercent = (e.clientY - rect.top) / rect.height;
+    
+    // Fallback to center point (0.5) if triggered via keyboard without clientX
+    const clickXPercent = e.clientX ? (e.clientX - rect.left) / rect.width : 0.5;
+    const clickYPercent = e.clientY ? (e.clientY - rect.top) / rect.height : 0.5;
 
     setState(prev => ({ ui: { ...prev.ui, isZoomedIn: willZoomIn } }));
 
