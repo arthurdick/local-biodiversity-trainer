@@ -35,10 +35,20 @@ subscribeSelector(
 
         if (obs.error) {
             if (obs.emptyPool && newState.config.difficulty === 'all') {
-                setState(prev => ({
-                    questions: prev.questions.slice(0, prev.currentIndex),
-                    ui: { ...prev.ui, activeView: 'results-view' }
-                }));
+                if (newState.currentIndex === 0) {
+                    setState(prev => ({
+                        ui: {
+                            ...prev.ui,
+                            activeView: 'setup-view',
+                            setupError: "No observations found matching these strict filters. Try adjusting your settings."
+                        }
+                    }));
+                } else {
+                    setState(prev => ({
+                        questions: prev.questions.slice(0, prev.currentIndex),
+                        ui: { ...prev.ui, activeView: 'results-view' }
+                    }));
+                }
             } else {
                 setState(prev => ({ ui: { ...prev.ui, quizError: { isMissingMedia: false } } }));
             }
@@ -348,21 +358,38 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
         let pool = [];
         let expertCount = 0;
 
-        if (isExpert && updatedState.config.isRarityMode) {
+        if (isExpert) {
             const preFlightData = await api.fetchSpeciesPool({
-                perPage: 1, wantsPhotos: updatedState.config.wantsPhotos, wantsSounds: updatedState.config.wantsSounds, months: updatedState.config.months, placeId: updatedState.form.placeId, lat: updatedState.form.lat, lng: updatedState.form.lng, radius: updatedState.form.radius, taxonId: updatedState.form.taxonId, establishmentStatus: updatedState.config.establishmentStatus
+                perPage: 1,
+                wantsPhotos: updatedState.config.wantsPhotos,
+                wantsSounds: updatedState.config.wantsSounds,
+                months: updatedState.config.months,
+                placeId: updatedState.form.placeId,
+                lat: updatedState.form.lat,
+                lng: updatedState.form.lng,
+                radius: updatedState.form.radius,
+                taxonId: updatedState.form.taxonId,
+                establishmentStatus: updatedState.config.establishmentStatus
             });
             expertCount = preFlightData.total_results || 0;
 
             if (expertCount === 0) {
-                setState(prev => ({ ui: { ...prev.ui, isLoadingQuizPool: false, setupError: "No observations found matching these strict filters. Try adjusting your settings." } }));
+                setState(prev => ({
+                    ui: {
+                        ...prev.ui,
+                        isLoadingQuizPool: false,
+                        setupError: "No observations found matching these strict filters. Try adjusting your settings."
+                    }
+                }));
                 return;
             }
 
-            const size = updatedState.config.preventDuplicates ? Math.min(updatedState.config.questionLimit, expertCount) : updatedState.config.questionLimit;
-            pool = Array.from({ length: size }, () => ({ taxon: null, observation: null }));
-        } else if (isExpert) {
-            pool = Array.from({ length: updatedState.config.questionLimit }, () => ({ taxon: null, observation: null }));
+            if (updatedState.config.isRarityMode) {
+                const size = updatedState.config.preventDuplicates ? Math.min(updatedState.config.questionLimit, expertCount) : updatedState.config.questionLimit;
+                pool = Array.from({ length: size }, () => ({ taxon: null, observation: null }));
+            } else {
+                pool = Array.from({ length: updatedState.config.questionLimit }, () => ({ taxon: null, observation: null }));
+            }
         } else {
             const data = await api.fetchSpeciesPool({
                 difficulty: updatedState.config.difficulty, wantsPhotos: updatedState.config.wantsPhotos, wantsSounds: updatedState.config.wantsSounds, months: updatedState.config.months, placeId: updatedState.form.placeId, lat: updatedState.form.lat, lng: updatedState.form.lng, radius: updatedState.form.radius, taxonId: updatedState.form.taxonId, establishmentStatus: updatedState.config.establishmentStatus
