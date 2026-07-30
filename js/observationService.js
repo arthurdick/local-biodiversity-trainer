@@ -34,6 +34,35 @@ export function clearCache() {
 }
 
 /**
+ * Helper to execute a fetch with its own network timeout,
+ * while linking to a parent AbortSignal for user cancellation.
+ */
+async function fetchWithTimeout(fetchFn, parentSignal) {
+    const fetchController = new AbortController();
+
+    const onParentAbort = () => fetchController.abort();
+    if (parentSignal) {
+        if (parentSignal.aborted) {
+            fetchController.abort();
+        } else {
+            parentSignal.addEventListener('abort', onParentAbort, { once: true });
+        }
+    }
+
+    const timeoutMs = getDynamicNetworkTimeout();
+    const timeoutId = setTimeout(() => fetchController.abort(), timeoutMs);
+
+    try {
+        return await fetchFn(fetchController.signal);
+    } finally {
+        clearTimeout(timeoutId);
+        if (parentSignal) {
+            parentSignal.removeEventListener('abort', onParentAbort);
+        }
+    }
+}
+
+/**
  * JIT Prefetcher for Loading Observations
  */
 export async function loadObservationForQuestion(index) {
@@ -58,9 +87,6 @@ export async function loadObservationForQuestion(index) {
         const isRareExpert = currentConfig.difficulty === 'all' && currentConfig.isRarityMode;
 
         try {
-            const timeoutMs = getDynamicNetworkTimeout();
-            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-            
             let targetTaxon = q.taxon;
             
             // If in Rare Expert mode and we haven't assigned a taxon yet, fetch a random deep page
@@ -75,19 +101,22 @@ export async function loadObservationForQuestion(index) {
                 while (validResults.length === 0 && attempts < maxAttempts && deepPage >= 1) {
                     attempts++;
 
-                    const deepData = await api.fetchSpeciesPool({
-                        perPage: 50,
-                        page: deepPage,
-                        wantsPhotos: currentConfig.wantsPhotos,
-                        wantsSounds: currentConfig.wantsSounds,
-                        months: currentConfig.months,
-                        placeId: currentConfig.placeId,
-                        lat: currentConfig.lat,
-                        lng: currentConfig.lng,
-                        radius: currentConfig.radius,
-                        taxonId: currentConfig.taxonId,
-                        establishmentStatus: currentConfig.establishmentStatus
-                    }, controller.signal);
+                    const deepData = await fetchWithTimeout(
+                        signal => api.fetchSpeciesPool({
+                            perPage: 50,
+                            page: deepPage,
+                            wantsPhotos: currentConfig.wantsPhotos,
+                            wantsSounds: currentConfig.wantsSounds,
+                            months: currentConfig.months,
+                            placeId: currentConfig.placeId,
+                            lat: currentConfig.lat,
+                            lng: currentConfig.lng,
+                            radius: currentConfig.radius,
+                            taxonId: currentConfig.taxonId,
+                            establishmentStatus: currentConfig.establishmentStatus
+                        }, signal),
+                        controller.signal
+                    );
 
                     if (deepData.results && deepData.results.length > 0) {
                         if (currentConfig.preventDuplicates) {
@@ -115,7 +144,6 @@ export async function loadObservationForQuestion(index) {
                 }
                 
                 if (validResults.length === 0) {
-                    clearTimeout(timeoutId);
                     const emptyData = { error: true, emptyPool: true };
                     updateQuestion(index, { observation: emptyData });
                     return emptyData;
@@ -146,22 +174,23 @@ export async function loadObservationForQuestion(index) {
                     .filter(uuid => uuid !== undefined);
             }
 
-            const data = await api.fetchObservation({
-                wantsPhotos: currentConfig.wantsPhotos,
-                wantsSounds: currentConfig.wantsSounds,
-                months: currentConfig.months,
-                placeId: currentConfig.placeId,
-                lat: currentConfig.lat,
-                lng: currentConfig.lng,
-                radius: currentConfig.radius,
-                difficulty: isStandardExpert ? 'all' : 'specific',
-                taxonId: isStandardExpert ? currentConfig.taxonId : targetTaxon?.id,
-                establishmentStatus: currentConfig.establishmentStatus,
-                withoutTaxonIds,
-                notObsIds
-            }, controller.signal);
-
-            clearTimeout(timeoutId);
+            const data = await fetchWithTimeout(
+                signal => api.fetchObservation({
+                    wantsPhotos: currentConfig.wantsPhotos,
+                    wantsSounds: currentConfig.wantsSounds,
+                    months: currentConfig.months,
+                    placeId: currentConfig.placeId,
+                    lat: currentConfig.lat,
+                    lng: currentConfig.lng,
+                    radius: currentConfig.radius,
+                    difficulty: isStandardExpert ? 'all' : 'specific',
+                    taxonId: isStandardExpert ? currentConfig.taxonId : targetTaxon?.id,
+                    establishmentStatus: currentConfig.establishmentStatus,
+                    withoutTaxonIds,
+                    notObsIds
+                }, signal),
+                controller.signal
+            );
 
             if (data.results && data.results.length > 0) {
                 const obs = data.results[0];
