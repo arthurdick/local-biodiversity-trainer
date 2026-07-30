@@ -87,7 +87,7 @@ function redactSpoilers(text, taxon) {
     if (sortedTerms.length === 0) return safeText;
 
     // 6. Global, case-insensitive redaction
-    const regex = new RegExp(`(?<=\\W|^)(${sortedTerms.join('|')})(?=\\W|$)`, 'gi');
+    const regex = new RegExp(`(?<=\\P{L}|^)(?:${sortedTerms.join('|')})(?=\\P{L}|$)`, 'giu');
     return safeText.replace(regex, '[REDACTED]');
 }
 
