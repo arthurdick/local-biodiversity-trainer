@@ -7,7 +7,7 @@ export function normalize(str) {
         .replace(/[\u0300-\u036f]/g, '') // Strip diacritics/accents
         .toLowerCase()
         .replace(/[-—–]/g, ' ')          // Convert ALL hyphens and dashes to spaces
-        .replace(/[^\w\s]/g, '')         // Strip all remaining punctuation (including apostrophes)
+        .replace(/[^\p{L}\p{N}\s]/gu, '')// Strip all remaining punctuation (including apostrophes)
         .replace(/\s+/g, ' ')            // Condense multiple spaces into one
         .trim();
 }
