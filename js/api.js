@@ -121,10 +121,8 @@ class RequestQueue {
                 }
             }
         } finally {
-            this.isProcessing = false; // Guarantees queue never deadlocks
+            this.isProcessing = false;
         }
-
-        this.isProcessing = false;
     }
 }
 
