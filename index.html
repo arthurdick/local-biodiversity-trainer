@@ -79,27 +79,23 @@
                     </div>
                 </fieldset>
 
-                <fieldset class="form-group fieldset-reset">
-                    <legend class="group-label">4. Seasonality (Months)</legend>
-                    <div class="month-grid" id="month-filters">
-                        <label class="checkbox-label"><input type="checkbox" value="1" aria-label="January" checked> Jan</label>
-                        <label class="checkbox-label"><input type="checkbox" value="2" aria-label="February" checked> Feb</label>
-                        <label class="checkbox-label"><input type="checkbox" value="3" aria-label="March" checked> Mar</label>
-                        <label class="checkbox-label"><input type="checkbox" value="4" aria-label="April" checked> Apr</label>
-                        <label class="checkbox-label"><input type="checkbox" value="5" aria-label="May" checked> May</label>
-                        <label class="checkbox-label"><input type="checkbox" value="6" aria-label="June" checked> Jun</label>
-                        <label class="checkbox-label"><input type="checkbox" value="7" aria-label="July" checked> Jul</label>
-                        <label class="checkbox-label"><input type="checkbox" value="8" aria-label="August" checked> Aug</label>
-                        <label class="checkbox-label"><input type="checkbox" value="9" aria-label="September" checked> Sep</label>
-                        <label class="checkbox-label"><input type="checkbox" value="10" aria-label="October" checked> Oct</label>
-                        <label class="checkbox-label"><input type="checkbox" value="11" aria-label="November" checked> Nov</label>
-                        <label class="checkbox-label"><input type="checkbox" value="12" aria-label="December" checked> Dec</label>
-                    </div>
-                    <div class="month-actions">
-                        <button type="button" id="btn-months-all" class="text-link-btn">Select All</button>
-                        <button type="button" id="btn-months-none" class="text-link-btn">Select None</button>
-                    </div>
-                </fieldset>
+                <div class="form-group">
+                    <label for="input-months">4. Seasonality (Months)</label>
+                    <select id="input-months" multiple size="6">
+                        <option value="1" selected>January</option>
+                        <option value="2" selected>February</option>
+                        <option value="3" selected>March</option>
+                        <option value="4" selected>April</option>
+                        <option value="5" selected>May</option>
+                        <option value="6" selected>June</option>
+                        <option value="7" selected>July</option>
+                        <option value="8" selected>August</option>
+                        <option value="9" selected>September</option>
+                        <option value="10" selected>October</option>
+                        <option value="11" selected>November</option>
+                        <option value="12" selected>December</option>
+                    </select>
+                </div>
 
                 <div class="form-row">
                     <div class="form-group">

@@ -165,14 +165,14 @@ export function render(state) {
         syncCheckbox('chk-unique', state.form.preventDuplicates);
         syncCheckbox('chk-rarity', state.form.isRarityMode);
 
-        const monthGrid = document.getElementById('month-filters');
-        if (monthGrid) {
-            const monthCache = domCache.get(monthGrid);
+        const selectMonths = document.getElementById('input-months');
+        if (selectMonths) {
+            const monthCache = domCache.get(selectMonths);
             if (monthCache?.lastMonths !== state.form.months) {
-                domCache.set(monthGrid, { lastMonths: state.form.months });
-                document.querySelectorAll('#month-filters input').forEach(cb => {
-                    const shouldBeChecked = state.form.months.includes(cb.value);
-                    if (cb.checked !== shouldBeChecked) cb.checked = shouldBeChecked;
+                domCache.set(selectMonths, { lastMonths: state.form.months });
+                Array.from(selectMonths.options).forEach(opt => {
+                    const shouldBeSelected = state.form.months.includes(opt.value);
+                    if (opt.selected !== shouldBeSelected) opt.selected = shouldBeSelected;
                 });
             }
         }

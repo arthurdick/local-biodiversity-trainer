@@ -178,18 +178,13 @@ function loadPreferences() {
     if (el) el.addEventListener('change', (e) => setState(prev => ({ form: { ...prev.form, [prop]: e.target.checked } })));
 });
 
-document.getElementById('month-filters').addEventListener('change', () => {
-    const months = Array.from(document.querySelectorAll('#month-filters input:checked')).map(cb => cb.value);
-    setState(prev => ({ form: { ...prev.form, months } }));
-});
-
-document.getElementById('btn-months-all').addEventListener('click', () => {
-    setState(prev => ({ form: { ...prev.form, months: ['1','2','3','4','5','6','7','8','9','10','11','12'] } }));
-});
-
-document.getElementById('btn-months-none').addEventListener('click', () => {
-    setState(prev => ({ form: { ...prev.form, months: [] } }));
-});
+const selectMonths = document.getElementById('input-months');
+if (selectMonths) {
+    selectMonths.addEventListener('change', () => {
+        const selectedMonths = Array.from(selectMonths.selectedOptions).map(opt => opt.value);
+        setState(prev => ({ form: { ...prev.form, months: selectedMonths } }));
+    });
+}
 
 document.querySelectorAll('input[name="loc-mode"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
