@@ -271,7 +271,10 @@ export function render(state) {
         if (isReadyForMedia && !isAnswered && !state.ui.isCheckingAnswer) {
             if (lastFocusedQuestionIndex !== state.currentIndex) {
                 lastFocusedQuestionIndex = state.currentIndex;
-                if (answerInput) answerInput.focus();
+                const quizCounter = document.getElementById('quiz-counter');
+                if (quizCounter) {
+                    quizCounter.focus();
+                }
             }
         }
         
