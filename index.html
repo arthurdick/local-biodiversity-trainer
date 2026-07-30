@@ -19,13 +19,15 @@
                 <fieldset class="form-group z-high fieldset-reset">
                     <legend class="group-label">1. Location</legend>
                     
-                    <div class="location-toggle">
+                    <fieldset class="location-toggle fieldset-reset">
+                        <legend class="visually-hidden">Location selection mode</legend>
+                        
                         <input type="radio" id="mode-search" name="loc-mode" value="search" checked>
                         <label for="mode-search" class="location-toggle-label">Search Place</label>
                         
                         <input type="radio" id="mode-coords" name="loc-mode" value="coords">
                         <label for="mode-coords" class="location-toggle-label">Custom Coordinates</label>
-                    </div>
+                    </fieldset>
 
                     <!-- Search Mode Section -->
                     <div id="section-search" class="location-section active">

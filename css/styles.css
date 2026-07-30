@@ -123,6 +123,9 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
     display: flex;
     gap: 10px;
     margin-bottom: 15px;
+    border: none;
+    padding: 0;
+    min-width: 0;
 }
 
 .location-toggle-label {
