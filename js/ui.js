@@ -165,10 +165,17 @@ export function render(state) {
         syncCheckbox('chk-unique', state.form.preventDuplicates);
         syncCheckbox('chk-rarity', state.form.isRarityMode);
 
-        document.querySelectorAll('#month-filters input').forEach(cb => {
-            const shouldBeChecked = state.form.months.includes(cb.value);
-            if (cb.checked !== shouldBeChecked) cb.checked = shouldBeChecked;
-        });
+        const monthGrid = document.getElementById('month-filters');
+        if (monthGrid) {
+            const monthCache = domCache.get(monthGrid);
+            if (monthCache?.lastMonths !== state.form.months) {
+                domCache.set(monthGrid, { lastMonths: state.form.months });
+                document.querySelectorAll('#month-filters input').forEach(cb => {
+                    const shouldBeChecked = state.form.months.includes(cb.value);
+                    if (cb.checked !== shouldBeChecked) cb.checked = shouldBeChecked;
+                });
+            }
+        }
         
         syncInput('input-difficulty', state.form.difficulty);
         syncInput('input-questions', state.form.questionLimit);
@@ -191,7 +198,6 @@ export function render(state) {
             }
             
             renderInputError(config.inputId, state.ui[config.errorKey]);
-            
             renderAutocomplete(config, state.ui[config.resultsKey]);
         });
 
@@ -404,10 +410,18 @@ function renderAutocomplete(config, results) {
 
 function renderError(id, msg) {
     const el = document.getElementById(id);
+    if (!el) return;
+
+    const cache = domCache.get(el);
+    if (cache?.lastMsg === msg) return;
+    
+    domCache.set(el, { lastMsg: msg });
+
     if (msg) {
         el.textContent = `⚠️ ${msg}`;
         el.style.display = 'block';
     } else {
+        el.textContent = '';
         el.style.display = 'none';
     }
 }
@@ -424,6 +438,11 @@ function renderInputError(id, msg) {
     }
     
     if (input && errEl) {
+        const cache = domCache.get(errEl);
+        if (cache?.lastMsg === msg) return;
+        
+        domCache.set(errEl, { lastMsg: msg });
+
         if (msg) {
             errEl.textContent = msg;
             errEl.style.display = 'block';
@@ -436,9 +455,31 @@ function renderInputError(id, msg) {
 }
 
 function renderQuizMedia(state, isReadyForMedia) {
+    const mediaContainer = document.querySelector('.quiz-media-container');
     const mediaArray = selectCurrentMedia(state);
     const media = mediaArray[state.currentMediaIndex];
     
+    if (mediaContainer) {
+        const mediaCache = domCache.get(mediaContainer);
+        const cacheKeyChanged =
+            !mediaCache ||
+            mediaCache.media !== media ||
+            mediaCache.isReady !== isReadyForMedia ||
+            mediaCache.isLoaded !== state.ui.isMediaLoaded ||
+            mediaCache.mediaIndex !== state.currentMediaIndex ||
+            mediaCache.mediaCount !== mediaArray.length;
+
+        if (!cacheKeyChanged) return;
+
+        domCache.set(mediaContainer, {
+            media,
+            isReady: isReadyForMedia,
+            isLoaded: state.ui.isMediaLoaded,
+            mediaIndex: state.currentMediaIndex,
+            mediaCount: mediaArray.length
+        });
+    }
+
     const imgEl = document.getElementById('quiz-image');
     const zoomBtn = document.getElementById('btn-zoom-image');
     const audioContainer = document.getElementById('quiz-audio-container');
@@ -527,96 +568,111 @@ function renderQuizMeta(state, isReadyForMedia) {
     const taxon = q?.observation?.taxon || q?.taxon;
     const meta = selectCurrentMeta(state);
 
-    const hintContent = document.getElementById('quiz-hint-content');
-    const cache = domCache.get(hintContent) || {};
+    // 1. Observation Metadata
+    const metaEl = document.getElementById('quiz-meta');
+    if (metaEl) {
+        const metaCache = domCache.get(metaEl);
+        if (metaCache?.meta !== meta || metaCache?.isReady !== isReadyForMedia) {
+            domCache.set(metaEl, { meta, isReady: isReadyForMedia });
 
-    // Skip DOM updates and redaction calculations if metadata results haven't changed
-    if (
-        cache.lastObs === q?.observation &&
-        cache.lastTaxon === taxon &&
-        cache.lastIsReady === isReadyForMedia &&
-        cache.lastHintVisible === state.ui.isHintVisible &&
-        cache.lastShowBadge === state.config.showIconicTaxonBadge &&
-        cache.lastIndex === state.currentIndex
-    ) {
-        return;
+            metaEl.style.display = (isReadyForMedia && meta) ? 'flex' : 'none';
+            if (meta) {
+                document.getElementById('meta-date').textContent = `📅 ${new Date(meta.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`;
+                const locLink = document.getElementById('meta-location');
+                
+                if (meta.isObscured) {
+                    locLink.textContent = `📍 ${meta.locationText || 'Unknown Location'} (Obscured)`;
+                    locLink.title = "Exact coordinates are obscured.";
+                } else {
+                    locLink.textContent = `📍 ${meta.locationText || 'Unknown Location'}`;
+                    locLink.removeAttribute('title');
+                }
+
+                if (meta.coordinates && !meta.isObscured) {
+                    locLink.href = `https://www.google.com/maps/search/?api=1&query=${meta.coordinates}`;
+                    locLink.className = 'enabled-link';
+                } else if (meta.locationText) {
+                    locLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(meta.locationText)}`;
+                    locLink.className = 'enabled-link';
+                } else {
+                    locLink.href = "#";
+                    locLink.className = 'disabled-link';
+                }
+                
+                document.getElementById('meta-observer').textContent = `👤 ${meta.observer} (${meta.license})`;
+            }
+        }
     }
 
-    // Update dirty-check cache in WeakMap
-    domCache.set(hintContent, {
-        ...cache,
-        lastObs: q?.observation,
-        lastTaxon: taxon,
-        lastIsReady: isReadyForMedia,
-        lastHintVisible: state.ui.isHintVisible,
-        lastShowBadge: state.config.showIconicTaxonBadge,
-        lastIndex: state.currentIndex
-    });
-
-    // Target Badge
+    // 2. Target Taxon Badge
     const badge = document.getElementById('quiz-target-badge');
-    if (state.config.showIconicTaxonBadge && taxon && taxon.iconic_taxon_name) {
-        badge.textContent = `🎯 Target: ${taxon.iconic_taxon_name}`;
-        badge.style.display = 'inline-block';
-    } else {
-        badge.style.display = 'none';
+    if (badge) {
+        const badgeCache = domCache.get(badge);
+        const shouldShowBadge = state.config.showIconicTaxonBadge && taxon && taxon.iconic_taxon_name;
+        const badgeText = shouldShowBadge ? `🎯 Target: ${taxon.iconic_taxon_name}` : '';
+
+        if (badgeCache?.text !== badgeText) {
+            domCache.set(badge, { text: badgeText });
+            if (shouldShowBadge) {
+                badge.textContent = badgeText;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
     }
 
-    // Observation Meta
-    document.getElementById('quiz-meta').style.display = (isReadyForMedia && meta) ? 'flex' : 'none';
-    if (meta) {
-        document.getElementById('meta-date').textContent = `📅 ${new Date(meta.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`;
-        const locLink = document.getElementById('meta-location');
-        
-        if (meta.isObscured) {
-            locLink.textContent = `📍 ${meta.locationText || 'Unknown Location'} (Obscured)`;
-            locLink.title = "Exact coordinates are obscured.";
-        } else {
-            locLink.textContent = `📍 ${meta.locationText || 'Unknown Location'}`;
-            locLink.removeAttribute('title');
-        }
-
-        if (meta.coordinates && !meta.isObscured) {
-            locLink.href = `https://www.google.com/maps/search/?api=1&query=${meta.coordinates}`;
-            locLink.className = 'enabled-link';
-        } else if (meta.locationText) {
-            locLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(meta.locationText)}`;
-            locLink.className = 'enabled-link';
-        } else {
-            locLink.href = "#";
-            locLink.className = 'disabled-link';
-        }
-        
-        document.getElementById('meta-observer').textContent = `👤 ${meta.observer} (${meta.license})`;
-    }
-
-    // Field Notes Hint
-    let desc = q?.observation?.description?.trim();
+    // 3. Field Notes Hint
+    const hintContent = document.getElementById('quiz-hint-content');
     const hintBtn = document.getElementById('btn-toggle-hint');
-    
-    if (isReadyForMedia && desc) {
-        const hintCache = domCache.get(hintContent) || {};
-        if (hintCache.lastRawDesc === desc && hintCache.lastTaxonForRedaction === taxon) {
-            desc = hintCache.lastRedactedDesc;
-        } else {
-            desc = redactSpoilers(desc, taxon);
-            domCache.set(hintContent, {
-                ...domCache.get(hintContent),
-                lastRawDesc: desc,
-                lastTaxonForRedaction: taxon,
-                lastRedactedDesc: desc
-            });
+    let desc = q?.observation?.description?.trim();
+
+    if (hintContent && hintBtn) {
+        const cache = domCache.get(hintContent) || {};
+
+        if (
+            cache.lastObs === q?.observation &&
+            cache.lastTaxon === taxon &&
+            cache.lastIsReady === isReadyForMedia &&
+            cache.lastHintVisible === state.ui.isHintVisible &&
+            cache.lastIndex === state.currentIndex
+        ) {
+            return;
         }
-        
-        hintBtn.style.display = 'inline-block';
-        hintBtn.textContent = state.ui.isHintVisible ? '🙈 Hide Field Notes' : '💡 Show Field Notes (Hint)';
-        hintBtn.setAttribute('aria-expanded', String(state.ui.isHintVisible));
-        
-        hintContent.style.display = state.ui.isHintVisible ? 'block' : 'none';
-        if (hintContent.textContent !== desc) hintContent.textContent = desc;
-    } else {
-        hintBtn.style.display = 'none';
-        hintContent.style.display = 'none';
+
+        domCache.set(hintContent, {
+            ...cache,
+            lastObs: q?.observation,
+            lastTaxon: taxon,
+            lastIsReady: isReadyForMedia,
+            lastHintVisible: state.ui.isHintVisible,
+            lastIndex: state.currentIndex
+        });
+
+        if (isReadyForMedia && desc) {
+            const hintCache = domCache.get(hintContent) || {};
+            if (hintCache.lastRawDesc === desc && hintCache.lastTaxonForRedaction === taxon) {
+                desc = hintCache.lastRedactedDesc;
+            } else {
+                desc = redactSpoilers(desc, taxon);
+                domCache.set(hintContent, {
+                    ...domCache.get(hintContent),
+                    lastRawDesc: desc,
+                    lastTaxonForRedaction: taxon,
+                    lastRedactedDesc: desc
+                });
+            }
+            
+            hintBtn.style.display = 'inline-block';
+            hintBtn.textContent = state.ui.isHintVisible ? '🙈 Hide Field Notes' : '💡 Show Field Notes (Hint)';
+            hintBtn.setAttribute('aria-expanded', String(state.ui.isHintVisible));
+            
+            hintContent.style.display = state.ui.isHintVisible ? 'block' : 'none';
+            if (hintContent.textContent !== desc) hintContent.textContent = desc;
+        } else {
+            hintBtn.style.display = 'none';
+            hintContent.style.display = 'none';
+        }
     }
 }
 
