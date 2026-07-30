@@ -12,12 +12,16 @@ const domCache = new WeakMap();
 export function formatPlaceDisplay(item) {
     if (!item) return '';
     const displayName = item.display_name || item.name || '';
-    const name = item.name || '';
 
-    // Defensive check: if name isn't already inside display_name, include it in parentheses
-    if (name && displayName && !displayName.toLowerCase().includes(name.toLowerCase())) {
-        return `${displayName} (${name})`;
+    if (item.matched_term) {
+        const match = item.matched_term.trim();
+        if (match && !displayName.toLowerCase().includes(match.toLowerCase())) {
+            return `${displayName} — Matched: ${match}`;
+        }
+    } else if (item.name && !displayName.toLowerCase().includes(item.name.toLowerCase())) {
+        return `${displayName} (${item.name})`;
     }
+
     return displayName;
 }
 
@@ -29,7 +33,6 @@ export function formatTaxonDisplay(item) {
 
     if (item.matched_term) {
         const match = item.matched_term.trim();
-        // Defensive check: only append if match term is not already a substring of main
         if (match && !main.toLowerCase().includes(match.toLowerCase())) {
             return `${main} — Matched: ${match}`;
         }

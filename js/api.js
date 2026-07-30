@@ -172,7 +172,7 @@ export const fetchPlaces = async (query, signal, locale = getLocale()) => {
         q: query,
         order_by: 'area',
         geo: 'true',      // Ensures the place has a valid geometry for observation fetching
-        fields: '(id:!t,name:!t,display_name:!t)',
+        fields: '(id:!t,name:!t,display_name:!t,matched_term:!t)',
         locale: locale
     });
 
