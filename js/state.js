@@ -86,37 +86,36 @@ function deepFreeze(obj) {
 
 let state = deepFreeze(structuredClone(initialState));
 const listeners = new Set();
+let isScheduled = false;
 
 export const getState = () => state;
 
-let isNotifying = false;
+/**
+ * Schedules a single microtask flush to notify subscribers.
+ * Prevents re-entrant notification cascades by batching multiple setState calls within the same tick.
+ */
+function scheduleNotification() {
+    if (isScheduled) return;
+    isScheduled = true;
+
+    queueMicrotask(() => {
+        isScheduled = false;
+        const currentState = state;
+        const snapshot = Array.from(listeners);
+        snapshot.forEach(listener => listener(currentState));
+    });
+}
 
 export const setState = (updater) => {
     if (typeof updater !== 'function') {
         throw new Error('setState strictly requires an updater function.');
     }
 
-    // 1. Update state immediately
+    // 1. Update state immediately (guarantees getState() reflects changes instantly)
     state = deepFreeze({ ...state, ...updater(state) });
 
-    // 2. If already inside a notification loop, return; the outer drain loop will pick up the updated state
-    if (isNotifying) return;
-
-    // 3. Queue-drain loop ensures all subscribers receive the final state sequentially
-    isNotifying = true;
-    try {
-        while (true) {
-            const currentState = state;
-            const snapshot = Array.from(listeners);
-            
-            snapshot.forEach(listener => listener(currentState));
-
-            // If state remained unchanged during listener execution, we are done
-            if (state === currentState) break;
-        }
-    } finally {
-        isNotifying = false;
-    }
+    // 2. Schedule notification microtask once for the current execution frame
+    scheduleNotification();
 };
 
 export const updateQuestion = (index, updates) => {
@@ -130,7 +129,7 @@ export const updateQuestion = (index, updates) => {
 
 export const resetState = () => {
     state = deepFreeze(structuredClone(initialState));
-    listeners.forEach(listener => listener(state));
+    scheduleNotification();
 };
 
 export const subscribe = (listener) => {
