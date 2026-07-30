@@ -629,7 +629,7 @@ function renderQuizMeta(state, isReadyForMedia) {
     // 3. Field Notes Hint
     const hintContent = document.getElementById('quiz-hint-content');
     const hintBtn = document.getElementById('btn-toggle-hint');
-    let desc = q?.observation?.description?.trim();
+    const rawDesc = q?.observation?.description?.trim();
 
     if (hintContent && hintBtn) {
         const cache = domCache.get(hintContent) || {};
@@ -653,17 +653,19 @@ function renderQuizMeta(state, isReadyForMedia) {
             lastIndex: state.currentIndex
         });
 
-        if (isReadyForMedia && desc) {
+        if (isReadyForMedia && rawDesc) {
+            let descToDisplay = '';
             const hintCache = domCache.get(hintContent) || {};
-            if (hintCache.lastRawDesc === desc && hintCache.lastTaxonForRedaction === taxon) {
-                desc = hintCache.lastRedactedDesc;
+
+            if (hintCache.lastRawDesc === rawDesc && hintCache.lastTaxonForRedaction === taxon) {
+                descToDisplay = hintCache.lastRedactedDesc;
             } else {
-                desc = redactSpoilers(desc, taxon);
+                descToDisplay = redactSpoilers(rawDesc, taxon);
                 domCache.set(hintContent, {
                     ...domCache.get(hintContent),
-                    lastRawDesc: desc,
+                    lastRawDesc: rawDesc,
                     lastTaxonForRedaction: taxon,
-                    lastRedactedDesc: desc
+                    lastRedactedDesc: descToDisplay
                 });
             }
             
@@ -672,7 +674,7 @@ function renderQuizMeta(state, isReadyForMedia) {
             hintBtn.setAttribute('aria-expanded', String(state.ui.isHintVisible));
             
             hintContent.style.display = state.ui.isHintVisible ? 'block' : 'none';
-            if (hintContent.textContent !== desc) hintContent.textContent = desc;
+            if (hintContent.textContent !== descToDisplay) hintContent.textContent = descToDisplay;
         } else {
             hintBtn.style.display = 'none';
             hintContent.style.display = 'none';
