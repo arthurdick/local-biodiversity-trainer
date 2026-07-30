@@ -100,6 +100,7 @@ export const setState = (updater) => {
 
 export const updateQuestion = (index, updates) => {
     setState(prevState => {
+        if (index < 0 || index >= prevState.questions.length) return prevState;
         const newQuestions = [...prevState.questions];
         newQuestions[index] = deepFreeze({ ...newQuestions[index], ...updates });
         return { questions: newQuestions };
