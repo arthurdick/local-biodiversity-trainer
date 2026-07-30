@@ -517,6 +517,27 @@ function renderQuizMeta(state, isReadyForMedia) {
     const taxon = q?.observation?.taxon || q?.taxon;
     const meta = selectCurrentMeta(state);
 
+    const hintContent = document.getElementById('quiz-hint-content');
+
+    // Skip DOM updates and redaction calculations if metadata results haven't changed
+    if (
+        hintContent._lastObs === q?.observation &&
+        hintContent._lastTaxon === taxon &&
+        hintContent._lastIsReady === isReadyForMedia &&
+        hintContent._lastHintVisible === state.ui.isHintVisible &&
+        hintContent._lastShowBadge === state.config.showIconicTaxonBadge &&
+        hintContent._lastIndex === state.currentIndex
+    ) {
+        return;
+    }
+
+    hintContent._lastObs = q?.observation;
+    hintContent._lastTaxon = taxon;
+    hintContent._lastIsReady = isReadyForMedia;
+    hintContent._lastHintVisible = state.ui.isHintVisible;
+    hintContent._lastShowBadge = state.config.showIconicTaxonBadge;
+    hintContent._lastIndex = state.currentIndex;
+
     // Target Badge
     const badge = document.getElementById('quiz-target-badge');
     if (state.config.showIconicTaxonBadge && taxon && taxon.iconic_taxon_name) {
@@ -557,10 +578,16 @@ function renderQuizMeta(state, isReadyForMedia) {
     // Field Notes Hint
     let desc = q?.observation?.description?.trim();
     const hintBtn = document.getElementById('btn-toggle-hint');
-    const hintContent = document.getElementById('quiz-hint-content');
     
     if (isReadyForMedia && desc) {
-        desc = redactSpoilers(desc, taxon);
+        if (hintContent._lastRawDesc === desc && hintContent._lastTaxonForRedaction === taxon) {
+            desc = hintContent._lastRedactedDesc;
+        } else {
+            desc = redactSpoilers(desc, taxon);
+            hintContent._lastRawDesc = desc;
+            hintContent._lastTaxonForRedaction = taxon;
+            hintContent._lastRedactedDesc = desc;
+        }
         
         hintBtn.style.display = 'inline-block';
         hintBtn.textContent = state.ui.isHintVisible ? '🙈 Hide Field Notes' : '💡 Show Field Notes (Hint)';
