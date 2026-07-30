@@ -89,13 +89,34 @@ const listeners = new Set();
 
 export const getState = () => state;
 
-// Enforce functional state updates to prevent race conditions
+let isNotifying = false;
+
 export const setState = (updater) => {
     if (typeof updater !== 'function') {
-        throw new Error('setState strictly requires an updater function (e.g., prevState => newState) to prevent race conditions.');
+        throw new Error('setState strictly requires an updater function.');
     }
+
+    // 1. Update state immediately
     state = deepFreeze({ ...state, ...updater(state) });
-    listeners.forEach(listener => listener(state));
+
+    // 2. If already inside a notification loop, return; the outer drain loop will pick up the updated state
+    if (isNotifying) return;
+
+    // 3. Queue-drain loop ensures all subscribers receive the final state sequentially
+    isNotifying = true;
+    try {
+        while (true) {
+            const currentState = state;
+            const snapshot = Array.from(listeners);
+            
+            snapshot.forEach(listener => listener(currentState));
+
+            // If state remained unchanged during listener execution, we are done
+            if (state === currentState) break;
+        }
+    } finally {
+        isNotifying = false;
+    }
 };
 
 export const updateQuestion = (index, updates) => {

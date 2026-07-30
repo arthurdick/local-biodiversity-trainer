@@ -59,8 +59,10 @@ h1, h2 {
     position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
     clip: rect(0, 0, 0, 0); border: 0;
 }
-.visually-hidden:focus,
-.visually-hidden:focus-visible {
+a.visually-hidden:focus,
+a.visually-hidden:focus-visible,
+button.visually-hidden:focus,
+button.visually-hidden:focus-visible {
     position: static;
     width: auto;
     height: auto;
