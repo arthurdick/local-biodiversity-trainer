@@ -33,19 +33,16 @@ class RequestQueue {
 
     enqueue(url, options = {}) {
         return new Promise((resolve, reject) => {
-            // Check if signal was already aborted before enqueuing
             if (options.signal?.aborted) {
                 return reject(new DOMException('Aborted before execution', 'AbortError'));
             }
 
             const task = { url, options, resolve, reject, cleanup: () => {} };
 
-            // Set up explicit event listener with a cleanup mechanism
             if (options.signal) {
                 const abortHandler = () => {
                     const index = this.queue.indexOf(task);
                     if (index > -1) {
-                        // Remove from the pending queue if it hasn't started processing
                         this.queue.splice(index, 1);
                         task.cleanup();
                         reject(new DOMException('Aborted before execution', 'AbortError'));
@@ -59,10 +56,7 @@ class RequestQueue {
                 options.signal.addEventListener('abort', abortHandler);
             }
 
-            // 1. Add task to the queue
             this.queue.push(task);
-
-            // 2. Start processing if not already running
             this.processQueue();
         });
     }
@@ -73,16 +67,23 @@ class RequestQueue {
 
         while (this.queue.length > 0) {
             const task = this.queue.shift();
-            
+
+            // 1. CHECK BEFORE SLEEPING:
+            // Discard immediately if aborted while sitting in queue
+            if (task.options.signal?.aborted) {
+                task.cleanup();
+                task.reject(new DOMException('Aborted before execution', 'AbortError'));
+                continue;
+            }
+
             const now = Date.now();
             const timeSinceLast = now - this.lastRequestTime;
 
-            // Wait if the interval hasn't passed yet, but make the wait cancelable
+            // Wait if throttling interval hasn't elapsed
             if (timeSinceLast < this.interval) {
                 await new Promise(resolve => {
                     let timeoutId;
-                    
-                    // Function to immediately break the sleep
+
                     const wakeUp = () => {
                         clearTimeout(timeoutId);
                         if (task.options.signal) {
@@ -91,25 +92,20 @@ class RequestQueue {
                         resolve();
                     };
 
-                    // If already aborted, wake up immediately
-                    if (task.options.signal?.aborted) {
-                        return resolve();
-                    }
-
-                    // Listen for abort to interrupt the sleep and unblock the queue
                     if (task.options.signal) {
                         task.options.signal.addEventListener('abort', wakeUp);
                     }
-                    
+
                     timeoutId = setTimeout(wakeUp, this.interval - timeSinceLast);
                 });
             }
 
-            // Double check if aborted right before fetching
+            // 2. CHECK AFTER SLEEPING:
+            // Double check if aborted WHILE it was sleeping in the delay above
             if (task.options.signal?.aborted) {
                 task.cleanup();
-                task.reject(new DOMException('Aborted', 'AbortError'));
-                continue; // Skip fetch and immediately proceed to the next queued item
+                task.reject(new DOMException('Aborted during delay', 'AbortError'));
+                continue; // Skip fetch and proceed directly to next item
             }
 
             this.lastRequestTime = Date.now();
@@ -120,7 +116,6 @@ class RequestQueue {
             } catch (error) {
                 task.reject(error);
             } finally {
-                // Guaranteed listener removal regardless of fetch success or failure
                 task.cleanup();
             }
         }
