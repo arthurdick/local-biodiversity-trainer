@@ -447,9 +447,13 @@ function renderInputError(id, msg) {
             errEl.textContent = msg;
             errEl.style.display = 'block';
             input.classList.add('input-error');
+            input.setAttribute('aria-invalid', 'true');
+            input.setAttribute('aria-describedby', `${id}-error`);
         } else {
             errEl.style.display = 'none';
             input.classList.remove('input-error');
+            input.setAttribute('aria-invalid', 'false');
+            input.removeAttribute('aria-describedby');
         }
     }
 }
