@@ -65,59 +65,63 @@ class RequestQueue {
         if (this.isProcessing || this.queue.length === 0) return;
         this.isProcessing = true;
 
-        while (this.queue.length > 0) {
-            const task = this.queue.shift();
+        try {
+            while (this.queue.length > 0) {
+                const task = this.queue.shift();
 
-            // 1. CHECK BEFORE SLEEPING:
-            // Discard immediately if aborted while sitting in queue
-            if (task.options.signal?.aborted) {
-                task.cleanup();
-                task.reject(new DOMException('Aborted before execution', 'AbortError'));
-                continue;
-            }
+                // 1. CHECK BEFORE SLEEPING:
+                // Discard immediately if aborted while sitting in queue
+                if (task.options.signal?.aborted) {
+                    task.cleanup();
+                    task.reject(new DOMException('Aborted before execution', 'AbortError'));
+                    continue;
+                }
 
-            const now = Date.now();
-            const timeSinceLast = now - this.lastRequestTime;
+                const now = Date.now();
+                const timeSinceLast = now - this.lastRequestTime;
 
-            // Wait if throttling interval hasn't elapsed
-            if (timeSinceLast < this.interval) {
-                await new Promise(resolve => {
-                    let timeoutId;
+                // Wait if throttling interval hasn't elapsed
+                if (timeSinceLast < this.interval) {
+                    await new Promise(resolve => {
+                        let timeoutId;
 
-                    const wakeUp = () => {
-                        clearTimeout(timeoutId);
+                        const wakeUp = () => {
+                            clearTimeout(timeoutId);
+                            if (task.options.signal) {
+                                task.options.signal.removeEventListener('abort', wakeUp);
+                            }
+                            resolve();
+                        };
+
                         if (task.options.signal) {
-                            task.options.signal.removeEventListener('abort', wakeUp);
+                            task.options.signal.addEventListener('abort', wakeUp);
                         }
-                        resolve();
-                    };
 
-                    if (task.options.signal) {
-                        task.options.signal.addEventListener('abort', wakeUp);
-                    }
+                        timeoutId = setTimeout(wakeUp, this.interval - timeSinceLast);
+                    });
+                }
 
-                    timeoutId = setTimeout(wakeUp, this.interval - timeSinceLast);
-                });
+                // 2. CHECK AFTER SLEEPING:
+                // Double check if aborted WHILE it was sleeping in the delay above
+                if (task.options.signal?.aborted) {
+                    task.cleanup();
+                    task.reject(new DOMException('Aborted during delay', 'AbortError'));
+                    continue; // Skip fetch and proceed directly to next item
+                }
+
+                this.lastRequestTime = Date.now();
+
+                try {
+                    const response = await fetch(task.url, task.options);
+                    task.resolve(response);
+                } catch (error) {
+                    task.reject(error);
+                } finally {
+                    task.cleanup();
+                }
             }
-
-            // 2. CHECK AFTER SLEEPING:
-            // Double check if aborted WHILE it was sleeping in the delay above
-            if (task.options.signal?.aborted) {
-                task.cleanup();
-                task.reject(new DOMException('Aborted during delay', 'AbortError'));
-                continue; // Skip fetch and proceed directly to next item
-            }
-
-            this.lastRequestTime = Date.now();
-
-            try {
-                const response = await fetch(task.url, task.options);
-                task.resolve(response);
-            } catch (error) {
-                task.reject(error);
-            } finally {
-                task.cleanup();
-            }
+        } finally {
+            this.isProcessing = false; // Guarantees queue never deadlocks
         }
 
         this.isProcessing = false;
