@@ -4,6 +4,9 @@ import { filterSignificantFragments } from './stopwords.js';
 let currentView = null;
 let lastFocusedQuestionIndex = -1;
 
+// Private WeakMap to track render cache without polluting DOM node properties
+const domCache = new WeakMap();
+
 const autocompleteConfigs = [
     {
         type: 'place',
@@ -327,20 +330,22 @@ export function render(state) {
 
         // Feedback Template Rendering
         const feedback = document.getElementById('feedback');
+        const feedbackCache = domCache.get(feedback);
+
         if (isAnswered) {
             feedback.style.display = 'block';
             feedback.className = q.isCorrect ? 'correct' : 'incorrect';
             
-            if (feedback._lastQuestionIndex !== state.currentIndex) {
+            if (feedbackCache?.lastQuestionIndex !== state.currentIndex) {
                 buildFeedbackDom(q, feedback);
-                feedback._lastQuestionIndex = state.currentIndex;
+                domCache.set(feedback, { ...feedbackCache, lastQuestionIndex: state.currentIndex });
             }
         } else {
             feedback.style.display = 'none';
             if (feedback.hasChildNodes()) {
                 feedback.replaceChildren();
             }
-            feedback._lastQuestionIndex = -1;
+            domCache.set(feedback, { ...feedbackCache, lastQuestionIndex: -1 });
         }
     }
 
@@ -382,8 +387,10 @@ function renderAutocomplete(config, results) {
     const list = document.getElementById(config.listId);
     if (!list) return;
 
-    if (list._lastResults === results) return;
-    list._lastResults = results;
+    const cache = domCache.get(list);
+    if (cache?.lastResults === results) return;
+    
+    domCache.set(list, { ...cache, lastResults: results });
 
     const fragment = document.createDocumentFragment();
     results.forEach(item => {
@@ -521,25 +528,30 @@ function renderQuizMeta(state, isReadyForMedia) {
     const meta = selectCurrentMeta(state);
 
     const hintContent = document.getElementById('quiz-hint-content');
+    const cache = domCache.get(hintContent) || {};
 
     // Skip DOM updates and redaction calculations if metadata results haven't changed
     if (
-        hintContent._lastObs === q?.observation &&
-        hintContent._lastTaxon === taxon &&
-        hintContent._lastIsReady === isReadyForMedia &&
-        hintContent._lastHintVisible === state.ui.isHintVisible &&
-        hintContent._lastShowBadge === state.config.showIconicTaxonBadge &&
-        hintContent._lastIndex === state.currentIndex
+        cache.lastObs === q?.observation &&
+        cache.lastTaxon === taxon &&
+        cache.lastIsReady === isReadyForMedia &&
+        cache.lastHintVisible === state.ui.isHintVisible &&
+        cache.lastShowBadge === state.config.showIconicTaxonBadge &&
+        cache.lastIndex === state.currentIndex
     ) {
         return;
     }
 
-    hintContent._lastObs = q?.observation;
-    hintContent._lastTaxon = taxon;
-    hintContent._lastIsReady = isReadyForMedia;
-    hintContent._lastHintVisible = state.ui.isHintVisible;
-    hintContent._lastShowBadge = state.config.showIconicTaxonBadge;
-    hintContent._lastIndex = state.currentIndex;
+    // Update dirty-check cache in WeakMap
+    domCache.set(hintContent, {
+        ...cache,
+        lastObs: q?.observation,
+        lastTaxon: taxon,
+        lastIsReady: isReadyForMedia,
+        lastHintVisible: state.ui.isHintVisible,
+        lastShowBadge: state.config.showIconicTaxonBadge,
+        lastIndex: state.currentIndex
+    });
 
     // Target Badge
     const badge = document.getElementById('quiz-target-badge');
@@ -583,13 +595,17 @@ function renderQuizMeta(state, isReadyForMedia) {
     const hintBtn = document.getElementById('btn-toggle-hint');
     
     if (isReadyForMedia && desc) {
-        if (hintContent._lastRawDesc === desc && hintContent._lastTaxonForRedaction === taxon) {
-            desc = hintContent._lastRedactedDesc;
+        const hintCache = domCache.get(hintContent) || {};
+        if (hintCache.lastRawDesc === desc && hintCache.lastTaxonForRedaction === taxon) {
+            desc = hintCache.lastRedactedDesc;
         } else {
             desc = redactSpoilers(desc, taxon);
-            hintContent._lastRawDesc = desc;
-            hintContent._lastTaxonForRedaction = taxon;
-            hintContent._lastRedactedDesc = desc;
+            domCache.set(hintContent, {
+                ...domCache.get(hintContent),
+                lastRawDesc: desc,
+                lastTaxonForRedaction: taxon,
+                lastRedactedDesc: desc
+            });
         }
         
         hintBtn.style.display = 'inline-block';
