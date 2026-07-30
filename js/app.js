@@ -494,6 +494,11 @@ document.getElementById('zoom-modal').addEventListener('close', () => {
         setState(prev => ({ ui: { ...prev.ui, zoomMediaUrl: null } }));
     }
 });
+document.getElementById('zoom-modal-scroll').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+        setState(prev => ({ ui: { ...prev.ui, zoomMediaUrl: null } }));
+    }
+});
 document.getElementById('btn-close-modal').addEventListener('click', () => setState(prev => ({ ui: { ...prev.ui, zoomMediaUrl: null } })));
 document.getElementById('btn-zoom-modal-toggle').addEventListener('click', (e) => {
     const s = getState();
