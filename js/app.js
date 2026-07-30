@@ -208,8 +208,9 @@ function setupAutocomplete(config) {
     const inputEl = document.getElementById(inputId);
     const clearBtn = document.getElementById(clearBtnId);
 
+    // Debounced search trigger (250ms delay)
     const performSearch = debounce(async (query) => {
-        if (abortController) abortController.abort();
+        // Instantiate a new AbortController right before the fetch starts
         abortController = new AbortController();
 
         if (query.length < 3) {
@@ -220,8 +221,10 @@ function setupAutocomplete(config) {
         try {
             const data = await fetchDataFn(query, abortController.signal);
             setState(prev => ({ ui: { ...prev.ui, [results]: data.results } }));
-        } catch(err) {
-            if (err.name !== 'AbortError') console.warn(`${inputId} search offline`);
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.warn(`${inputId} search offline`);
+            }
         }
     }, 250);
 
@@ -229,8 +232,16 @@ function setupAutocomplete(config) {
         const query = e.target.value;
         const currentResults = getState().ui[results];
 
+        // 1. IMMEDIATELY abort any active in-flight fetch as soon as the key is pressed,
+        // preventing older/slower API responses from resolving and overwriting the UI state.
+        if (abortController) {
+            abortController.abort();
+            abortController = null;
+        }
+
         const selectedItem = currentResults.find(item => formatDisplay(item) === query);
 
+        // 2. Update form state immediately for instant input responsiveness
         setState(prev => ({
             form: {
                 ...prev.form,
@@ -240,6 +251,7 @@ function setupAutocomplete(config) {
             ui: { ...prev.ui, [error]: null }
         }));
 
+        // 3. Queue the debounced fetch if a suggested item wasn't selected
         if (!selectedItem) {
             performSearch(query);
         }
@@ -260,6 +272,12 @@ function setupAutocomplete(config) {
 
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
+            // Cancel any pending fetch when clearing input
+            if (abortController) {
+                abortController.abort();
+                abortController = null;
+            }
+
             setState(prev => ({
                 form: { ...prev.form, [id]: null, [name]: '' },
                 ui: { ...prev.ui, [results]: [], [error]: null }
