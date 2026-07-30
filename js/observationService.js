@@ -5,6 +5,7 @@ import * as engine from './quizEngine.js';
 // --- RUNTIME CACHE ---
 const pendingFetches = new Map();
 const activeControllers = new Map();
+const preloadedImages = new Map(); // Retains strong references to prevent GC
 
 /**
  * Calculates a dynamic network timeout based on the user's connection speed.
@@ -29,6 +30,7 @@ export function clearCache() {
     activeControllers.forEach(controller => controller.abort());
     activeControllers.clear();
     pendingFetches.clear();
+    preloadedImages.clear();
 }
 
 /**
@@ -65,13 +67,11 @@ export async function loadObservationForQuestion(index) {
             if (isRareExpert && !targetTaxon) {
                 const totalSpecies = currentConfig.expertTotalSpecies || 0;
                 
-                // Abstracted math into the engine to standardize weighting
                 let deepPage = engine.calculateDeepPage(totalSpecies);
                 let validResults = [];
                 let attempts = 0;
-                const maxAttempts = 2; // Only 1 retry is needed since pages hold 50 species and max quiz size is 50
+                const maxAttempts = 2;
 
-                // Retry loop: step backwards exactly once if the rare tail is completely exhausted
                 while (validResults.length === 0 && attempts < maxAttempts && deepPage >= 1) {
                     attempts++;
 
@@ -94,7 +94,6 @@ export async function loadObservationForQuestion(index) {
                             const existingIds = getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined);
                             validResults = deepData.results.filter(r => !existingIds.includes(r.taxon.id));
                         } else {
-                            // Calculate how many times each taxon has already been queued
                             const existingIdCounts = {};
                             getState().questions.forEach(quest => {
                                 if (quest.taxon?.id) {
@@ -102,7 +101,6 @@ export async function loadObservationForQuestion(index) {
                                 }
                             });
                             
-                            // Filter out taxa where the selected count meets or exceeds total available observations
                             validResults = deepData.results.filter(r => {
                                 const selectedCount = existingIdCounts[r.taxon.id] || 0;
                                 const totalAvailable = Math.max(1, r.count || 1);
@@ -111,7 +109,6 @@ export async function loadObservationForQuestion(index) {
                         }
                     }
                     
-                    // If exhausted, decrement the page to search slightly more common species on the retry
                     if (validResults.length === 0) {
                         deepPage--;
                     }
@@ -137,16 +134,13 @@ export async function loadObservationForQuestion(index) {
             let notObsIds = [];
             
             if (isStandardExpert && currentConfig.preventDuplicates) {
-                // The without_taxon_id parameter handles deduplication entirely; no observation UUIDs needed.
                 notObsIds = [];
             } else if (targetTaxon) {
-                // Specific taxon mode: only exclude previous observation UUIDs for THIS specific taxon.
                 notObsIds = getState().questions
                     .filter(quest => quest.taxon?.id === targetTaxon.id)
                     .map(quest => quest.observation?.uuid)
                     .filter(uuid => uuid !== undefined);
             } else {
-                // Standard Expert with duplicates allowed: map all previous UUIDs as a fallback.
                 notObsIds = getState().questions
                     .map(quest => quest.observation?.uuid)
                     .filter(uuid => uuid !== undefined);
@@ -180,6 +174,8 @@ export async function loadObservationForQuestion(index) {
                 if (obs.photos && obs.photos.length > 0) {
                     const preload = new Image();
                     preload.src = obs.photos[0].url.replace('square', 'medium');
+                    // Retain strong reference in Map to prevent garbage collection sweep
+                    preloadedImages.set(index, preload);
                 }
                 return obs;
             } else {
