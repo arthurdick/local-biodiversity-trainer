@@ -7,6 +7,36 @@ let lastFocusedQuestionIndex = -1;
 // Private WeakMap to track render cache without polluting DOM node properties
 const domCache = new WeakMap();
 
+// --- AUTOCOMPLETE FORMATTERS ---
+
+export function formatPlaceDisplay(item) {
+    if (!item) return '';
+    const displayName = item.display_name || item.name || '';
+    const name = item.name || '';
+
+    // Defensive check: if name isn't already inside display_name, include it in parentheses
+    if (name && displayName && !displayName.toLowerCase().includes(name.toLowerCase())) {
+        return `${displayName} (${name})`;
+    }
+    return displayName;
+}
+
+export function formatTaxonDisplay(item) {
+    if (!item) return '';
+    const main = item.preferred_common_name
+        ? `${item.preferred_common_name} (${item.name})`
+        : item.name;
+
+    if (item.matched_term) {
+        const match = item.matched_term.trim();
+        // Defensive check: only append if match term is not already a substring of main
+        if (match && !main.toLowerCase().includes(match.toLowerCase())) {
+            return `${main} — Matched: ${match}`;
+        }
+    }
+    return main;
+}
+
 const autocompleteConfigs = [
     {
         type: 'place',
@@ -16,7 +46,7 @@ const autocompleteConfigs = [
         nameKey: 'placeName',
         errorKey: 'placeError',
         resultsKey: 'placeResults',
-        formatDisplay: (item) => item.display_name || item.name
+        formatDisplay: formatPlaceDisplay
     },
     {
         type: 'taxon',
@@ -26,7 +56,7 @@ const autocompleteConfigs = [
         nameKey: 'taxonName',
         errorKey: 'taxonError',
         resultsKey: 'taxonResults',
-        formatDisplay: (item) => item.preferred_common_name ? `${item.preferred_common_name} (${item.name})` : item.name
+        formatDisplay: formatTaxonDisplay
     }
 ];
 

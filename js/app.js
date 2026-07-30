@@ -303,7 +303,7 @@ setupAutocomplete({
     stateKeys: {
         id: 'placeId', name: 'placeName', error: 'placeError', results: 'placeResults'
     },
-    formatDisplay: (item) => item.display_name || item.name,
+    formatDisplay: ui.formatPlaceDisplay,
     validateOnBlur: (s) => s.form.locMode === 'search' ? !!s.form.placeId : (s.form.lat !== null && s.form.lng !== null),
     errorMsg: "⚠️ Please select a location from the suggestions list."
 });
@@ -316,7 +316,7 @@ setupAutocomplete({
     stateKeys: {
         id: 'taxonId', name: 'taxonName', error: 'taxonError', results: 'taxonResults'
     },
-    formatDisplay: (item) => item.preferred_common_name ? `${item.preferred_common_name} (${item.name})` : item.name,
+    formatDisplay: ui.formatTaxonDisplay,
     validateOnBlur: (s) => !!s.form.taxonId,
     errorMsg: "⚠️ Please select a valid target taxon from the suggestions list."
 });

@@ -184,7 +184,7 @@ export const fetchPlaces = async (query, signal, locale = getLocale()) => {
 export const fetchTaxaAutocomplete = async (query, signal, locale = getLocale()) => {
     const params = new URLSearchParams({
         q: query,
-        fields: '(id:!t,name:!t,preferred_common_name:!t)',
+        fields: '(id:!t,name:!t,preferred_common_name:!t,matched_term:!t)',
         locale: locale
     });
 
