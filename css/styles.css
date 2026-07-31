@@ -205,6 +205,37 @@ select[multiple] {
 .text-link-btn:hover { text-decoration: underline; background: none; }
 .text-link-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
+.quick-selectors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.btn-quick-select {
+    width: auto;
+    padding: 4px 10px;
+    font-size: 12px;
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-weight: normal;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.btn-quick-select:hover {
+    background-color: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.btn-quick-select:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
 /* ==========================================================================
    4. Input Helpers & Clear Buttons
    ========================================================================== */

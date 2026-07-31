@@ -83,8 +83,19 @@
                     </div>
                 </fieldset>
 
-                <div class="form-group">
-                    <label for="input-months">4. Seasonality (Months)</label>
+                <fieldset class="form-group fieldset-reset">
+                    <legend class="group-label">4. Seasonality (Months)</legend>
+                    
+                    <div class="quick-selectors" role="group" aria-label="Seasonality quick presets">
+                        <button type="button" class="btn-quick-select" data-months="all">Select All</button>
+                        <button type="button" class="btn-quick-select" data-months="clear">Clear</button>
+                        <button type="button" class="btn-quick-select" data-months="spring">Spring</button>
+                        <button type="button" class="btn-quick-select" data-months="summer">Summer</button>
+                        <button type="button" class="btn-quick-select" data-months="autumn">Autumn</button>
+                        <button type="button" class="btn-quick-select" data-months="winter">Winter</button>
+                    </div>
+
+                    <label for="input-months" class="visually-hidden">Select active months</label>
                     <select id="input-months" multiple size="6">
                         <option value="1" selected>January</option>
                         <option value="2" selected>February</option>
@@ -99,7 +110,7 @@
                         <option value="11" selected>November</option>
                         <option value="12" selected>December</option>
                     </select>
-                </div>
+                </fieldset>
 
                 <div class="form-row">
                     <div class="form-group">

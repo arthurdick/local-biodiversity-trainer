@@ -188,6 +188,26 @@ if (selectMonths) {
     });
 }
 
+const seasonalPresets = {
+    all: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
+    clear: [],
+    spring: ['3', '4', '5'],      // Mar, Apr, May
+    summer: ['6', '7', '8'],      // Jun, Jul, Aug
+    autumn: ['9', '10', '11'],    // Sep, Oct, Nov
+    winter: ['12', '1', '2']      // Dec, Jan, Feb
+};
+
+document.querySelectorAll('.btn-quick-select').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const presetKey = e.target.dataset.months;
+        if (seasonalPresets[presetKey]) {
+            setState(prev => ({
+                form: { ...prev.form, months: seasonalPresets[presetKey] }
+            }));
+        }
+    });
+});
+
 document.querySelectorAll('input[name="loc-mode"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
         setState(prev => ({
