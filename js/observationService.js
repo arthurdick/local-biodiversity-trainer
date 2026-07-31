@@ -14,6 +14,7 @@ export function clearCache() {
     activeControllers.clear();
     pendingFetches.clear();
     preloadedImages.clear();
+    api.clearApiQueue().catch(err => console.error('Error draining queue:', err));
 }
 
 export async function loadObservationForQuestion(index) {

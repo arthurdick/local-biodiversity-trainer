@@ -48,6 +48,7 @@ export const getDynamicNetworkTimeout = (defaultTimeout = 10000) => {
 class RequestQueue {
     constructor(interval = 1000) {
         this.queue = [];
+        this.activeRequests = new Set();
         this.isProcessing = false;
         this.interval = interval;
         this.lastRequestTime = 0;
@@ -83,10 +84,6 @@ class RequestQueue {
         });
     }
 
-    /**
-     * Executes an individual network request handling connection-aware dynamic timeouts.
-     * Runs asynchronously without blocking queue dispatch.
-     */
     async _executeTask(task) {
         try {
             const timeoutSignal = AbortSignal.timeout(getDynamicNetworkTimeout());
@@ -148,12 +145,25 @@ class RequestQueue {
 
                 this.lastRequestTime = performance.now();
 
-                // Fire task asynchronously so the processing loop can continue dispatching next queued items
-                this._executeTask(task);
+                const executionPromise = this._executeTask(task)
+                    .catch(err => {
+                        console.error('Critical queue execution failure:', err);
+                        task.reject(err);
+                    })
+                    .finally(() => {
+                        this.activeRequests.delete(executionPromise);
+                    });
+
+                this.activeRequests.add(executionPromise);
             }
         } finally {
             this.isProcessing = false;
         }
+    }
+
+    async drain() {
+        this.queue = [];
+        await Promise.allSettled(this.activeRequests);
     }
 }
 
@@ -319,4 +329,11 @@ export const checkTaxonSearch = async (inputStr, guessedRank, signal, locale = g
     });
 
     return request('/taxa', params, { signal });
+};
+
+/**
+ * Flushes the global request throttler and waits for in-flight requests to settle.
+ */
+export const clearApiQueue = () => {
+    return apiQueue.drain();
 };
