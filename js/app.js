@@ -491,6 +491,18 @@ document.getElementById('btn-zoom-image').addEventListener('click', () => {
     const media = selectCurrentMedia(getState())[getState().currentMediaIndex];
     setState(prev => ({ ui: { ...prev.ui, zoomMediaUrl: media.originalUrl, isZoomedIn: false } }));
 });
+document.getElementById('zoom-modal-img').addEventListener('load', (e) => {
+    const loader = document.getElementById('zoom-loading');
+    if (loader) loader.style.display = 'none';
+    e.target.style.display = 'inline-block';
+});
+document.getElementById('zoom-modal-img').addEventListener('error', () => {
+    const loader = document.getElementById('zoom-loading');
+    if (loader) {
+        loader.textContent = '❌ Failed to load image.';
+        loader.style.animation = 'none';
+    }
+});
 document.getElementById('zoom-modal').addEventListener('close', () => {
     if (getState().ui.zoomMediaUrl) {
         setState(prev => ({ ui: { ...prev.ui, zoomMediaUrl: null } }));

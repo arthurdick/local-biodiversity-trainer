@@ -498,12 +498,22 @@ export function render(state) {
     // 5. Zoom Modal
     const modal = document.getElementById('zoom-modal');
     const zoomImg = document.getElementById('zoom-modal-img');
+    const zoomLoading = document.getElementById('zoom-loading');
+
     if (state.ui.zoomMediaUrl) {
         if (!modal.open && typeof modal.showModal === 'function') modal.showModal();
         if (zoomImg.dataset.src !== state.ui.zoomMediaUrl) {
+            
+            // Show loading spinner, reset its animation, and hide the image until loaded
+            if (zoomLoading) {
+                zoomLoading.textContent = 'Loading high-resolution image...';
+                zoomLoading.style.animation = '';
+                zoomLoading.style.display = 'block';
+            }
+            zoomImg.style.display = 'none';
+            
             zoomImg.src = state.ui.zoomMediaUrl;
             zoomImg.dataset.src = state.ui.zoomMediaUrl;
-            zoomImg.style.display = 'inline-block';
         }
         zoomImg.className = state.ui.isZoomedIn ? 'zoomed-in' : '';
     } else {
