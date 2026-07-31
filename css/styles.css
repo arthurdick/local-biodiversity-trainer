@@ -346,6 +346,17 @@ select[multiple] {
     margin-bottom: 5px;
 }
 
+/* Media Attribution License Link */
+.license-link {
+    color: inherit;
+    text-decoration: underline;
+    transition: opacity 0.2s;
+}
+
+.license-link:hover {
+    opacity: 0.8;
+}
+
 .hint-wrapper {
     margin: 12px 0;
     text-align: center;
@@ -625,3 +636,10 @@ select[multiple] {
 
 .disabled-link { pointer-events: none; }
 .enabled-link { pointer-events: auto; }
+
+/* Footer License & Source Metadata */
+.app-footer .footer-meta {
+    display: inline-block;
+    margin-top: 6px;
+    opacity: 0.9;
+}

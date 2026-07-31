@@ -649,10 +649,24 @@ function renderQuizMedia(state, isReadyForMedia) {
             }
         }
         
+        // --- Hyperlinked TASL Attribution Rendering ---
         attrEl.style.display = 'block';
-        attrEl.textContent = media.type === 'photo' 
-            ? `Photo: ${media.attribution}` 
-            : `Sound: ${media.attribution || 'iNaturalist Contributor'}`;
+        attrEl.replaceChildren();
+
+        const licInfo = getLicenseInfo(media.license);
+        const fullAttributionText = `${media.type === 'photo' ? 'Photo: ' : 'Sound: '} ${media.attribution || 'iNaturalist Contributor'}`;
+
+        if (licInfo.url) {
+            const licLink = document.createElement('a');
+            licLink.href = licInfo.url;
+            licLink.target = '_blank';
+            licLink.rel = 'noopener';
+            licLink.className = 'license-link';
+            licLink.textContent = fullAttributionText;
+            attrEl.appendChild(licLink);
+        } else {
+            attrEl.textContent = fullAttributionText;
+        }
             
         if (mediaArray.length > 1) {
             controls.style.display = 'flex';
@@ -728,7 +742,26 @@ function renderQuizMeta(state, isReadyForMedia) {
                     locLink.className = 'disabled-link';
                 }
                 
-                document.getElementById('meta-observer').textContent = `👤 ${meta.observer} (${meta.license})`;
+                // --- Interactive Observation License Link ---
+                const observerEl = document.getElementById('meta-observer');
+                const licInfo = getLicenseInfo(meta.license);
+                
+                observerEl.replaceChildren(); // Clear plain text
+                
+                const observerText = document.createTextNode(`👤 ${meta.observer} `);
+                observerEl.appendChild(observerText);
+                
+                if (licInfo.url) {
+                    const licLink = document.createElement('a');
+                    licLink.href = licInfo.url;
+                    licLink.target = '_blank';
+                    licLink.rel = 'noopener';
+                    // We don't need .license-link class here because .quiz-meta a handles the styling natively
+                    licLink.textContent = `(${licInfo.label})`;
+                    observerEl.appendChild(licLink);
+                } else {
+                    observerEl.appendChild(document.createTextNode(`(${licInfo.label})`));
+                }
             }
         }
     }
@@ -1016,4 +1049,27 @@ function buildResultsDom(questions, container) {
     
     container.appendChild(gridDiv);
     gridDiv.scrollTop = 0;
+}
+
+/**
+ * Resolves a Creative Commons license code to its official deed URL and display label.
+ */
+export function getLicenseInfo(licenseCode) {
+    if (!licenseCode) return { label: 'All Rights Reserved', url: null };
+
+    const code = licenseCode.toLowerCase().trim();
+
+    if (code === 'cc0') {
+        return {
+            label: 'CC0 1.0 (Public Domain)',
+            url: 'https://creativecommons.org/publicdomain/zero/1.0/'
+        };
+    }
+
+    const licensePath = code.startsWith('cc-') ? code.slice(3) : code;
+
+    return {
+        label: `${code.toUpperCase()} 4.0`,
+        url: `https://creativecommons.org/licenses/${licensePath}/4.0/`
+    };
 }
