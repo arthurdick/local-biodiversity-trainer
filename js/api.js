@@ -84,7 +84,7 @@ class RequestQueue {
     }
 
     /**
-     * Executes an individual network request, handling dynamic timeouts and HTTP 429 retries.
+     * Executes an individual network request handling connection-aware dynamic timeouts.
      * Runs asynchronously without blocking queue dispatch.
      */
     async _executeTask(task) {
@@ -94,32 +94,10 @@ class RequestQueue {
                 ? AbortSignal.any([task.options.signal, timeoutSignal])
                 : timeoutSignal;
 
-            let response = await fetch(task.url, {
+            const response = await fetch(task.url, {
                 ...task.options,
                 signal: combinedSignal
             });
-
-            // Conditional retry for HTTP 429 strictly when Retry-After is explicitly specified
-            const retryAfterHeader = response.headers.get('Retry-After');
-            if (response.status === 429 && retryAfterHeader && !task.options.signal?.aborted) {
-                const backoffMs = parseInt(retryAfterHeader, 10) * 1000;
-                if (!isNaN(backoffMs) && backoffMs > 0) {
-                    console.warn(`HTTP 429 rate limit encountered. Retrying in ${backoffMs}ms...`);
-                    await new Promise(r => setTimeout(r, backoffMs));
-
-                    if (!task.options.signal?.aborted) {
-                        const retryTimeoutSignal = AbortSignal.timeout(getDynamicNetworkTimeout());
-                        const retryCombinedSignal = task.options.signal
-                            ? AbortSignal.any([task.options.signal, retryTimeoutSignal])
-                            : retryTimeoutSignal;
-
-                        response = await fetch(task.url, {
-                            ...task.options,
-                            signal: retryCombinedSignal
-                        });
-                    }
-                }
-            }
 
             task.resolve(response);
         } catch (error) {
