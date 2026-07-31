@@ -134,16 +134,113 @@ function debounce(func, timeout = 250) {
     return debounced;
 }
 
+/**
+ * Sanitizes and validates raw object properties read from localStorage.
+ * Ensures state is never corrupted by legacy, malformed, or out-of-bounds user preferences.
+ */
+function sanitizePreferences(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+
+    const sanitized = {};
+
+    // 1. Location Mode & Coordinates
+    if (['search', 'coords'].includes(raw.locMode)) {
+        sanitized.locMode = raw.locMode;
+    }
+
+    if (typeof raw.placeName === 'string') sanitized.placeName = raw.placeName;
+    if (raw.placeId === null || typeof raw.placeId === 'number') sanitized.placeId = raw.placeId;
+
+    if (raw.lat !== null && raw.lat !== undefined) {
+        const lat = parseFloat(raw.lat);
+        if (!isNaN(lat) && lat >= -90 && lat <= 90) sanitized.lat = lat;
+    }
+
+    if (raw.lng !== null && raw.lng !== undefined) {
+        const lng = parseFloat(raw.lng);
+        if (!isNaN(lng) && lng >= -180 && lng <= 180) sanitized.lng = lng;
+    }
+
+    if (raw.radius !== undefined) {
+        const radius = parseFloat(raw.radius);
+        if (!isNaN(radius) && radius >= 1 && radius <= 100) sanitized.radius = radius;
+    }
+
+    // 2. Taxon Settings
+    if (typeof raw.taxonName === 'string') sanitized.taxonName = raw.taxonName;
+    if (raw.taxonId === null || typeof raw.taxonId === 'number') sanitized.taxonId = raw.taxonId;
+
+    // 3. Boolean Toggles
+    if (typeof raw.showIconicTaxonBadge === 'boolean') sanitized.showIconicTaxonBadge = raw.showIconicTaxonBadge;
+    if (typeof raw.preventDuplicates === 'boolean') sanitized.preventDuplicates = raw.preventDuplicates;
+    if (typeof raw.isRarityMode === 'boolean') sanitized.isRarityMode = raw.isRarityMode;
+
+    // Media Options & Logic Guarantee
+    if (typeof raw.wantsPhotos === 'boolean') sanitized.wantsPhotos = raw.wantsPhotos;
+    if (typeof raw.wantsSounds === 'boolean') sanitized.wantsSounds = raw.wantsSounds;
+
+    // Fallback: Ensure at least one media type is active if preferences were corrupted
+    if (sanitized.wantsPhotos === false && sanitized.wantsSounds === false) {
+        sanitized.wantsPhotos = true;
+    }
+
+    // 4. Seasonality (Months Array)
+    const validMonths = new Set(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']);
+    if (Array.isArray(raw.months)) {
+        const filtered = raw.months.map(String).filter(m => validMonths.has(m));
+        if (filtered.length > 0) {
+            sanitized.months = filtered;
+        }
+    }
+
+    // 5. Select Input Validation
+    const validDifficulties = ['15', '50', '125', '500', 'all'];
+    if (validDifficulties.includes(String(raw.difficulty))) {
+        sanitized.difficulty = String(raw.difficulty);
+    }
+
+    const validQuestions = ['5', '10', '20', '50', 5, 10, 20, 50];
+    if (validQuestions.includes(raw.questionLimit)) {
+        sanitized.questionLimit = String(raw.questionLimit);
+    }
+
+    const validWeighting = ['linear', 'log'];
+    if (validWeighting.includes(raw.weightingMethod)) {
+        sanitized.weightingMethod = raw.weightingMethod;
+    }
+
+    const validEstablishment = ['any', 'native', 'introduced', 'endemic'];
+    if (validEstablishment.includes(raw.establishmentStatus)) {
+        sanitized.establishmentStatus = raw.establishmentStatus;
+    }
+
+    return sanitized;
+}
+
 function savePreferences() {
-    localStorage.setItem('bio_trainer_prefs', JSON.stringify(getState().form));
+    try {
+        const currentForm = getState().form;
+        localStorage.setItem('bio_trainer_prefs', JSON.stringify(currentForm));
+    } catch (e) {
+        console.warn("Unable to save preferences to localStorage (storage may be disabled or full):", e);
+    }
 }
 
 function loadPreferences() {
     try {
         const saved = localStorage.getItem('bio_trainer_prefs');
-        if (saved) setState(prev => ({ form: { ...prev.form, ...JSON.parse(saved) } }));
+        if (!saved) return;
+
+        const parsed = JSON.parse(saved);
+        const sanitized = sanitizePreferences(parsed);
+
+        if (Object.keys(sanitized).length > 0) {
+            setState(prev => ({
+                form: { ...prev.form, ...sanitized }
+            }));
+        }
     } catch (e) {
-        console.warn("Could not load preferences");
+        console.warn("Could not load preferences from localStorage:", e);
     }
 }
 
