@@ -119,7 +119,7 @@ class RequestQueue {
                     continue;
                 }
 
-                const now = Date.now();
+                const now = performance.now();
                 const timeSinceLast = now - this.lastRequestTime;
 
                 if (timeSinceLast < this.interval) {
@@ -146,7 +146,7 @@ class RequestQueue {
                     continue;
                 }
 
-                this.lastRequestTime = Date.now();
+                this.lastRequestTime = performance.now();
 
                 // Fire task asynchronously so the processing loop can continue dispatching next queued items
                 this._executeTask(task);
