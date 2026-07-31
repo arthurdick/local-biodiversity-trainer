@@ -1,119 +1,117 @@
-import { getState, setState, updateQuestion, resetState, subscribe, subscribeSelector, selectCurrentMedia } from './state.js';
+import { store, selectCurrentMedia } from './state.js';
 import * as api from './api.js';
 import * as engine from './quizEngine.js';
 import * as ui from './ui.js';
 import * as observationService from './observationService.js';
 
 // ==========================================================================
-// DECOUPLED STATE SUBSCRIBERS
+// EVENT TARGET LIFECYCLE ROUTER
 // ==========================================================================
 
 // 1. Pure Declarative DOM Rendering
-subscribe((newState) => {
-    ui.render(newState);
+store.addEventListener('statechange', (e) => {
+    ui.render(e.detail);
 });
 
-// 2. Question Navigation & JIT Prefetch Trigger
-subscribeSelector(
-    (s) => ({ activeView: s.ui.activeView, index: s.currentIndex }),
-    ({ activeView, index }, prev) => {
-        const isNewQuiz = prev.activeView !== 'quiz-view' && activeView === 'quiz-view';
-        const isNextQuestion = index !== prev.index;
+// 2. Question Navigation & JIT Prefetch Triggers
+store.addEventListener('quiz:start', () => {
+    observationService.loadObservationForQuestion(store.getState().currentIndex);
+});
 
-        if (activeView === 'quiz-view' && (isNewQuiz || isNextQuestion)) {
-            observationService.loadObservationForQuestion(index);
-        }
-    },
-    (a, b) => a.activeView === b.activeView && a.index === b.index
-);
+store.addEventListener('quiz:next', () => {
+    observationService.loadObservationForQuestion(store.getState().currentIndex);
+});
+
+store.addEventListener('quiz:retry', () => {
+    const s = store.getState();
+    const q = s.questions[s.currentIndex];
+    
+    // If we already have a valid observation, just retry loading the media
+    if (q.observation && !q.observation.error) {
+        checkMediaReadiness();
+    } else {
+        observationService.loadObservationForQuestion(s.currentIndex);
+    }
+});
 
 // 3. Observation Data Arrival Reaction
-subscribeSelector(
-    (s) => s.questions[s.currentIndex]?.observation,
-    (obs, prevObs, newState) => {
-        if (!obs || obs === prevObs) return;
-
-        if (obs.error) {
-            if (obs.emptyPool && newState.config.difficulty === 'all') {
-                if (newState.currentIndex === 0) {
-                    setState(prev => ({
-                        ui: {
-                            ...prev.ui,
-                            activeView: 'setup-view',
-                            setupError: "No observations found matching these strict filters. Try adjusting your settings."
-                        }
-                    }));
-                } else {
-                    setState(prev => ({
-                        questions: prev.questions.slice(0, prev.currentIndex),
-                        ui: { ...prev.ui, activeView: 'results-view' }
-                    }));
-                }
+store.addEventListener('observation:loaded', (e) => {
+    const { index, error, emptyPool } = e.detail;
+    const s = store.getState();
+    
+    // Ignore if the user navigated away while the fetch was pending
+    if (index !== s.currentIndex) return;
+    
+    if (error) {
+        if (emptyPool && s.config.difficulty === 'all') {
+            if (s.currentIndex === 0) {
+                store.setState(prev => ({
+                    ui: {
+                        ...prev.ui,
+                        activeView: 'setup-view',
+                        setupError: "No observations found matching these strict filters. Try adjusting your settings."
+                    }
+                }));
             } else {
-                setState(prev => ({ ui: { ...prev.ui, quizError: { isMissingMedia: false } } }));
+                store.setState(prev => ({
+                    questions: prev.questions.slice(0, prev.currentIndex),
+                    ui: { ...prev.ui, activeView: 'results-view' }
+                }));
             }
         } else {
-            const mediaArray = selectCurrentMedia(newState);
-            if (mediaArray.length === 0) {
-                setState(prev => ({ ui: { ...prev.ui, quizError: { isMissingMedia: true } } }));
-            } else if (mediaArray[0].type === 'sound') {
-                setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true } }));
-            }
+            store.setState(prev => ({ ui: { ...prev.ui, quizError: { isMissingMedia: false } } }));
+        }
+    } else {
+        const mediaArray = selectCurrentMedia(s);
+        if (mediaArray.length === 0) {
+            store.setState(prev => ({ ui: { ...prev.ui, quizError: { isMissingMedia: true } } }));
+        } else if (mediaArray[0].type === 'sound') {
+            store.setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true } }));
+            store.dispatchEvent(new CustomEvent('media:ready'));
+        } else {
+            checkMediaReadiness();
         }
     }
-);
+});
 
-// 4. Cached Media Readiness Controller
-subscribeSelector(
-    (s) => ({
-        activeView: s.ui.activeView,
-        isMediaLoaded: s.ui.isMediaLoaded,
-        currentIndex: s.currentIndex,
-        mediaIndex: s.currentMediaIndex,
-        obs: s.questions[s.currentIndex]?.observation
-    }),
-    ({ activeView, isMediaLoaded, mediaIndex }, _, newState) => {
-        if (activeView !== 'quiz-view' || isMediaLoaded) return;
+// 4. Sequential Prefetch Trigger
+store.addEventListener('media:ready', () => {
+    const s = store.getState();
+    if (s.ui.activeView === 'quiz-view') {
+        observationService.loadObservationForQuestion(s.currentIndex + 1);
+    }
+});
 
-        const mediaArray = selectCurrentMedia(newState);
-        const currentMedia = mediaArray[mediaIndex];
+store.addEventListener('media:navigate', () => {
+    checkMediaReadiness();
+});
 
-        if (currentMedia?.type === 'photo') {
-            const imgEl = document.getElementById('quiz-image');
-            if (imgEl && imgEl.complete && imgEl.naturalWidth > 0 && imgEl.dataset.src === currentMedia.mediumUrl) {
-                setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true } }));
-            }
-        } else if (currentMedia?.type === 'sound') {
-            const audioPlayer = document.getElementById('quiz-audio-player');
-            if (audioPlayer && audioPlayer.readyState >= 2 && audioPlayer.dataset.src === currentMedia.fileUrl) {
-                setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true } }));
-            }
+// Media Controller Helper
+function checkMediaReadiness() {
+    const s = store.getState();
+    if (s.ui.activeView !== 'quiz-view' || s.ui.isMediaLoaded) return;
+
+    const mediaArray = selectCurrentMedia(s);
+    const currentMedia = mediaArray[s.currentMediaIndex];
+
+    if (currentMedia?.type === 'photo') {
+        const imgEl = document.getElementById('quiz-image');
+        if (imgEl && imgEl.complete && imgEl.naturalWidth > 0 && imgEl.dataset.src === currentMedia.mediumUrl) {
+            store.setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true } }));
+            store.dispatchEvent(new CustomEvent('media:ready'));
         }
-    },
-    (a, b) => a.activeView === b.activeView &&
-              a.isMediaLoaded === b.isMediaLoaded &&
-              a.currentIndex === b.currentIndex &&
-              a.mediaIndex === b.mediaIndex &&
-              a.obs === b.obs
-);
-
-// 5. Sequential Prefetch Trigger
-subscribeSelector(
-    (s) => ({
-        isLoaded: s.ui.isMediaLoaded,
-        index: s.currentIndex
-    }),
-    ({ isLoaded, index }, prev, newState) => {
-        if (isLoaded && newState.ui.activeView === 'quiz-view') {
-            observationService.loadObservationForQuestion(index + 1);
+    } else if (currentMedia?.type === 'sound') {
+        const audioPlayer = document.getElementById('quiz-audio-player');
+        if (audioPlayer && audioPlayer.readyState >= 2 && audioPlayer.dataset.src === currentMedia.fileUrl) {
+            store.setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true } }));
+            store.dispatchEvent(new CustomEvent('media:ready'));
         }
-    },
-    (a, b) => a.isLoaded === b.isLoaded && a.index === b.index
-);
+    }
+}
 
 // --- NAVIGATION PROTECTION ---
 window.addEventListener('beforeunload', (e) => {
-    const s = getState();
+    const s = store.getState();
     if (s.ui.activeView === 'quiz-view') {
         e.preventDefault();
         e.returnValue = '';
@@ -134,20 +132,12 @@ function debounce(func, timeout = 250) {
     return debounced;
 }
 
-/**
- * Sanitizes and validates raw object properties read from localStorage.
- * Ensures state is never corrupted by legacy, malformed, or out-of-bounds user preferences.
- */
 function sanitizePreferences(raw) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
 
     const sanitized = {};
 
-    // 1. Location Mode & Coordinates
-    if (['search', 'coords'].includes(raw.locMode)) {
-        sanitized.locMode = raw.locMode;
-    }
-
+    if (['search', 'coords'].includes(raw.locMode)) sanitized.locMode = raw.locMode;
     if (typeof raw.placeName === 'string') sanitized.placeName = raw.placeName;
     if (raw.placeId === null || typeof raw.placeId === 'number') sanitized.placeId = raw.placeId;
 
@@ -166,63 +156,47 @@ function sanitizePreferences(raw) {
         if (!isNaN(radius) && radius >= 1 && radius <= 100) sanitized.radius = radius;
     }
 
-    // 2. Taxon Settings
     if (typeof raw.taxonName === 'string') sanitized.taxonName = raw.taxonName;
     if (raw.taxonId === null || typeof raw.taxonId === 'number') sanitized.taxonId = raw.taxonId;
 
-    // 3. Boolean Toggles
     if (typeof raw.showIconicTaxonBadge === 'boolean') sanitized.showIconicTaxonBadge = raw.showIconicTaxonBadge;
     if (typeof raw.preventDuplicates === 'boolean') sanitized.preventDuplicates = raw.preventDuplicates;
     if (typeof raw.isRarityMode === 'boolean') sanitized.isRarityMode = raw.isRarityMode;
 
-    // Media Options & Logic Guarantee
     if (typeof raw.wantsPhotos === 'boolean') sanitized.wantsPhotos = raw.wantsPhotos;
     if (typeof raw.wantsSounds === 'boolean') sanitized.wantsSounds = raw.wantsSounds;
 
-    // Fallback: Ensure at least one media type is active if preferences were corrupted
     if (sanitized.wantsPhotos === false && sanitized.wantsSounds === false) {
         sanitized.wantsPhotos = true;
     }
 
-    // 4. Seasonality (Months Array)
     const validMonths = new Set(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']);
     if (Array.isArray(raw.months)) {
         const filtered = raw.months.map(String).filter(m => validMonths.has(m));
-        if (filtered.length > 0) {
-            sanitized.months = filtered;
-        }
+        if (filtered.length > 0) sanitized.months = filtered;
     }
 
-    // 5. Select Input Validation
     const validDifficulties = ['15', '50', '125', '500', 'all'];
-    if (validDifficulties.includes(String(raw.difficulty))) {
-        sanitized.difficulty = String(raw.difficulty);
-    }
+    if (validDifficulties.includes(String(raw.difficulty))) sanitized.difficulty = String(raw.difficulty);
 
     const validQuestions = ['5', '10', '20', '50', 5, 10, 20, 50];
-    if (validQuestions.includes(raw.questionLimit)) {
-        sanitized.questionLimit = String(raw.questionLimit);
-    }
+    if (validQuestions.includes(raw.questionLimit)) sanitized.questionLimit = String(raw.questionLimit);
 
     const validWeighting = ['linear', 'log'];
-    if (validWeighting.includes(raw.weightingMethod)) {
-        sanitized.weightingMethod = raw.weightingMethod;
-    }
+    if (validWeighting.includes(raw.weightingMethod)) sanitized.weightingMethod = raw.weightingMethod;
 
     const validEstablishment = ['any', 'native', 'introduced', 'endemic'];
-    if (validEstablishment.includes(raw.establishmentStatus)) {
-        sanitized.establishmentStatus = raw.establishmentStatus;
-    }
+    if (validEstablishment.includes(raw.establishmentStatus)) sanitized.establishmentStatus = raw.establishmentStatus;
 
     return sanitized;
 }
 
 function savePreferences() {
     try {
-        const currentForm = getState().form;
+        const currentForm = store.getState().form;
         localStorage.setItem('bio_trainer_prefs', JSON.stringify(currentForm));
     } catch (e) {
-        console.warn("Unable to save preferences to localStorage (storage may be disabled or full):", e);
+        console.warn("Unable to save preferences:", e);
     }
 }
 
@@ -231,16 +205,12 @@ function loadPreferences() {
         const saved = localStorage.getItem('bio_trainer_prefs');
         if (!saved) return;
 
-        const parsed = JSON.parse(saved);
-        const sanitized = sanitizePreferences(parsed);
-
+        const sanitized = sanitizePreferences(JSON.parse(saved));
         if (Object.keys(sanitized).length > 0) {
-            setState(prev => ({
-                form: { ...prev.form, ...sanitized }
-            }));
+            store.setState(prev => ({ form: { ...prev.form, ...sanitized } }));
         }
     } catch (e) {
-        console.warn("Could not load preferences from localStorage:", e);
+        console.warn("Could not load preferences:", e);
     }
 }
 
@@ -256,11 +226,9 @@ function loadPreferences() {
         const updates = { [prop]: e.target.value };
         const uiUpdates = {};
 
-        if (prop === 'answerInput' || prop === 'rankInput') {
-            uiUpdates.answerError = null;
-        }
+        if (prop === 'answerInput' || prop === 'rankInput') uiUpdates.answerError = null;
 
-        setState(prev => ({
+        store.setState(prev => ({
             form: { ...prev.form, ...updates },
             ui: { ...prev.ui, ...uiUpdates }
         }));
@@ -274,40 +242,38 @@ function loadPreferences() {
                  `chk-${prop.replace('wants', '').toLowerCase()}`;
 
     const el = document.getElementById(elId);
-    if (el) el.addEventListener('change', (e) => setState(prev => ({ form: { ...prev.form, [prop]: e.target.checked } })));
+    if (el) el.addEventListener('change', (e) => store.setState(prev => ({ form: { ...prev.form, [prop]: e.target.checked } })));
 });
 
 const selectMonths = document.getElementById('input-months');
 if (selectMonths) {
     selectMonths.addEventListener('change', () => {
         const selectedMonths = Array.from(selectMonths.selectedOptions).map(opt => opt.value);
-        setState(prev => ({ form: { ...prev.form, months: selectedMonths } }));
+        store.setState(prev => ({ form: { ...prev.form, months: selectedMonths } }));
     });
 }
 
 const seasonalPresets = {
     all: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
     clear: [],
-    spring: ['3', '4', '5'],      // Mar, Apr, May
-    summer: ['6', '7', '8'],      // Jun, Jul, Aug
-    autumn: ['9', '10', '11'],    // Sep, Oct, Nov
-    winter: ['12', '1', '2']      // Dec, Jan, Feb
+    spring: ['3', '4', '5'],
+    summer: ['6', '7', '8'],
+    autumn: ['9', '10', '11'],
+    winter: ['12', '1', '2']
 };
 
 document.querySelectorAll('.btn-quick-select').forEach(btn => {
     btn.addEventListener('click', (e) => {
         const presetKey = e.target.dataset.months;
         if (seasonalPresets[presetKey]) {
-            setState(prev => ({
-                form: { ...prev.form, months: seasonalPresets[presetKey] }
-            }));
+            store.setState(prev => ({ form: { ...prev.form, months: seasonalPresets[presetKey] } }));
         }
     });
 });
 
 document.querySelectorAll('input[name="loc-mode"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
-        setState(prev => ({
+        store.setState(prev => ({
             form: { ...prev.form, locMode: e.target.value, lat: null, lng: null, placeId: null, placeName: '' },
             ui: { ...prev.ui, setupError: null, placeError: null }
         }));
@@ -326,36 +292,28 @@ function setupAutocomplete(config) {
     const inputEl = document.getElementById(inputId);
     const clearBtn = document.getElementById(clearBtnId);
 
-    // Debounced search trigger (250ms delay)
     const performSearch = debounce(async (query) => {
-        // Defensive Check: Ensure the live input still matches the query
         if (inputEl.value.trim() !== query.trim() || query.length < 3) {
-            setState(prev => ({ ui: { ...prev.ui, [results]: [] } }));
+            store.setState(prev => ({ ui: { ...prev.ui, [results]: [] } }));
             return;
         }
 
-        // Instantiate AbortController right before fetch execution
         abortController = new AbortController();
 
         try {
             const data = await fetchDataFn(query, abortController.signal);
-            
-            // Double-check input match after fetch resolves before updating state
             if (inputEl.value.trim() === query.trim()) {
-                setState(prev => ({ ui: { ...prev.ui, [results]: data.results } }));
+                store.setState(prev => ({ ui: { ...prev.ui, [results]: data.results } }));
             }
         } catch (err) {
-            if (err.name !== 'AbortError') {
-                console.warn(`${inputId} search offline`);
-            }
+            if (err.name !== 'AbortError') console.warn(`${inputId} search offline`);
         }
     }, 250);
 
     inputEl.addEventListener('input', (e) => {
         const query = e.target.value;
-        const currentResults = getState().ui[results];
+        const currentResults = store.getState().ui[results];
 
-        // 1. Kill any pending debounced timer AND active in-flight request
         performSearch.cancel();
         if (abortController) {
             abortController.abort();
@@ -364,48 +322,35 @@ function setupAutocomplete(config) {
 
         const selectedItem = currentResults.find(item => formatDisplay(item) === query);
 
-        // 2. Update form state immediately for instant input responsiveness
-        setState(prev => ({
-            form: {
-                ...prev.form,
-                [id]: selectedItem ? selectedItem.id : null,
-                [name]: query
-            },
+        store.setState(prev => ({
+            form: { ...prev.form, [id]: selectedItem ? selectedItem.id : null, [name]: query },
             ui: { ...prev.ui, [error]: null }
         }));
 
-        // 3. Queue search if query is not an explicit selection match
-        if (!selectedItem) {
-            performSearch(query);
-        }
+        if (!selectedItem) performSearch(query);
     });
 
     inputEl.addEventListener('focus', () => {
-        setState(prev => ({ ui: { ...prev.ui, [error]: null } }));
+        store.setState(prev => ({ ui: { ...prev.ui, [error]: null } }));
     });
 
     inputEl.addEventListener('blur', () => {
-        const s = getState();
+        const s = store.getState();
         const isValid = validateOnBlur ? validateOnBlur(s) : !!s.form[id];
-
         if ((s.form[name] || '').trim() !== '' && !isValid) {
-            setState(prev => ({ ui: { ...prev.ui, [error]: errorMsg } }));
+            store.setState(prev => ({ ui: { ...prev.ui, [error]: errorMsg } }));
         }
     });
 
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
-            // 1. Cancel pending debounced timer
             performSearch.cancel();
-
-            // 2. Abort any active in-flight fetch request
             if (abortController) {
                 abortController.abort();
                 abortController = null;
             }
 
-            // 3. Reset form and results state
-            setState(prev => ({
+            store.setState(prev => ({
                 form: { ...prev.form, [id]: null, [name]: '' },
                 ui: { ...prev.ui, [results]: [], [error]: null }
             }));
@@ -415,48 +360,40 @@ function setupAutocomplete(config) {
 }
 
 setupAutocomplete({
-    inputId: 'input-place',
-    listId: 'list-place',
-    clearBtnId: 'clear-place',
+    inputId: 'input-place', listId: 'list-place', clearBtnId: 'clear-place',
     fetchDataFn: api.fetchPlaces,
-    stateKeys: {
-        id: 'placeId', name: 'placeName', error: 'placeError', results: 'placeResults'
-    },
+    stateKeys: { id: 'placeId', name: 'placeName', error: 'placeError', results: 'placeResults' },
     formatDisplay: ui.formatPlaceDisplay,
     validateOnBlur: (s) => s.form.locMode === 'search' ? !!s.form.placeId : (s.form.lat !== null && s.form.lng !== null),
     errorMsg: "⚠️ Please select a location from the suggestions list."
 });
 
 setupAutocomplete({
-    inputId: 'input-taxon',
-    listId: 'list-taxon',
-    clearBtnId: 'clear-taxon',
+    inputId: 'input-taxon', listId: 'list-taxon', clearBtnId: 'clear-taxon',
     fetchDataFn: api.fetchTaxaAutocomplete,
-    stateKeys: {
-        id: 'taxonId', name: 'taxonName', error: 'taxonError', results: 'taxonResults'
-    },
+    stateKeys: { id: 'taxonId', name: 'taxonName', error: 'taxonError', results: 'taxonResults' },
     formatDisplay: ui.formatTaxonDisplay,
     validateOnBlur: (s) => !!s.form.taxonId,
     errorMsg: "⚠️ Please select a valid target taxon from the suggestions list."
 });
 
 document.getElementById('btn-gps').addEventListener('click', () => {
-    setState(prev => ({ ui: { ...prev.ui, isLocatingGps: true } }));
+    store.setState(prev => ({ ui: { ...prev.ui, isLocatingGps: true } }));
     navigator.geolocation.getCurrentPosition(
         (pos) => {
-            setState(prev => ({
+            store.setState(prev => ({
                 form: { ...prev.form, lat: pos.coords.latitude, lng: pos.coords.longitude, placeId: null, placeName: '' },
                 ui: { ...prev.ui, isLocatingGps: false }
             }));
         },
-        () => setState(prev => ({ ui: { ...prev.ui, isLocatingGps: false, setupError: 'Could not get location' } }))
+        () => store.setState(prev => ({ ui: { ...prev.ui, isLocatingGps: false, setupError: 'Could not get location' } }))
     );
 });
 
 // --- GAME BOOTSTRAPPING ---
 document.getElementById('setup-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const s = getState();
+    const s = store.getState();
     let hasError = false;
     let placeError = null, setupError = null, taxonError = null;
 
@@ -468,11 +405,8 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
         const lng = parseFloat(s.form.lng);
         const radius = parseFloat(s.form.radius);
 
-        if (isNaN(lat) || isNaN(lng)) {
+        if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
             setupError = "Please enter valid latitude and longitude coordinates, or use GPS.";
-            hasError = true;
-        } else if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-            setupError = "Latitude must be between -90 and 90, and Longitude between -180 and 180.";
             hasError = true;
         } else if (isNaN(radius) || radius < 1 || radius > 100) {
             setupError = "Radius must be between 1 and 100 km.";
@@ -485,18 +419,18 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     if (s.form.months.length === 0) { setupError = "Please select at least one month for seasonality."; hasError = true; }
 
     if (hasError) {
-        setState(prev => ({ ui: { ...prev.ui, placeError, setupError, taxonError } })); return;
+        store.setState(prev => ({ ui: { ...prev.ui, placeError, setupError, taxonError } })); return;
     }
 
     savePreferences();
     observationService.clearCache();
 
-    setState(prev => ({
+    store.setState(prev => ({
         config: { ...prev.form, questionLimit: parseInt(prev.form.questionLimit, 10), expertTotalSpecies: 0 },
         ui: { ...prev.ui, isLoadingQuizPool: true, setupError: null, placeError: null, taxonError: null }
     }));
 
-    const updatedState = getState();
+    const updatedState = store.getState();
     const isExpert = updatedState.config.difficulty === 'all';
 
     try {
@@ -519,94 +453,93 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
             expertCount = preFlightData.total_results || 0;
 
             if (expertCount === 0) {
-                setState(prev => ({
-                    ui: {
-                        ...prev.ui,
-                        isLoadingQuizPool: false,
-                        setupError: "No observations found matching these strict filters. Try adjusting your settings."
-                    }
+                store.setState(prev => ({
+                    ui: { ...prev.ui, isLoadingQuizPool: false, setupError: "No observations found matching these strict filters." }
                 }));
                 return;
             }
 
-            if (updatedState.config.isRarityMode) {
-                const size = updatedState.config.preventDuplicates ? Math.min(updatedState.config.questionLimit, expertCount) : updatedState.config.questionLimit;
-                pool = Array.from({ length: size }, () => ({ taxon: null, observation: null }));
-            } else {
-                pool = Array.from({ length: updatedState.config.questionLimit }, () => ({ taxon: null, observation: null }));
-            }
+            const size = updatedState.config.preventDuplicates && updatedState.config.isRarityMode ? Math.min(updatedState.config.questionLimit, expertCount) : updatedState.config.questionLimit;
+            pool = Array.from({ length: size }, () => ({ taxon: null, observation: null }));
+            
         } else {
             const data = await api.fetchSpeciesPool({
                 difficulty: updatedState.config.difficulty, wantsPhotos: updatedState.config.wantsPhotos, wantsSounds: updatedState.config.wantsSounds, months: updatedState.config.months, placeId: updatedState.form.placeId, lat: updatedState.form.lat, lng: updatedState.form.lng, radius: updatedState.form.radius, taxonId: updatedState.form.taxonId, establishmentStatus: updatedState.config.establishmentStatus
             });
             if (!data.results || data.results.length === 0) {
-                setState(prev => ({ ui: { ...prev.ui, isLoadingQuizPool: false, setupError: "No research-grade observations found. Try a broader search." } }));
+                store.setState(prev => ({ ui: { ...prev.ui, isLoadingQuizPool: false, setupError: "No research-grade observations found." } }));
                 return;
             }
             pool = engine.generateWeightedPool(
-                data.results,
-                updatedState.config.questionLimit,
-                updatedState.config.preventDuplicates,
-                updatedState.config.isRarityMode,
-                updatedState.config.weightingMethod
+                data.results, updatedState.config.questionLimit, updatedState.config.preventDuplicates, updatedState.config.isRarityMode, updatedState.config.weightingMethod
             );
         }
 
         if (pool.length === 0) {
-            setState(prev => ({ ui: { ...prev.ui, isLoadingQuizPool: false, setupError: "No observations found matching these strict filters. Try adjusting your settings." } }));
+            store.setState(prev => ({ ui: { ...prev.ui, isLoadingQuizPool: false, setupError: "No observations found matching these strict filters." } }));
             return;
         }
 
-        setState(prev => ({
+        store.setState(prev => ({
             config: { ...prev.config, expertTotalSpecies: expertCount },
-            questions: pool,
-            currentIndex: 0, score: 0, currentMediaIndex: 0,
+            questions: pool, currentIndex: 0, score: 0, currentMediaIndex: 0,
             form: { ...prev.form, answerInput: '', rankInput: 'species' },
             ui: { ...prev.ui, isLoadingQuizPool: false, activeView: 'quiz-view', quizError: null, isCheckingAnswer: false, isHintVisible: false, isMediaLoaded: false }
         }));
+        
+        // Dispatch explicit start event to kick off JIT network calls
+        store.dispatchEvent(new CustomEvent('quiz:start'));
+        
     } catch (error) {
-        const isRateLimit = error.status === 429;
-        const setupError = isRateLimit
-            ? "⏳ Rate limit exceeded. Please wait a minute before starting a new quiz."
-            : "Error loading species data. Please check your internet connection.";
-
-        setState(prev => ({ ui: { ...prev.ui, isLoadingQuizPool: false, setupError } }));
+        const setupError = error.status === 429 ? "⏳ Rate limit exceeded." : "Error loading species data.";
+        store.setState(prev => ({ ui: { ...prev.ui, isLoadingQuizPool: false, setupError } }));
     }
 });
 
 // --- QUIZ ACTIONS & MEDIA CAPTURE ---
 
 document.getElementById('quiz-image').onload = (e) => {
-    const s = getState();
+    const s = store.getState();
     const media = selectCurrentMedia(s)[s.currentMediaIndex];
     if (media && e.target.dataset.src === media.mediumUrl) {
-        setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true } }));
+        store.setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true } }));
+        store.dispatchEvent(new CustomEvent('media:ready'));
     }
 };
 
-document.getElementById('quiz-image').onerror = () => setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true, quizError: { isMissingMedia: false } } }));
-document.getElementById('quiz-audio-player').onerror = () => setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true, quizError: { isMissingMedia: false } } }));
+document.getElementById('quiz-image').onerror = () => store.setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true, quizError: { isMissingMedia: false } } }));
+document.getElementById('quiz-audio-player').onerror = () => store.setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true, quizError: { isMissingMedia: false } } }));
+
 document.getElementById('quiz-audio-player').oncanplay = (e) => {
-    const s = getState();
+    const s = store.getState();
     const media = selectCurrentMedia(s)[s.currentMediaIndex];
     if (media && media.type === 'sound' && e.target.dataset.src === media.fileUrl) {
-        setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true } }));
+        store.setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true } }));
+        store.dispatchEvent(new CustomEvent('media:ready'));
     }
 };
 
 document.getElementById('btn-prev-media').addEventListener('click', () => {
-    if (getState().currentMediaIndex > 0) setState(prev => ({ currentMediaIndex: prev.currentMediaIndex - 1, ui: { ...prev.ui, isMediaLoaded: false } }));
+    if (store.getState().currentMediaIndex > 0) {
+        store.setState(prev => ({ currentMediaIndex: prev.currentMediaIndex - 1, ui: { ...prev.ui, isMediaLoaded: false } }));
+        store.dispatchEvent(new CustomEvent('media:navigate'));
+    }
 });
+
 document.getElementById('btn-next-media').addEventListener('click', () => {
-    const s = getState();
-    if (s.currentMediaIndex < selectCurrentMedia(s).length - 1) setState(prev => ({ currentMediaIndex: prev.currentMediaIndex + 1, ui: { ...prev.ui, isMediaLoaded: false } }));
+    const s = store.getState();
+    if (s.currentMediaIndex < selectCurrentMedia(s).length - 1) {
+        store.setState(prev => ({ currentMediaIndex: prev.currentMediaIndex + 1, ui: { ...prev.ui, isMediaLoaded: false } }));
+        store.dispatchEvent(new CustomEvent('media:navigate'));
+    }
 });
-document.getElementById('btn-toggle-hint').addEventListener('click', () => setState(prev => ({ ui: { ...prev.ui, isHintVisible: !prev.ui.isHintVisible } })));
+
+document.getElementById('btn-toggle-hint').addEventListener('click', () => store.setState(prev => ({ ui: { ...prev.ui, isHintVisible: !prev.ui.isHintVisible } })));
 
 // Modal Bindings
 document.getElementById('btn-zoom-image').addEventListener('click', () => {
-    const media = selectCurrentMedia(getState())[getState().currentMediaIndex];
-    setState(prev => ({ ui: { ...prev.ui, zoomMediaUrl: media.originalUrl, isZoomedIn: false } }));
+    const media = selectCurrentMedia(store.getState())[store.getState().currentMediaIndex];
+    store.setState(prev => ({ ui: { ...prev.ui, zoomMediaUrl: media.originalUrl, isZoomedIn: false } }));
 });
 document.getElementById('zoom-modal-img').addEventListener('load', (e) => {
     const loader = document.getElementById('zoom-loading');
@@ -621,29 +554,24 @@ document.getElementById('zoom-modal-img').addEventListener('error', () => {
     }
 });
 document.getElementById('zoom-modal').addEventListener('close', () => {
-    if (getState().ui.zoomMediaUrl) {
-        setState(prev => ({ ui: { ...prev.ui, zoomMediaUrl: null } }));
-    }
+    if (store.getState().ui.zoomMediaUrl) store.setState(prev => ({ ui: { ...prev.ui, zoomMediaUrl: null } }));
 });
 document.getElementById('zoom-modal-scroll').addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) {
-        setState(prev => ({ ui: { ...prev.ui, zoomMediaUrl: null } }));
-    }
+    if (e.target === e.currentTarget) store.setState(prev => ({ ui: { ...prev.ui, zoomMediaUrl: null } }));
 });
-document.getElementById('btn-close-modal').addEventListener('click', () => setState(prev => ({ ui: { ...prev.ui, zoomMediaUrl: null } })));
+document.getElementById('btn-close-modal').addEventListener('click', () => store.setState(prev => ({ ui: { ...prev.ui, zoomMediaUrl: null } })));
+
 document.getElementById('btn-zoom-modal-toggle').addEventListener('click', (e) => {
-    const s = getState();
+    const s = store.getState();
     const willZoomIn = !s.ui.isZoomedIn;
     const zoomImg = document.getElementById('zoom-modal-img');
     const zoomScroll = document.getElementById('zoom-modal-scroll');
 
     const rect = zoomImg.getBoundingClientRect();
-    
-    // Fallback to center point (0.5) if triggered via keyboard without clientX
     const clickXPercent = e.clientX ? (e.clientX - rect.left) / rect.width : 0.5;
     const clickYPercent = e.clientY ? (e.clientY - rect.top) / rect.height : 0.5;
 
-    setState(prev => ({ ui: { ...prev.ui, isZoomedIn: willZoomIn } }));
+    store.setState(prev => ({ ui: { ...prev.ui, isZoomedIn: willZoomIn } }));
 
     if (willZoomIn) {
         requestAnimationFrame(() => {
@@ -658,16 +586,16 @@ document.getElementById('btn-zoom-modal-toggle').addEventListener('click', (e) =
 
 // Answer Loop
 document.getElementById('clear-answer').addEventListener('click', () => {
-    setState(prev => ({ form: { ...prev.form, answerInput: '' } }));
+    store.setState(prev => ({ form: { ...prev.form, answerInput: '' } }));
     document.getElementById('input-answer').focus();
 });
 
 document.getElementById('btn-skip').addEventListener('click', () => {
-    let s = getState();
+    let s = store.getState();
     const q = s.questions[s.currentIndex];
     const mediaInfo = engine.getQuestionThumbnail(q, selectCurrentMedia(s));
 
-    updateQuestion(s.currentIndex, {
+    store.updateQuestion(s.currentIndex, {
         isAnswered: true, userAnswer: "(Skipped)", isCorrect: false, pointsEarned: 0, thumbnailUrl: mediaInfo.url, mediaAttribution: mediaInfo.attribution, isSkipped: true
     });
 });
@@ -675,7 +603,7 @@ document.getElementById('btn-skip').addEventListener('click', () => {
 document.getElementById('answer-form').addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const s = getState();
+    const s = store.getState();
     const q = s.questions[s.currentIndex];
 
     if (s.ui.isCheckingAnswer || q.isAnswered) return;
@@ -683,14 +611,14 @@ document.getElementById('answer-form').addEventListener('submit', async (e) => {
     const inputStr = (s.form.answerInput || '').trim();
     if (!inputStr) return;
 
-    setState(prev => ({ ui: { ...prev.ui, isCheckingAnswer: true, answerError: null } }));
+    store.setState(prev => ({ ui: { ...prev.ui, isCheckingAnswer: true, answerError: null } }));
 
     const { isCorrect, pointsEarned, matchedNameDisplay, networkError } = await engine.evaluateAnswer(
         inputStr, s.form.rankInput, q.observation?.taxon || q.taxon
     );
 
     if (networkError) {
-        setState(prev => ({
+        store.setState(prev => ({
             ui: {
                 ...prev.ui,
                 isCheckingAnswer: false,
@@ -700,9 +628,9 @@ document.getElementById('answer-form').addEventListener('submit', async (e) => {
         return;
     }
 
-    const mediaInfo = engine.getQuestionThumbnail(q, selectCurrentMedia(getState()));
+    const mediaInfo = engine.getQuestionThumbnail(q, selectCurrentMedia(store.getState()));
 
-    updateQuestion(s.currentIndex, {
+    store.updateQuestion(s.currentIndex, {
         isAnswered: true,
         userAnswer: `${inputStr} (${s.form.rankInput})`,
         guessedRank: s.form.rankInput,
@@ -714,61 +642,44 @@ document.getElementById('answer-form').addEventListener('submit', async (e) => {
         isSkipped: false
     });
 
-    if (isCorrect) setState(prev => ({ score: prev.score + pointsEarned }));
-    setState(prev => ({ ui: { ...prev.ui, isCheckingAnswer: false } }));
+    if (isCorrect) store.setState(prev => ({ score: prev.score + pointsEarned }));
+    store.setState(prev => ({ ui: { ...prev.ui, isCheckingAnswer: false } }));
 });
 
 // Advancing State
 document.getElementById('btn-next').addEventListener('click', () => {
-    const s = getState();
+    const s = store.getState();
     const nextIdx = s.currentIndex + 1;
     if (nextIdx >= s.questions.length) {
-        setState(prev => ({ ui: { ...prev.ui, activeView: 'results-view' } }));
+        store.setState(prev => ({ ui: { ...prev.ui, activeView: 'results-view' } }));
     } else {
-        setState(prev => ({
+        store.setState(prev => ({
             currentIndex: nextIdx, currentMediaIndex: 0,
             form: { ...prev.form, answerInput: '', rankInput: 'species' },
             ui: { ...prev.ui, isMediaLoaded: false, isCheckingAnswer: false, quizError: null, isHintVisible: false }
         }));
         
         const quizCounter = document.getElementById('quiz-counter');
-        if (quizCounter) {
-            quizCounter.focus();
-        }
+        if (quizCounter) quizCounter.focus();
+        
+        store.dispatchEvent(new CustomEvent('quiz:next'));
     }
 });
 
 document.getElementById('btn-retry').addEventListener('click', () => {
-    const s = getState();
-    const q = s.questions[s.currentIndex];
-
-    // If we already have a valid observation, just retry loading the media
-    if (q.observation && !q.observation.error) {
-        const imgEl = document.getElementById('quiz-image');
-        const audioPlayer = document.getElementById('quiz-audio-player');
-        
-        // Clear src attributes and dataset to force ui.js to reassign and trigger a reload
-        if (imgEl) {
-            imgEl.removeAttribute('src');
-            delete imgEl.dataset.src;
-        }
-        if (audioPlayer) {
-            audioPlayer.removeAttribute('src');
-            delete audioPlayer.dataset.src;
-        }
-        
-        setState(prev => ({ ui: { ...prev.ui, quizError: null, isMediaLoaded: false } }));
-    } else {
-        // Otherwise, retry fetching the observation data from the API
-        updateQuestion(s.currentIndex, { observation: null });
-        setState(prev => ({ ui: { ...prev.ui, quizError: null, isMediaLoaded: false } }));
-        observationService.loadObservationForQuestion(s.currentIndex);
-    }
+    const imgEl = document.getElementById('quiz-image');
+    const audioPlayer = document.getElementById('quiz-audio-player');
+    
+    if (imgEl) { imgEl.removeAttribute('src'); delete imgEl.dataset.src; }
+    if (audioPlayer) { audioPlayer.removeAttribute('src'); delete audioPlayer.dataset.src; }
+    
+    store.setState(prev => ({ ui: { ...prev.ui, quizError: null, isMediaLoaded: false } }));
+    store.dispatchEvent(new CustomEvent('quiz:retry'));
 });
 
 document.getElementById('btn-skip-end').addEventListener('click', () => {
     observationService.clearCache();
-    setState(prev => ({
+    store.setState(prev => ({
         questions: prev.questions.slice(0, prev.currentIndex),
         ui: { ...prev.ui, activeView: 'results-view' }
     }));
@@ -776,10 +687,10 @@ document.getElementById('btn-skip-end').addEventListener('click', () => {
 
 document.getElementById('btn-restart').addEventListener('click', () => {
     observationService.clearCache();
-    resetState();
+    store.resetState();
     loadPreferences();
 });
 
 // Boot
 loadPreferences();
-ui.render(getState());
+ui.render(store.getState());

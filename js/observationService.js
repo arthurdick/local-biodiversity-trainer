@@ -1,59 +1,45 @@
-import { getState, updateQuestion } from './state.js';
+import { store } from './state.js';
 import * as api from './api.js';
 import * as engine from './quizEngine.js';
 
-// --- SESSION TRACKER & RUNTIME CACHE ---
 let currentSessionId = 0;
 
 const pendingFetches = new Map();
 const activeControllers = new Map();
 const preloadedImages = new Map();
 
-/**
- * Clears the runtime cache, aborts pending fetches, and invalidates the session ID.
- */
 export function clearCache() {
-    currentSessionId++; // Invalidate all pending session tasks
+    currentSessionId++; 
     activeControllers.forEach(controller => controller.abort());
     activeControllers.clear();
     pendingFetches.clear();
     preloadedImages.clear();
 }
 
-/**
- * JIT Prefetcher for Loading Observations
- */
 export async function loadObservationForQuestion(index) {
-    const s = getState();
+    const s = store.getState();
     if (index >= s.questions.length) return;
     
-    // Check state first
     if (s.questions[index].observation) return s.questions[index].observation;
     
-    // Check runtime cache for pending fetch
     if (pendingFetches.has(index)) return pendingFetches.get(index);
 
-    // Capture the session ID when this request is initiated
     const requestSessionId = currentSessionId;
-
     const controller = new AbortController();
     activeControllers.set(index, controller);
 
     const fetchPromise = (async () => {
-        const q = getState().questions[index];
-        const currentConfig = getState().config;
+        const q = store.getState().questions[index];
+        const currentConfig = store.getState().config;
         
-        // Mode detection
         const isStandardExpert = currentConfig.difficulty === 'all' && !currentConfig.isRarityMode;
         const isRareExpert = currentConfig.difficulty === 'all' && currentConfig.isRarityMode;
 
         try {
             let targetTaxon = q.taxon;
             
-            // If in Rare Expert mode and we haven't assigned a taxon yet, fetch a random deep page
             if (isRareExpert && !targetTaxon) {
                 const totalSpecies = currentConfig.expertTotalSpecies || 0;
-                
                 let deepPage = engine.calculateDeepPage(totalSpecies);
                 let validResults = [];
                 let attempts = 0;
@@ -63,29 +49,21 @@ export async function loadObservationForQuestion(index) {
                     attempts++;
 
                     const deepData = await api.fetchSpeciesPool({
-                        perPage: 50,
-                        page: deepPage,
-                        wantsPhotos: currentConfig.wantsPhotos,
-                        wantsSounds: currentConfig.wantsSounds,
-                        months: currentConfig.months,
-                        placeId: currentConfig.placeId,
-                        lat: currentConfig.lat,
-                        lng: currentConfig.lng,
-                        radius: currentConfig.radius,
-                        taxonId: currentConfig.taxonId,
-                        establishmentStatus: currentConfig.establishmentStatus
+                        perPage: 50, page: deepPage,
+                        wantsPhotos: currentConfig.wantsPhotos, wantsSounds: currentConfig.wantsSounds,
+                        months: currentConfig.months, placeId: currentConfig.placeId,
+                        lat: currentConfig.lat, lng: currentConfig.lng, radius: currentConfig.radius,
+                        taxonId: currentConfig.taxonId, establishmentStatus: currentConfig.establishmentStatus
                     }, controller.signal);
 
                     if (deepData.results && deepData.results.length > 0) {
                         if (currentConfig.preventDuplicates) {
-                            const existingIds = getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined);
+                            const existingIds = store.getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined);
                             validResults = deepData.results.filter(r => !existingIds.includes(r.taxon.id));
                         } else {
                             const existingIdCounts = {};
-                            getState().questions.forEach(quest => {
-                                if (quest.taxon?.id) {
-                                    existingIdCounts[quest.taxon.id] = (existingIdCounts[quest.taxon.id] || 0) + 1;
-                                }
+                            store.getState().questions.forEach(quest => {
+                                if (quest.taxon?.id) existingIdCounts[quest.taxon.id] = (existingIdCounts[quest.taxon.id] || 0) + 1;
                             });
                             
                             validResults = deepData.results.filter(r => {
@@ -96,36 +74,31 @@ export async function loadObservationForQuestion(index) {
                         }
                     }
                     
-                    if (validResults.length === 0) {
-                        deepPage--;
-                    }
+                    if (validResults.length === 0) deepPage--;
                 }
                 
-                // Check if session changed while awaiting deep page data
                 if (requestSessionId !== currentSessionId) return null;
 
                 if (validResults.length === 0) {
                     const emptyData = { error: true, emptyPool: true };
                     
-                    // Session ID Guard prior to state mutation
                     if (requestSessionId !== currentSessionId) return null;
                     
-                    updateQuestion(index, { observation: emptyData });
+                    store.updateQuestion(index, { observation: emptyData });
+                    store.dispatchEvent(new CustomEvent('observation:loaded', { detail: { index, observation: emptyData, error: true, emptyPool: true } }));
                     return emptyData;
                 }
 
                 const randomItem = engine.selectRareTaxonFromPool(validResults, currentConfig.weightingMethod);
-
                 targetTaxon = randomItem.taxon;
                 
-                // Session ID Guard prior to state mutation
                 if (requestSessionId !== currentSessionId) return null;
                 
-                updateQuestion(index, { taxon: targetTaxon });
+                store.updateQuestion(index, { taxon: targetTaxon });
             }
             
             const withoutTaxonIds = (isStandardExpert && currentConfig.preventDuplicates)
-                ? getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined)
+                ? store.getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined)
                 : [];
                 
             let notObsIds = [];
@@ -133,32 +106,26 @@ export async function loadObservationForQuestion(index) {
             if (isStandardExpert && currentConfig.preventDuplicates) {
                 notObsIds = [];
             } else if (targetTaxon) {
-                notObsIds = getState().questions
+                notObsIds = store.getState().questions
                     .filter(quest => quest.taxon?.id === targetTaxon.id)
                     .map(quest => quest.observation?.uuid)
                     .filter(uuid => uuid !== undefined);
             } else {
-                notObsIds = getState().questions
+                notObsIds = store.getState().questions
                     .map(quest => quest.observation?.uuid)
                     .filter(uuid => uuid !== undefined);
             }
 
             const data = await api.fetchObservation({
-                wantsPhotos: currentConfig.wantsPhotos,
-                wantsSounds: currentConfig.wantsSounds,
-                months: currentConfig.months,
-                placeId: currentConfig.placeId,
-                lat: currentConfig.lat,
-                lng: currentConfig.lng,
-                radius: currentConfig.radius,
+                wantsPhotos: currentConfig.wantsPhotos, wantsSounds: currentConfig.wantsSounds,
+                months: currentConfig.months, placeId: currentConfig.placeId,
+                lat: currentConfig.lat, lng: currentConfig.lng, radius: currentConfig.radius,
                 difficulty: isStandardExpert ? 'all' : 'specific',
                 taxonId: isStandardExpert ? currentConfig.taxonId : targetTaxon?.id,
                 establishmentStatus: currentConfig.establishmentStatus,
-                withoutTaxonIds,
-                notObsIds
+                withoutTaxonIds, notObsIds
             }, controller.signal);
 
-            // Session ID Guard prior to state mutation
             if (requestSessionId !== currentSessionId) return null;
 
             if (data.results && data.results.length > 0) {
@@ -167,10 +134,10 @@ export async function loadObservationForQuestion(index) {
                 
                 if (isStandardExpert) updates.taxon = obs.taxon;
                 
-                // Session ID Guard prior to state mutation
                 if (requestSessionId !== currentSessionId) return null;
                 
-                updateQuestion(index, updates);
+                store.updateQuestion(index, updates);
+                store.dispatchEvent(new CustomEvent('observation:loaded', { detail: { index, observation: obs } }));
                 
                 if (obs.photos && obs.photos.length > 0) {
                     const preload = new Image();
@@ -181,34 +148,25 @@ export async function loadObservationForQuestion(index) {
             } else {
                 const emptyData = { error: true, emptyPool: true };
                 
-                // Session ID Guard prior to state mutation
                 if (requestSessionId !== currentSessionId) return null;
                 
-                updateQuestion(index, { observation: emptyData });
+                store.updateQuestion(index, { observation: emptyData });
+                store.dispatchEvent(new CustomEvent('observation:loaded', { detail: { index, observation: emptyData, error: true, emptyPool: true } }));
                 return emptyData;
             }
         } catch(e) {
-            // 1. If the session changed (e.g. user clicked "Play Again"), discard silently
-            if (requestSessionId !== currentSessionId) {
-                return null;
-            }
+            if (requestSessionId !== currentSessionId) return null;
 
-            // 2. Same-session error handling (including dynamic network timeouts)
             const errorData = { error: true };
             
             if (e.status === 429) {
                 errorData.isRateLimited = true;
-                console.warn(`Question ${index + 1}: Rate limited (HTTP 429).`);
-            } else if (e.name === 'AbortError') {
-                console.warn(`Question ${index + 1}: Network request timed out.`);
-            } else {
-                console.error(`Question ${index + 1}: Fetch failed`, e);
-            }
+            } 
 
-            // Session ID Guard prior to state mutation
             if (requestSessionId !== currentSessionId) return null;
 
-            updateQuestion(index, { observation: errorData });
+            store.updateQuestion(index, { observation: errorData });
+            store.dispatchEvent(new CustomEvent('observation:loaded', { detail: { index, observation: errorData, error: true } }));
             return errorData;
         } finally {
             pendingFetches.delete(index);

@@ -40,27 +40,23 @@ const initialState = {
 
     // 3. Centralized UI & View Flags
     ui: {
-        activeView: 'setup-view', // 'setup-view', 'quiz-view', 'results-view'
+        activeView: 'setup-view',
 
-        // Setup state
         isLocatingGps: false,
         isLoadingQuizPool: false,
         setupError: null,
         placeError: null,
         taxonError: null,
 
-        // Autocomplete search result pools
         placeResults: [],
         taxonResults: [],
 
-        // Quiz state
         quizError: null,
         answerError: null,
         isCheckingAnswer: false,
         isHintVisible: false,
         isMediaLoaded: false,
 
-        // Modal state
         zoomMediaUrl: null,
         isZoomedIn: false
     },
@@ -84,75 +80,45 @@ function deepFreeze(obj) {
     return Object.freeze(obj);
 }
 
-let state = deepFreeze(structuredClone(initialState));
-const listeners = new Set();
-let isScheduled = false;
-
-export const getState = () => state;
-
-/**
- * Schedules a single microtask flush to notify subscribers.
- * Prevents re-entrant notification cascades by batching multiple setState calls within the same tick.
- */
-function scheduleNotification() {
-    if (isScheduled) return;
-    isScheduled = true;
-
-    queueMicrotask(() => {
-        isScheduled = false;
-        const currentState = state;
-        const snapshot = Array.from(listeners);
-        snapshot.forEach(listener => listener(currentState));
-    });
-}
-
-export const setState = (updater) => {
-    if (typeof updater !== 'function') {
-        throw new Error('setState strictly requires an updater function.');
+class Store extends EventTarget {
+    #state;
+    
+    constructor(initial) {
+        super();
+        this.initialState = initial;
+        this.#state = deepFreeze(structuredClone(initial));
     }
 
-    // 1. Update state immediately (guarantees getState() reflects changes instantly)
-    state = deepFreeze({ ...state, ...updater(state) });
+    getState() { 
+        return this.#state; 
+    }
 
-    // 2. Schedule notification microtask once for the current execution frame
-    scheduleNotification();
-};
-
-export const updateQuestion = (index, updates) => {
-    setState(prevState => {
-        if (index < 0 || index >= prevState.questions.length) return prevState;
-        const newQuestions = [...prevState.questions];
-        newQuestions[index] = deepFreeze({ ...newQuestions[index], ...updates });
-        return { questions: newQuestions };
-    });
-};
-
-export const resetState = () => {
-    state = deepFreeze(structuredClone(initialState));
-    scheduleNotification();
-};
-
-export const subscribe = (listener) => {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
-};
-
-/**
- * Subscribes a listener to a specific state slice using a selector.
- * The callback only fires when the selected value changes.
- */
-export const subscribeSelector = (selector, callback, isEqual = (a, b) => a === b) => {
-    let currentSelected = selector(state);
-
-    return subscribe((newState) => {
-        const nextSelected = selector(newState);
-        if (!isEqual(currentSelected, nextSelected)) {
-            const prevSelected = currentSelected;
-            currentSelected = nextSelected;
-            callback(nextSelected, prevSelected, newState);
+    setState(updater) {
+        if (typeof updater !== 'function') {
+            throw new Error('setState strictly requires an updater function.');
         }
-    });
-};
+
+        this.#state = deepFreeze({ ...this.#state, ...updater(this.#state) });
+        this.dispatchEvent(new CustomEvent('statechange', { detail: this.#state }));
+    }
+
+    updateQuestion(index, updates) {
+        this.setState(prevState => {
+            if (index < 0 || index >= prevState.questions.length) return prevState;
+            const newQuestions = [...prevState.questions];
+            newQuestions[index] = deepFreeze({ ...newQuestions[index], ...updates });
+            return { questions: newQuestions };
+        });
+    }
+
+    resetState() {
+        this.#state = deepFreeze(structuredClone(this.initialState));
+        this.dispatchEvent(new CustomEvent('statechange', { detail: this.#state }));
+    }
+}
+
+// Export Singleton Store
+export const store = new Store(initialState);
 
 // --- SELECTORS ---
 export function selectCurrentMedia(currentState) {
