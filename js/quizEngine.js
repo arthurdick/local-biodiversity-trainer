@@ -49,61 +49,49 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
         return {
             taxon: r.taxon,
             count: count,
-            weight: isRarityMode ? (1 / rawWeight) : rawWeight
+            weight: isRarityMode ? (1 / rawWeight) : rawWeight,
+            selectedCount: 0
         };
     });
-    
-    if (preventDuplicates) {
-        const limit = Math.min(questionLimit, availablePool.length);
-        let totalWeight = availablePool.reduce((sum, item) => sum + item.weight, 0);
 
-        for (let i = 0; i < limit; i++) {
-            if (totalWeight <= 0) break;
+    const limit = preventDuplicates
+        ? Math.min(questionLimit, availablePool.length)
+        : questionLimit;
 
-            const roll = Math.random() * totalWeight;
-            let runningWeight = 0, selectedIndex = availablePool.length - 1;
+    for (let i = 0; i < limit; i++) {
+        if (availablePool.length === 0) break;
 
-            for (let j = 0; j < availablePool.length; j++) {
-                runningWeight += availablePool[j].weight;
-                if (roll <= runningWeight) {
-                    selectedIndex = j;
-                    break;
-                }
+        // 1. Recalculate total weight on every iteration
+        const totalWeight = availablePool.reduce((sum, item) => sum + item.weight, 0);
+        if (totalWeight <= 0) break;
+
+        // 2. Weighted random sampling
+        const roll = Math.random() * totalWeight;
+        let runningWeight = 0;
+        let selectedIndex = availablePool.length - 1;
+
+        for (let j = 0; j < availablePool.length; j++) {
+            runningWeight += availablePool[j].weight;
+            if (roll <= runningWeight) {
+                selectedIndex = j;
+                break;
             }
-
-            const selectedItem = availablePool[selectedIndex];
-            questions.push({ taxon: selectedItem.taxon, observation: null });
-            
-            totalWeight -= selectedItem.weight;
-            availablePool.splice(selectedIndex, 1);
         }
-    } else {
-        for (let i = 0; i < questionLimit; i++) {
-            if (availablePool.length === 0) break;
-            
-            let totalWeight = availablePool.reduce((sum, item) => sum + item.weight, 0);
-            const roll = Math.random() * totalWeight;
-            
-            let runningWeight = 0, selectedIndex = availablePool.length - 1;
 
-            for (let j = 0; j < availablePool.length; j++) {
-                runningWeight += availablePool[j].weight;
-                if (roll <= runningWeight) {
-                    selectedIndex = j;
-                    break;
-                }
-            }
+        const selectedItem = availablePool[selectedIndex];
+        questions.push({ taxon: selectedItem.taxon, observation: null });
 
-            const selectedItem = availablePool[selectedIndex];
-            questions.push({ taxon: selectedItem.taxon, observation: null });
-            
-            selectedItem.selectedCount = (selectedItem.selectedCount || 0) + 1;
-            
+        // 3. Pool depletion logic
+        if (preventDuplicates) {
+            availablePool.splice(selectedIndex, 1);
+        } else {
+            selectedItem.selectedCount += 1;
             if (selectedItem.selectedCount >= selectedItem.count) {
                 availablePool.splice(selectedIndex, 1);
             }
         }
     }
+
     return questions;
 }
 
