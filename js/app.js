@@ -620,6 +620,9 @@ document.getElementById('btn-skip').addEventListener('click', () => {
     store.updateQuestion(s.currentIndex, {
         isAnswered: true, userAnswer: "(Skipped)", isCorrect: false, pointsEarned: 0, thumbnailUrl: mediaInfo.url, mediaAttribution: mediaInfo.attribution, isSkipped: true
     });
+    
+    const btnNext = document.getElementById('btn-next');
+    if (btnNext) btnNext.focus();
 });
 
 document.getElementById('answer-form').addEventListener('submit', async (e) => {
@@ -666,6 +669,9 @@ document.getElementById('answer-form').addEventListener('submit', async (e) => {
 
     if (isCorrect) store.setState(prev => ({ score: prev.score + pointsEarned }));
     store.setState(prev => ({ ui: { ...prev.ui, isCheckingAnswer: false } }));
+    
+    const btnNext = document.getElementById('btn-next');
+    if (btnNext) btnNext.focus();
 });
 
 // Advancing State

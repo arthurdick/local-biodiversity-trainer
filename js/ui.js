@@ -459,9 +459,6 @@ export function render(state) {
             if (feedbackCache?.lastQuestionIndex !== state.currentIndex) {
                 buildFeedbackDom(q, feedback);
                 domCache.set(feedback, { ...feedbackCache, lastQuestionIndex: state.currentIndex });
-                
-                const btnNext = document.getElementById('btn-next');
-                if (btnNext) btnNext.focus();
             }
         } else {
             feedback.style.display = 'none';
