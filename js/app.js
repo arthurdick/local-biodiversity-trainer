@@ -180,8 +180,10 @@ function sanitizePreferences(raw) {
     const validDifficulties = ['15', '50', '125', '500', 'all'];
     if (validDifficulties.includes(String(raw.difficulty))) sanitized.difficulty = String(raw.difficulty);
 
-    const validQuestions = ['5', '10', '20', '50', 5, 10, 20, 50];
-    if (validQuestions.includes(raw.questionLimit)) sanitized.questionLimit = String(raw.questionLimit);
+    const parsedQuestions = parseInt(raw.questionLimit, 10);
+    if ([5, 10, 20, 50].includes(parsedQuestions)) {
+        sanitized.questionLimit = parsedQuestions;
+    }
 
     const validWeighting = ['linear', 'log'];
     if (validWeighting.includes(raw.weightingMethod)) sanitized.weightingMethod = raw.weightingMethod;
@@ -224,7 +226,17 @@ function loadPreferences() {
 
     const el = document.getElementById(elId);
     if (el) el.addEventListener('input', (e) => {
-        const updates = { [prop]: e.target.value };
+        let val = e.target.value;
+
+        if (prop === 'questionLimit') {
+            val = parseInt(val, 10);
+        } else if (prop === 'radius') {
+            val = parseFloat(val);
+        } else if (prop === 'lat' || prop === 'lng') {
+            val = val === '' ? null : parseFloat(val);
+        }
+
+        const updates = { [prop]: val };
         const uiUpdates = {};
 
         if (prop === 'answerInput' || prop === 'rankInput') uiUpdates.answerError = null;
@@ -463,7 +475,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     observationService.clearCache();
 
     store.setState(prev => ({
-        config: { ...prev.form, questionLimit: parseInt(prev.form.questionLimit, 10), expertTotalSpecies: 0 },
+        config: { ...prev.form, expertTotalSpecies: 0 },
         ui: { ...prev.ui, isLoadingQuizPool: true, setupError: null, placeError: null, taxonError: null }
     }));
 
