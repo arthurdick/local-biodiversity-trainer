@@ -165,6 +165,9 @@ export async function evaluateAnswer(inputStr, guessedRank, taxon, signal = null
 
     if (!isCorrect) {
         try {
+            // NOTE: checkTaxonSearch filters results by guessedRank at the API level:
+            // - 'species' rank limits API results to species/subspecies/varieties.
+            // - Higher ranks ('genus', 'family', etc.) limit API results strictly to that rank.
             const searchData = await api.checkTaxonSearch(inputStr, guessedRank, signal);
             
             if (searchData.results && searchData.results.length > 0) {
@@ -173,15 +176,23 @@ export async function evaluateAnswer(inputStr, guessedRank, taxon, signal = null
                     const isGuessChildOfTarget = result.ancestor_ids && result.ancestor_ids.includes(taxon.id);
                     const isGuessParentOfTarget = taxon.ancestor_ids && taxon.ancestor_ids.includes(result.id);
                     
-                    const validNames = [normalize(result.name), normalize(result.preferred_common_name), normalize(result.matched_term)];
+                    const validNames = [
+                        normalize(result.name),
+                        normalize(result.preferred_common_name),
+                        normalize(result.matched_term)
+                    ];
                     
                     if (validNames.includes(normalizedInput)) {
-                        if (guessedRank === 'species' && (isExactMatch || isGuessChildOfTarget || isGuessParentOfTarget)) {
-                            isCorrect = true;
-                            pointsEarned = getPointsForRank('species');
-                            matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;
-                            break;
-                        } else if (guessedRank !== 'species' && isGuessParentOfTarget) {
+                        if (guessedRank === 'species') {
+                            // Matches exact species, or subspecies/variety parents/children
+                            if (isExactMatch || isGuessChildOfTarget || isGuessParentOfTarget) {
+                                isCorrect = true;
+                                pointsEarned = getPointsForRank('species');
+                                matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;
+                                break;
+                            }
+                        } else if (isGuessParentOfTarget) {
+                            // Higher rank guesses (Genus/Family/Order) must be a valid ancestor of the target
                             isCorrect = true;
                             pointsEarned = getPointsForRank(guessedRank);
                             matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;
