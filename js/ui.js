@@ -358,11 +358,13 @@ export function render(state) {
         if (hasError) {
             errDiv.style.display = 'block';
             
-            // Only build the error nodes if the container is empty
-            if (!errDiv.hasChildNodes()) {
-                const isMissing = state.ui.isMissingMedia || state.ui.quizError?.isMissingMedia;
-                const isRateLimited = q?.observation?.isRateLimited || state.ui.quizError?.isRateLimited;
-                
+            const isMissing = state.ui.isMissingMedia || state.ui.quizError?.isMissingMedia;
+            const isRateLimited = q?.observation?.isRateLimited || state.ui.quizError?.isRateLimited;
+            
+            const errCache = domCache.get(errDiv) || {};
+
+            // Rebuild the error nodes only if the specific error signature changes or if it's empty
+            if (errCache.isMissing !== isMissing || errCache.isRateLimited !== isRateLimited || !errDiv.hasChildNodes()) {
                 let mainTextContent = '❌ Failed to load observation data.';
                 let hintTextContent = 'Please check your internet connection or filters.';
 
@@ -380,12 +382,17 @@ export function render(state) {
                 hint.textContent = hintTextContent;
                 
                 errDiv.replaceChildren(mainText, document.createElement('br'), document.createElement('br'), hint);
+                
+                // Update cache with the latest error signature
+                domCache.set(errDiv, { isMissing, isRateLimited });
             }
         } else {
             errDiv.style.display = 'none';
             if (errDiv.hasChildNodes()) {
                 errDiv.replaceChildren();
             }
+            // Clear the cache when the error is resolved
+            domCache.set(errDiv, { isMissing: null, isRateLimited: null });
         }
 
         renderQuizMedia(state, isReadyForMedia);
