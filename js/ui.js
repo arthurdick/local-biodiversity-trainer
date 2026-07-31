@@ -99,8 +99,14 @@ const autocompleteConfigs = [
 function redactSpoilers(text, taxon) {
     if (!text || !taxon) return text;
 
-    // 1. Normalize typographic quotes and dashes in both text and taxonomy
-    const normalizeTypography = (str) => str.replace(/[’‘´`]/g, "'").replace(/[—–]/g, "-");
+    // 1. Canonicalize Unicode (NFC) and normalize typographic quotes/dashes in both text and taxonomy
+    const normalizeTypography = (str) => {
+        if (!str) return '';
+        return str
+            .normalize('NFC')
+            .replace(/[’‘´`]/g, "'")
+            .replace(/[—–]/g, "-");
+    };
     
     let safeText = normalizeTypography(text);
 
