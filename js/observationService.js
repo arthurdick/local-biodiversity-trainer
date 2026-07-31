@@ -5,16 +5,29 @@ import * as engine from './quizEngine.js';
 // Re-export for external consumers if needed
 export { getDynamicNetworkTimeout } from './api.js';
 
-// --- RUNTIME CACHE ---
+// --- SESSION TRACKER & RUNTIME CACHE ---
+let currentSessionId = 0;
+
 const pendingFetches = new Map();
 const activeControllers = new Map();
 const preloadedImages = new Map();
 
+/**
+ * Clears the runtime cache, aborts pending fetches, and invalidates the session ID.
+ */
 export function clearCache() {
+    currentSessionId++; // Invalidate all pending session tasks
     activeControllers.forEach(controller => controller.abort());
     activeControllers.clear();
     pendingFetches.clear();
     preloadedImages.clear();
+}
+
+/**
+ * Returns the active session ID.
+ */
+export function getCurrentSessionId() {
+    return currentSessionId;
 }
 
 /**
@@ -29,6 +42,9 @@ export async function loadObservationForQuestion(index) {
     
     // Check runtime cache for pending fetch
     if (pendingFetches.has(index)) return pendingFetches.get(index);
+
+    // Capture the session ID when this request is initiated
+    const requestSessionId = currentSessionId;
 
     const controller = new AbortController();
     activeControllers.set(index, controller);
@@ -95,6 +111,9 @@ export async function loadObservationForQuestion(index) {
                     }
                 }
                 
+                // Check if session changed while awaiting deep page data
+                if (requestSessionId !== currentSessionId) return null;
+
                 if (validResults.length === 0) {
                     const emptyData = { error: true, emptyPool: true };
                     updateQuestion(index, { observation: emptyData });
@@ -141,6 +160,9 @@ export async function loadObservationForQuestion(index) {
                 notObsIds
             }, controller.signal);
 
+            // Guard against obsolete session completion
+            if (requestSessionId !== currentSessionId) return null;
+
             if (data.results && data.results.length > 0) {
                 const obs = data.results[0];
                 const updates = { observation: obs };
@@ -161,6 +183,12 @@ export async function loadObservationForQuestion(index) {
                 return emptyData;
             }
         } catch(e) {
+            // 1. If the session changed (e.g. user clicked "Play Again"), discard silently
+            if (requestSessionId !== currentSessionId) {
+                return null;
+            }
+
+            // 2. Same-session error handling (including dynamic network timeouts)
             const errorData = { error: true };
             
             if (e.status === 429) {
@@ -172,6 +200,7 @@ export async function loadObservationForQuestion(index) {
                 console.error(`Question ${index + 1}: Fetch failed`, e);
             }
 
+            // Always update state for the current session so the UI shows the error/retry controls
             updateQuestion(index, { observation: errorData });
             return errorData;
         } finally {
