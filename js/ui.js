@@ -1,5 +1,5 @@
 import { selectCurrentMedia, selectCurrentMeta } from './state.js';
-import { filterSignificantFragments } from './stopwords.js';
+import { filterSignificantFragments, isStopWord } from './stopwords.js';
 
 let currentView = null;
 let lastFocusedQuestionIndex = -1;
@@ -64,13 +64,13 @@ const autocompleteConfigs = [
 ];
 
 /**
- * Redacts the taxon's scientific name, common names, and significant fragments
- * from field note strings while protecting generic stop-words from over-redaction.
+ * Redacts the taxon's scientific name, common names, possessive variants,
+ * hyphenated space variants, and significant fragments from field note strings.
  */
 function redactSpoilers(text, taxon) {
     if (!text || !taxon) return text;
 
-    // 1. Normalize typographic quotes and dashes in both the text and taxonomy.
+    // 1. Normalize typographic quotes and dashes in both text and taxonomy
     const normalizeTypography = (str) => str.replace(/[’‘´`]/g, "'").replace(/[—–]/g, "-");
     
     let safeText = normalizeTypography(text);
@@ -78,7 +78,7 @@ function redactSpoilers(text, taxon) {
     const scientificTerms = new Set();
     const commonTerms = new Set();
 
-    // 2. Add Full Scientific Name & Genus/Epithet parts
+    // 2. Add Scientific Name & Genus/Epithet parts
     if (taxon.name) {
         const safeSciName = normalizeTypography(taxon.name);
         scientificTerms.add(safeSciName);
@@ -89,21 +89,53 @@ function redactSpoilers(text, taxon) {
         });
     }
 
-    // 3. Add Full Preferred Common Name
+    // 3. Add Common Name & Variant Terms
     if (taxon.preferred_common_name) {
         const safeCommonName = normalizeTypography(taxon.preferred_common_name);
         commonTerms.add(safeCommonName);
-        
-        // Extract & filter fragments using the stop-word dictionary
-        const fragments = safeCommonName.split(/[\s-]+/);
-        const significantFragments = filterSignificantFragments(fragments, 3);
-        
-        significantFragments.forEach(fragment => {
-            commonTerms.add(fragment);
+
+        // Convert hyphenated full names to space variants (e.g., "Red-tailed Hawk" -> "Red tailed Hawk")
+        if (safeCommonName.includes('-')) {
+            commonTerms.add(safeCommonName.replace(/-/g, ' '));
+        }
+
+        // Process space-delimited word tokens
+        const words = safeCommonName.split(/\s+/);
+
+        words.forEach(word => {
+            // Handle possessive variants (e.g., "Steller's" -> "Steller's", "Stellers", "Steller")
+            if (word.includes("'")) {
+                commonTerms.add(word);
+                const noApostrophe = word.replace(/'/g, '');
+                if (noApostrophe.length >= 3) commonTerms.add(noApostrophe);
+
+                const baseName = word.replace(/'s?$/i, '');
+                if (baseName.length >= 3 && !isStopWord(baseName)) {
+                    commonTerms.add(baseName);
+                }
+            }
+
+            // Handle hyphenated token variants (e.g., "Red-tailed" -> "Red-tailed", "Red tailed")
+            if (word.includes('-')) {
+                commonTerms.add(word);
+                commonTerms.add(word.replace(/-/g, ' '));
+
+                const subParts = word.split('-');
+                const significantSubParts = filterSignificantFragments(subParts, 3);
+                significantSubParts.forEach(sub => commonTerms.add(sub));
+            }
+
+            // Standard single tokens
+            if (!word.includes("'") && !word.includes('-')) {
+                const clean = word.toLowerCase().replace(/[^\w]/g, '');
+                if (clean.length >= 3 && !isStopWord(clean)) {
+                    commonTerms.add(word);
+                }
+            }
         });
     }
 
-    // 4. Pluralize ONLY significant common terms (e.g., "Falcon" -> "Falcons")
+    // 4. Pluralize significant common terms
     const termsToRedact = new Set([...scientificTerms, ...commonTerms]);
     
     commonTerms.forEach(term => {
@@ -117,6 +149,7 @@ function redactSpoilers(text, taxon) {
 
     // 5. Sort descending by length so full phrases match before single words
     const sortedTerms = Array.from(termsToRedact)
+        .filter(term => term && term.trim().length > 0)
         .sort((a, b) => b.length - a.length)
         .map(term => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
 
