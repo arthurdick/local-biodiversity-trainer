@@ -106,6 +106,10 @@ export async function loadObservationForQuestion(index) {
 
                 if (validResults.length === 0) {
                     const emptyData = { error: true, emptyPool: true };
+                    
+                    // Session ID Guard prior to state mutation
+                    if (requestSessionId !== currentSessionId) return null;
+                    
                     updateQuestion(index, { observation: emptyData });
                     return emptyData;
                 }
@@ -113,6 +117,10 @@ export async function loadObservationForQuestion(index) {
                 const randomItem = engine.selectRareTaxonFromPool(validResults, currentConfig.weightingMethod);
 
                 targetTaxon = randomItem.taxon;
+                
+                // Session ID Guard prior to state mutation
+                if (requestSessionId !== currentSessionId) return null;
+                
                 updateQuestion(index, { taxon: targetTaxon });
             }
             
@@ -150,7 +158,7 @@ export async function loadObservationForQuestion(index) {
                 notObsIds
             }, controller.signal);
 
-            // Guard against obsolete session completion
+            // Session ID Guard prior to state mutation
             if (requestSessionId !== currentSessionId) return null;
 
             if (data.results && data.results.length > 0) {
@@ -158,6 +166,9 @@ export async function loadObservationForQuestion(index) {
                 const updates = { observation: obs };
                 
                 if (isStandardExpert) updates.taxon = obs.taxon;
+                
+                // Session ID Guard prior to state mutation
+                if (requestSessionId !== currentSessionId) return null;
                 
                 updateQuestion(index, updates);
                 
@@ -169,6 +180,10 @@ export async function loadObservationForQuestion(index) {
                 return obs;
             } else {
                 const emptyData = { error: true, emptyPool: true };
+                
+                // Session ID Guard prior to state mutation
+                if (requestSessionId !== currentSessionId) return null;
+                
                 updateQuestion(index, { observation: emptyData });
                 return emptyData;
             }
@@ -190,7 +205,9 @@ export async function loadObservationForQuestion(index) {
                 console.error(`Question ${index + 1}: Fetch failed`, e);
             }
 
-            // Always update state for the current session so the UI shows the error/retry controls
+            // Session ID Guard prior to state mutation
+            if (requestSessionId !== currentSessionId) return null;
+
             updateQuestion(index, { observation: errorData });
             return errorData;
         } finally {
