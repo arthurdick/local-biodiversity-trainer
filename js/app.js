@@ -605,9 +605,31 @@ document.getElementById('btn-next').addEventListener('click', () => {
 });
 
 document.getElementById('btn-retry').addEventListener('click', () => {
-    updateQuestion(getState().currentIndex, { observation: null });
-    setState(prev => ({ ui: { ...prev.ui, quizError: null, isMediaLoaded: false } }));
-    observationService.loadObservationForQuestion(getState().currentIndex);
+    const s = getState();
+    const q = s.questions[s.currentIndex];
+
+    // If we already have a valid observation, just retry loading the media
+    if (q.observation && !q.observation.error) {
+        const imgEl = document.getElementById('quiz-image');
+        const audioPlayer = document.getElementById('quiz-audio-player');
+        
+        // Clear src attributes and dataset to force ui.js to reassign and trigger a reload
+        if (imgEl) {
+            imgEl.removeAttribute('src');
+            delete imgEl.dataset.src;
+        }
+        if (audioPlayer) {
+            audioPlayer.removeAttribute('src');
+            delete audioPlayer.dataset.src;
+        }
+        
+        setState(prev => ({ ui: { ...prev.ui, quizError: null, isMediaLoaded: false } }));
+    } else {
+        // Otherwise, retry fetching the observation data from the API
+        updateQuestion(s.currentIndex, { observation: null });
+        setState(prev => ({ ui: { ...prev.ui, quizError: null, isMediaLoaded: false } }));
+        observationService.loadObservationForQuestion(s.currentIndex);
+    }
 });
 
 document.getElementById('btn-skip-end').addEventListener('click', () => {
