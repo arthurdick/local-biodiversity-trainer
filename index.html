@@ -9,6 +9,10 @@
 <body>
 
 <div id="app">
+    <!-- Centralized Screen Reader Announcer -->
+    <div id="a11y-polite" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+    <div id="a11y-assertive" class="visually-hidden" aria-live="assertive" aria-atomic="true"></div>
+
     <main>
         <!-- Setup View -->
         <div id="setup-view" class="view active">
@@ -158,20 +162,20 @@
         <!-- Quiz View -->
         <div id="quiz-view" class="view">
             <h2 id="quiz-heading" class="visually-hidden" tabindex="-1">Quiz Active</h2>
-            <div class="progress" aria-live="polite">
+            <div class="progress">
                 <span id="quiz-counter" tabindex="-1">Question 1 of 10</span>
                 <span id="quiz-score">Score: 0</span>
             </div>
             
             <div class="badge-container">
-                <span id="quiz-target-badge" class="target-badge" aria-live="polite"></span>
+                <span id="quiz-target-badge" class="target-badge"></span>
             </div>
             
             <!-- Quiz Media Container -->
             <div class="quiz-media-container">
                 <div class="quiz-media-stage">
-                    <div id="quiz-loading" aria-live="assertive">Fetching random observation...</div>
-                    <div id="quiz-error" aria-live="assertive"></div>
+                    <div id="quiz-loading">Fetching random observation...</div>
+                    <div id="quiz-error"></div>
                     
                     <button type="button" id="btn-zoom-image" aria-label="View full resolution image" title="Click to view full resolution">
                         <img id="quiz-image" src="" alt="Observation photo">
@@ -187,7 +191,7 @@
 
                 <div id="media-controls" class="media-controls">
                     <button type="button" id="btn-prev-media" aria-label="Previous Media">◀</button>
-                    <span id="media-counter" aria-live="polite">1 / 1</span>
+                    <span id="media-counter">1 / 1</span>
                     <button type="button" id="btn-next-media" aria-label="Next Media">▶</button>
                 </div>
                 
@@ -202,12 +206,13 @@
                 <button type="button" id="btn-toggle-hint" class="btn-hint" style="display: none;" aria-expanded="false" aria-controls="quiz-hint-content">
                     💡 Show Field Notes (Hint)
                 </button>
-                <div id="quiz-hint-content" class="hint-content" style="display: none;" aria-live="polite"></div>
+                <div id="quiz-hint-content" class="hint-content" style="display: none;"></div>
             </div>
 
             <form class="form-group" id="answer-form">
                 <label for="input-answer">What is this?</label>
                 <div class="answer-inputs-row">
+                    <label for="input-rank" class="visually-hidden">Taxonomic Rank</label>
                     <select id="input-rank" aria-label="Taxonomic Rank">
                         <option value="species" selected>Species</option>
                         <option value="genus">Genus</option>
@@ -225,7 +230,7 @@
                 </div>
             </form>
 
-            <div id="feedback" aria-live="polite"></div>
+            <div id="feedback"></div>
             <button type="button" id="btn-retry">Retry Loading ↻</button>
             <button type="button" id="btn-skip-end">Skip to End ➔</button>
             <button type="button" id="btn-next">Next Observation ➔</button>

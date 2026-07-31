@@ -7,6 +7,38 @@ let lastFocusedQuestionIndex = -1;
 // Private WeakMap to track render cache without polluting DOM node properties
 const domCache = new WeakMap();
 
+/**
+ * Pushes a coherent string to the central screen reader live region.
+ */
+let announceTimeout = null;
+
+function announce(message, isAssertive = false) {
+    if (!message) return;
+
+    // Clear any pending rapid announcements to prevent stuttering
+    if (announceTimeout) clearTimeout(announceTimeout);
+
+    announceTimeout = setTimeout(() => {
+        const targetId = isAssertive ? 'a11y-assertive' : 'a11y-polite';
+        const announcer = document.getElementById(targetId);
+        
+        if (announcer) {
+            // Append a non-breaking space if the text is identical to force a new mutation event
+            if (announcer.textContent === message) {
+                announcer.textContent = message + '\u00A0';
+            } else {
+                announcer.textContent = message;
+            }
+        }
+        
+        // Clear the *other* region so they don't visually clutter the DOM or conflict
+        const otherId = isAssertive ? 'a11y-polite' : 'a11y-assertive';
+        const otherAnnouncer = document.getElementById(otherId);
+        if (otherAnnouncer) otherAnnouncer.textContent = '';
+        
+    }, 250); // 250ms debounce allows rapid DOM updates to settle
+}
+
 // --- AUTOCOMPLETE FORMATTERS ---
 
 export function formatPlaceDisplay(item) {
@@ -279,7 +311,33 @@ export function render(state) {
         const hasError = !!state.ui.quizError || !!q?.observation?.error;
         
         const isReadyForMedia = hasObservation && !hasError;
+
+        // --- Coherent Screen Reader Announcements ---
+        let currentPhase = '';
+        if (state.ui.answerError) {
+            currentPhase = `Error: ${state.ui.answerError}`;
+        } else if (hasError) {
+            currentPhase = 'Error loading observation data. Please check your connection or retry.';
+        } else if (!hasObservation) {
+            currentPhase = `Question ${state.currentIndex + 1}. Fetching observation.`;
+        } else if (!state.ui.isMediaLoaded) {
+            currentPhase = 'Loading media.';
+        } else if (isReadyForMedia && !isAnswered && !state.ui.isCheckingAnswer) {
+            currentPhase = `Question ${state.currentIndex + 1} ready. Media loaded.`;
+        } else if (state.ui.isCheckingAnswer) {
+            currentPhase = 'Checking answer...';
+        } else if (isAnswered) {
+            currentPhase = q.isSkipped ? 'Question skipped.' : (q.isCorrect ? 'Correct!' : 'Incorrect.');
+        }
+
+        const quizViewEl = document.getElementById('quiz-view');
+        const quizCache = domCache.get(quizViewEl) || {};
         
+        if (quizCache.lastPhase !== currentPhase && currentPhase !== '') {
+            announce(currentPhase, hasError || !!state.ui.answerError);
+            domCache.set(quizViewEl, { ...quizCache, lastPhase: currentPhase });
+        }
+
         document.getElementById('quiz-counter').textContent = `Question ${state.currentIndex + 1} of ${state.questions.length}`;
         document.getElementById('quiz-score').textContent = `Score: ${formatPoints(state.score)}`;
 
@@ -359,7 +417,6 @@ export function render(state) {
             answerErrEl.id = 'answer-error';
             answerErrEl.className = 'inline-error';
             answerErrEl.style.marginBottom = '10px';
-            answerErrEl.setAttribute('aria-live', 'assertive');
             
             const buttonsRow = document.querySelector('.answer-buttons-row');
             if (buttonsRow) buttonsRow.parentNode.insertBefore(answerErrEl, buttonsRow);
@@ -710,31 +767,31 @@ function renderQuizMeta(state, isReadyForMedia) {
             return;
         }
 
-        domCache.set(hintContent, {
-            ...cache,
-            lastObs: q?.observation,
-            lastTaxon: taxon,
-            lastIsReady: isReadyForMedia,
-            lastHintVisible: state.ui.isHintVisible,
-            lastIndex: state.currentIndex
-        });
-
         if (isReadyForMedia && rawDesc) {
             let descToDisplay = '';
-            const hintCache = domCache.get(hintContent) || {};
 
-            if (hintCache.lastRawDesc === rawDesc && hintCache.lastTaxonForRedaction === taxon) {
-                descToDisplay = hintCache.lastRedactedDesc;
+            if (cache.lastRawDesc === rawDesc && cache.lastTaxonForRedaction === taxon) {
+                descToDisplay = cache.lastRedactedDesc;
             } else {
                 descToDisplay = redactSpoilers(rawDesc, taxon);
-                domCache.set(hintContent, {
-                    ...domCache.get(hintContent),
-                    lastRawDesc: rawDesc,
-                    lastTaxonForRedaction: taxon,
-                    lastRedactedDesc: descToDisplay
-                });
             }
             
+            if (cache.lastHintVisible !== undefined && cache.lastHintVisible !== state.ui.isHintVisible) {
+                announce(state.ui.isHintVisible ? `Hint revealed: ${descToDisplay}` : 'Hint hidden');
+            }
+
+            domCache.set(hintContent, {
+                ...cache,
+                lastObs: q?.observation,
+                lastTaxon: taxon,
+                lastIsReady: isReadyForMedia,
+                lastHintVisible: state.ui.isHintVisible,
+                lastIndex: state.currentIndex,
+                lastRawDesc: rawDesc,
+                lastTaxonForRedaction: taxon,
+                lastRedactedDesc: descToDisplay
+            });
+
             hintBtn.style.display = 'inline-block';
             hintBtn.textContent = state.ui.isHintVisible ? '🙈 Hide Field Notes' : '💡 Show Field Notes (Hint)';
             hintBtn.setAttribute('aria-expanded', String(state.ui.isHintVisible));
@@ -742,6 +799,15 @@ function renderQuizMeta(state, isReadyForMedia) {
             hintContent.style.display = state.ui.isHintVisible ? 'block' : 'none';
             if (hintContent.textContent !== descToDisplay) hintContent.textContent = descToDisplay;
         } else {
+            domCache.set(hintContent, {
+                ...cache,
+                lastObs: q?.observation,
+                lastTaxon: taxon,
+                lastIsReady: isReadyForMedia,
+                lastHintVisible: state.ui.isHintVisible,
+                lastIndex: state.currentIndex
+            });
+
             hintBtn.style.display = 'none';
             hintContent.style.display = 'none';
         }
