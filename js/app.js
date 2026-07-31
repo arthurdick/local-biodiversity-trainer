@@ -30,6 +30,7 @@ store.addEventListener('quiz:retry', () => {
     if (q.observation && !q.observation.error) {
         checkMediaReadiness();
     } else {
+        store.updateQuestion(s.currentIndex, { observation: null });
         observationService.loadObservationForQuestion(s.currentIndex);
     }
 });
