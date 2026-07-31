@@ -2,9 +2,6 @@ import { getState, updateQuestion } from './state.js';
 import * as api from './api.js';
 import * as engine from './quizEngine.js';
 
-// Re-export for external consumers if needed
-export { getDynamicNetworkTimeout } from './api.js';
-
 // --- SESSION TRACKER & RUNTIME CACHE ---
 let currentSessionId = 0;
 
@@ -21,13 +18,6 @@ export function clearCache() {
     activeControllers.clear();
     pendingFetches.clear();
     preloadedImages.clear();
-}
-
-/**
- * Returns the active session ID.
- */
-export function getCurrentSessionId() {
-    return currentSessionId;
 }
 
 /**

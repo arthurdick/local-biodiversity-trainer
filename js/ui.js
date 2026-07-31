@@ -74,7 +74,6 @@ export function formatTaxonDisplay(item) {
 
 const autocompleteConfigs = [
     {
-        type: 'place',
         inputId: 'input-place',
         listId: 'list-place',
         clearBtnId: 'clear-place',
@@ -84,7 +83,6 @@ const autocompleteConfigs = [
         formatDisplay: formatPlaceDisplay
     },
     {
-        type: 'taxon',
         inputId: 'input-taxon',
         listId: 'list-taxon',
         clearBtnId: 'clear-taxon',
@@ -192,7 +190,7 @@ function redactSpoilers(text, taxon) {
     return safeText.replace(regex, '[REDACTED]');
 }
 
-export const formatPoints = (points) => Number((points / 10).toFixed(1));
+const formatPoints = (points) => Number((points / 10).toFixed(1));
 
 // Helper to safely pause and reset audio playback
 function stopAudio() {
@@ -204,12 +202,12 @@ function stopAudio() {
 }
 
 // Safe text input sync (prevents cursor jumping)
-export function syncInput(id, value) {
+function syncInput(id, value) {
     const el = document.getElementById(id);
     if (el && el.value !== String(value)) el.value = value;
 }
 
-export function syncCheckbox(id, checked) {
+function syncCheckbox(id, checked) {
     const el = document.getElementById(id);
     const isChecked = !!checked;
     if (el && el.checked !== isChecked) el.checked = isChecked;

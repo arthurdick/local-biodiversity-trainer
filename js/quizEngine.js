@@ -1,6 +1,6 @@
 import * as api from './api.js';
 
-export function normalize(str) {
+function normalize(str) {
     if (!str) return '';
     return str
         .normalize('NFD')
@@ -32,7 +32,7 @@ export function getQuestionThumbnail(q, currentMediaArray) {
     return { url: '', attribution: '' };
 }
 
-export function getWeight(count, method = 'linear') {
+function getWeight(count, method = 'linear') {
     if (method === 'linear') {
         return Math.max(1, count);
     }
@@ -128,7 +128,7 @@ export function selectRareTaxonFromPool(validResults, weightingMethod = 'linear'
     return (weightedResults.find(w => roll <= w.threshold) || weightedResults[weightedResults.length - 1]).item;
 }
 
-export function checkExactMatch(inputStr, taxon) {
+function checkExactMatch(inputStr, taxon) {
     const normalizedInput = normalize(inputStr);
     const matchSci = normalizedInput === normalize(taxon.name);
     const matchCommon = taxon.preferred_common_name ? (normalizedInput === normalize(taxon.preferred_common_name)) : false;
@@ -139,7 +139,7 @@ export function checkExactMatch(inputStr, taxon) {
     return { isCorrect: false, matchedNameDisplay: "", normalizedInput };
 }
 
-export function getPointsForRank(rank) {
+function getPointsForRank(rank) {
     switch(rank) {
         case 'species': return 10;
         case 'genus': return 7;
