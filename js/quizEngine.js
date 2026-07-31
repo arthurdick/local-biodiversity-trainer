@@ -7,8 +7,8 @@ export function normalize(str) {
         .replace(/[\u0300-\u036f]/g, '') // Strip diacritics/accents
         .toLowerCase()
         .replace(/[-—–]/g, ' ')          // Convert ALL hyphens and dashes to spaces
-        .replace(/[^\p{L}\p{N}\s]/gu, '')// Strip all remaining punctuation (including apostrophes)
-        .replace(/\s+/g, ' ')            // Condense multiple spaces into one
+        .replace(/[^\p{L}\p{N}\s]/gu, '')// Strip all remaining punctuation
+        .replace(/\s+/g, ' ')            // Condense spaces
         .trim();
 }
 
@@ -32,9 +32,6 @@ export function getQuestionThumbnail(q, currentMediaArray) {
     return { url: '', attribution: '' };
 }
 
-/**
- * Standardizes weighting to either flatten API skewing (logarithmic) or reflect true ecological abundance (linear).
- */
 export function getWeight(count, method = 'linear') {
     if (method === 'linear') {
         return Math.max(1, count);
@@ -45,7 +42,6 @@ export function getWeight(count, method = 'linear') {
 export function generateWeightedPool(dataResults, questionLimit, preventDuplicates, isRarityMode = false, weightingMethod = 'linear') {
     const questions = [];
     
-    // Create a working pool using the standardized weights
     let availablePool = dataResults.map(r => {
         const count = Math.max(1, r.count || 1); 
         const rawWeight = getWeight(count, weightingMethod);
@@ -59,7 +55,6 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
     
     if (preventDuplicates) {
         const limit = Math.min(questionLimit, availablePool.length);
-
         let totalWeight = availablePool.reduce((sum, item) => sum + item.weight, 0);
 
         for (let i = 0; i < limit; i++) {
@@ -83,9 +78,8 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
             availablePool.splice(selectedIndex, 1);
         }
     } else {
-        // Dynamic recalculation for allowed duplicates
         for (let i = 0; i < questionLimit; i++) {
-            if (availablePool.length === 0) break; // Stop gracefully if the entire pool is exhausted
+            if (availablePool.length === 0) break;
             
             let totalWeight = availablePool.reduce((sum, item) => sum + item.weight, 0);
             const roll = Math.random() * totalWeight;
@@ -103,10 +97,8 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
             const selectedItem = availablePool[selectedIndex];
             questions.push({ taxon: selectedItem.taxon, observation: null });
             
-            // Track how many times this species has been queued
             selectedItem.selectedCount = (selectedItem.selectedCount || 0) + 1;
             
-            // If we've exhausted all observations for this species, remove it from the pool
             if (selectedItem.selectedCount >= selectedItem.count) {
                 availablePool.splice(selectedIndex, 1);
             }
@@ -115,9 +107,6 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
     return questions;
 }
 
-/**
- * Deep paging algorithm for Rare Expert mode.
- */
 export function calculateDeepPage(totalSpecies) {
     let deepPage = 1;
     if (totalSpecies > 50) {
@@ -137,15 +126,12 @@ export function calculateDeepPage(totalSpecies) {
     return deepPage;
 }
 
-/**
- * Selects a rare taxon utilizing inverse weighting for isolated small pools.
- */
 export function selectRareTaxonFromPool(validResults, weightingMethod = 'linear') {
     let totalWeight = 0;
     const weightedResults = validResults.map(r => {
         const count = Math.max(1, r.count || 1);
         const rawWeight = getWeight(count, weightingMethod);
-        const weight = 1 / rawWeight; // Inverse for rarity
+        const weight = 1 / rawWeight;
         totalWeight += weight;
         return { item: r, threshold: totalWeight };
     });
@@ -178,7 +164,7 @@ export function getPointsForRank(rank) {
 /**
  * Orchestrates local strict matching and API ancestor validation.
  */
-export async function evaluateAnswer(inputStr, guessedRank, taxon, getTimeoutFn) {
+export async function evaluateAnswer(inputStr, guessedRank, taxon, signal = null) {
     let { isCorrect, matchedNameDisplay, normalizedInput } = checkExactMatch(inputStr, taxon);
     let pointsEarned = 0;
     let networkError = false;
@@ -191,12 +177,7 @@ export async function evaluateAnswer(inputStr, guessedRank, taxon, getTimeoutFn)
 
     if (!isCorrect) {
         try {
-            const controller = new AbortController();
-            const timeoutMs = getTimeoutFn ? getTimeoutFn() : 10000;
-            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-            
-            const searchData = await api.checkTaxonSearch(inputStr, guessedRank, controller.signal);
-            clearTimeout(timeoutId);
+            const searchData = await api.checkTaxonSearch(inputStr, guessedRank, signal);
             
             if (searchData.results && searchData.results.length > 0) {
                 for (const result of searchData.results) {

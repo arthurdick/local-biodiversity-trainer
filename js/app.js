@@ -557,7 +557,7 @@ document.getElementById('answer-form').addEventListener('submit', async (e) => {
     setState(prev => ({ ui: { ...prev.ui, isCheckingAnswer: true, answerError: null } }));
 
     const { isCorrect, pointsEarned, matchedNameDisplay, networkError } = await engine.evaluateAnswer(
-        inputStr, s.form.rankInput, q.observation?.taxon || q.taxon, observationService.getDynamicNetworkTimeout
+        inputStr, s.form.rankInput, q.observation?.taxon || q.taxon
     );
 
     if (networkError) {

@@ -2,64 +2,19 @@ import { getState, updateQuestion } from './state.js';
 import * as api from './api.js';
 import * as engine from './quizEngine.js';
 
+// Re-export for external consumers if needed
+export { getDynamicNetworkTimeout } from './api.js';
+
 // --- RUNTIME CACHE ---
 const pendingFetches = new Map();
 const activeControllers = new Map();
-const preloadedImages = new Map(); // Retains strong references to prevent GC
-
-/**
- * Calculates a dynamic network timeout based on the user's connection speed.
- */
-export function getDynamicNetworkTimeout(defaultTimeout = 10000) {
-    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-    if (!connection) return defaultTimeout;
-
-    switch (connection.effectiveType) {
-        case 'slow-2g':
-        case '2g':
-            return 30000; // 30 seconds for very slow connections
-        case '3g':
-            return 20000; // 20 seconds for 3G
-        case '4g':
-        default:
-            return defaultTimeout;
-    }
-}
+const preloadedImages = new Map();
 
 export function clearCache() {
     activeControllers.forEach(controller => controller.abort());
     activeControllers.clear();
     pendingFetches.clear();
     preloadedImages.clear();
-}
-
-/**
- * Helper to execute a fetch with its own network timeout,
- * while linking to a parent AbortSignal for user cancellation.
- */
-async function fetchWithTimeout(fetchFn, parentSignal) {
-    const fetchController = new AbortController();
-
-    const onParentAbort = () => fetchController.abort();
-    if (parentSignal) {
-        if (parentSignal.aborted) {
-            fetchController.abort();
-        } else {
-            parentSignal.addEventListener('abort', onParentAbort, { once: true });
-        }
-    }
-
-    const timeoutMs = getDynamicNetworkTimeout();
-    const timeoutId = setTimeout(() => fetchController.abort(), timeoutMs);
-
-    try {
-        return await fetchFn(fetchController.signal);
-    } finally {
-        clearTimeout(timeoutId);
-        if (parentSignal) {
-            parentSignal.removeEventListener('abort', onParentAbort);
-        }
-    }
 }
 
 /**
@@ -101,22 +56,19 @@ export async function loadObservationForQuestion(index) {
                 while (validResults.length === 0 && attempts < maxAttempts && deepPage >= 1) {
                     attempts++;
 
-                    const deepData = await fetchWithTimeout(
-                        signal => api.fetchSpeciesPool({
-                            perPage: 50,
-                            page: deepPage,
-                            wantsPhotos: currentConfig.wantsPhotos,
-                            wantsSounds: currentConfig.wantsSounds,
-                            months: currentConfig.months,
-                            placeId: currentConfig.placeId,
-                            lat: currentConfig.lat,
-                            lng: currentConfig.lng,
-                            radius: currentConfig.radius,
-                            taxonId: currentConfig.taxonId,
-                            establishmentStatus: currentConfig.establishmentStatus
-                        }, signal),
-                        controller.signal
-                    );
+                    const deepData = await api.fetchSpeciesPool({
+                        perPage: 50,
+                        page: deepPage,
+                        wantsPhotos: currentConfig.wantsPhotos,
+                        wantsSounds: currentConfig.wantsSounds,
+                        months: currentConfig.months,
+                        placeId: currentConfig.placeId,
+                        lat: currentConfig.lat,
+                        lng: currentConfig.lng,
+                        radius: currentConfig.radius,
+                        taxonId: currentConfig.taxonId,
+                        establishmentStatus: currentConfig.establishmentStatus
+                    }, controller.signal);
 
                     if (deepData.results && deepData.results.length > 0) {
                         if (currentConfig.preventDuplicates) {
@@ -174,23 +126,20 @@ export async function loadObservationForQuestion(index) {
                     .filter(uuid => uuid !== undefined);
             }
 
-            const data = await fetchWithTimeout(
-                signal => api.fetchObservation({
-                    wantsPhotos: currentConfig.wantsPhotos,
-                    wantsSounds: currentConfig.wantsSounds,
-                    months: currentConfig.months,
-                    placeId: currentConfig.placeId,
-                    lat: currentConfig.lat,
-                    lng: currentConfig.lng,
-                    radius: currentConfig.radius,
-                    difficulty: isStandardExpert ? 'all' : 'specific',
-                    taxonId: isStandardExpert ? currentConfig.taxonId : targetTaxon?.id,
-                    establishmentStatus: currentConfig.establishmentStatus,
-                    withoutTaxonIds,
-                    notObsIds
-                }, signal),
-                controller.signal
-            );
+            const data = await api.fetchObservation({
+                wantsPhotos: currentConfig.wantsPhotos,
+                wantsSounds: currentConfig.wantsSounds,
+                months: currentConfig.months,
+                placeId: currentConfig.placeId,
+                lat: currentConfig.lat,
+                lng: currentConfig.lng,
+                radius: currentConfig.radius,
+                difficulty: isStandardExpert ? 'all' : 'specific',
+                taxonId: isStandardExpert ? currentConfig.taxonId : targetTaxon?.id,
+                establishmentStatus: currentConfig.establishmentStatus,
+                withoutTaxonIds,
+                notObsIds
+            }, controller.signal);
 
             if (data.results && data.results.length > 0) {
                 const obs = data.results[0];
@@ -203,7 +152,6 @@ export async function loadObservationForQuestion(index) {
                 if (obs.photos && obs.photos.length > 0) {
                     const preload = new Image();
                     preload.src = obs.photos[0].url.replace('square', 'medium');
-                    // Retain strong reference in Map to prevent garbage collection sweep
                     preloadedImages.set(index, preload);
                 }
                 return obs;
@@ -225,7 +173,6 @@ export async function loadObservationForQuestion(index) {
             }
 
             updateQuestion(index, { observation: errorData });
-            
             return errorData;
         } finally {
             pendingFetches.delete(index);

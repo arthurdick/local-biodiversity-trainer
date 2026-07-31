@@ -19,9 +19,31 @@ export const getLocale = () => {
 };
 
 /**
+ * Calculates a dynamic network timeout based on the user's connection speed.
+ */
+export const getDynamicNetworkTimeout = (defaultTimeout = 10000) => {
+    if (typeof navigator !== 'undefined') {
+        const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (connection) {
+            switch (connection.effectiveType) {
+                case 'slow-2g':
+                case '2g':
+                    return 30000; // 30 seconds for very slow connections
+                case '3g':
+                    return 20000; // 20 seconds for 3G
+                case '4g':
+                default:
+                    return defaultTimeout;
+            }
+        }
+    }
+    return defaultTimeout;
+};
+
+/**
  * Global Request Throttler
  * Ensures requests to the API are spaced by at least `interval` milliseconds,
- * while allowing aborted requests to instantly unblock the queue.
+ * while isolating network timeouts strictly to active HTTP fetch executions.
  */
 class RequestQueue {
     constructor(interval = 1000) {
@@ -68,11 +90,10 @@ class RequestQueue {
         try {
             while (this.queue.length > 0) {
                 const task = this.queue.shift();
+                task.cleanup(); // Task dequeued; remove queue-level listener
 
                 // 1. CHECK BEFORE SLEEPING:
-                // Discard immediately if aborted while sitting in queue
                 if (task.options.signal?.aborted) {
-                    task.cleanup();
                     task.reject(new DOMException('Aborted before execution', 'AbortError'));
                     continue;
                 }
@@ -102,22 +123,40 @@ class RequestQueue {
                 }
 
                 // 2. CHECK AFTER SLEEPING:
-                // Double check if aborted WHILE it was sleeping in the delay above
                 if (task.options.signal?.aborted) {
-                    task.cleanup();
                     task.reject(new DOMException('Aborted during delay', 'AbortError'));
-                    continue; // Skip fetch and proceed directly to next item
+                    continue;
                 }
 
                 this.lastRequestTime = Date.now();
 
+                // 3. NETWORK EXECUTION (Timeout active strictly during active fetch)
+                const fetchController = new AbortController();
+                const timeoutMs = getDynamicNetworkTimeout();
+                const timeoutId = setTimeout(() => fetchController.abort(), timeoutMs);
+
+                const onParentAbort = () => fetchController.abort();
+                if (task.options.signal) {
+                    if (task.options.signal.aborted) {
+                        fetchController.abort();
+                    } else {
+                        task.options.signal.addEventListener('abort', onParentAbort, { once: true });
+                    }
+                }
+
                 try {
-                    const response = await fetch(task.url, task.options);
+                    const response = await fetch(task.url, {
+                        ...task.options,
+                        signal: fetchController.signal
+                    });
                     task.resolve(response);
                 } catch (error) {
                     task.reject(error);
                 } finally {
-                    task.cleanup();
+                    clearTimeout(timeoutId);
+                    if (task.options.signal) {
+                        task.options.signal.removeEventListener('abort', onParentAbort);
+                    }
                 }
             }
         } finally {
@@ -139,7 +178,6 @@ const appendMediaParams = (params, wantsPhotos, wantsSounds) => {
         params.set('sounds', 'true');
     }
     
-    // Ensure both observation data and associated media strictly use open licenses
     params.set('license', CC_LICENSES);
     
     if (wantsPhotos) {
@@ -169,7 +207,7 @@ export const fetchPlaces = async (query, signal, locale = getLocale()) => {
     const params = new URLSearchParams({
         q: query,
         order_by: 'area',
-        geo: 'true',      // Ensures the place has a valid geometry for observation fetching
+        geo: 'true',
         fields: '(id:!t,name:!t,display_name:!t,matched_term:!t)',
         locale: locale
     });
@@ -192,7 +230,6 @@ export const fetchTaxaAutocomplete = async (query, signal, locale = getLocale())
 };
 
 export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, taxonId, establishmentStatus, page = 1, perPage = null, locale = getLocale() }, signal) => {
-    // If perPage is explicitly passed, use it; otherwise fallback to difficulty string mapping
     const limit = perPage !== null ? String(perPage) : String(difficulty);
     
     const params = new URLSearchParams({
