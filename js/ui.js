@@ -2,7 +2,6 @@ import { selectCurrentMedia, selectCurrentMeta } from './state.js';
 import { filterSignificantFragments, isStopWord } from './stopwords.js';
 
 let currentView = null;
-let lastFocusedQuestionIndex = -1;
 
 // Private WeakMap to track render cache without polluting DOM node properties
 const domCache = new WeakMap();
@@ -242,8 +241,6 @@ export function render(state) {
 
     // 2. Setup View
     if (state.ui.activeView === 'setup-view') {
-        lastFocusedQuestionIndex = -1;
-        
         syncInput('input-place', state.form.placeName || '');
         syncInput('input-taxon', state.form.taxonName || '');
         syncInput('input-lat', state.form.lat ?? '');
@@ -398,15 +395,6 @@ export function render(state) {
         
         if (answerInput) answerInput.disabled = inputDisabled;
         if (rankInput) rankInput.disabled = inputDisabled;
-        
-        if (isReadyForMedia && !isAnswered && !state.ui.isCheckingAnswer) {
-            if (lastFocusedQuestionIndex !== state.currentIndex) {
-                lastFocusedQuestionIndex = state.currentIndex;
-                
-                const quizCounter = document.getElementById('quiz-counter');
-                if (quizCounter) quizCounter.focus();
-            }
-        }
         
         const btnSubmit = document.getElementById('btn-submit');
         btnSubmit.style.display = (!isAnswered && isReadyForMedia) ? 'block' : 'none';

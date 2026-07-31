@@ -730,6 +730,11 @@ document.getElementById('btn-next').addEventListener('click', () => {
             form: { ...prev.form, answerInput: '', rankInput: 'species' },
             ui: { ...prev.ui, isMediaLoaded: false, isCheckingAnswer: false, quizError: null, isHintVisible: false }
         }));
+        
+        const quizCounter = document.getElementById('quiz-counter');
+        if (quizCounter) {
+            quizCounter.focus();
+        }
     }
 });
 
