@@ -42,8 +42,8 @@ export const getDynamicNetworkTimeout = (defaultTimeout = 10000) => {
 
 /**
  * Global Request Throttler
- * Ensures requests to the API are spaced by at least `interval` milliseconds,
- * using modern AbortSignal compositions and conditional HTTP 429 backoff retries.
+ * Ensures request dispatches are spaced by at least `interval` milliseconds,
+ * while allowing requests to resolve asynchronously in flight.
  */
 class RequestQueue {
     constructor(interval = 1000) {
@@ -81,6 +81,50 @@ class RequestQueue {
             this.queue.push(task);
             this.processQueue();
         });
+    }
+
+    /**
+     * Executes an individual network request, handling dynamic timeouts and HTTP 429 retries.
+     * Runs asynchronously without blocking queue dispatch.
+     */
+    async _executeTask(task) {
+        try {
+            const timeoutSignal = AbortSignal.timeout(getDynamicNetworkTimeout());
+            const combinedSignal = task.options.signal
+                ? AbortSignal.any([task.options.signal, timeoutSignal])
+                : timeoutSignal;
+
+            let response = await fetch(task.url, {
+                ...task.options,
+                signal: combinedSignal
+            });
+
+            // Conditional retry for HTTP 429 strictly when Retry-After is explicitly specified
+            const retryAfterHeader = response.headers.get('Retry-After');
+            if (response.status === 429 && retryAfterHeader && !task.options.signal?.aborted) {
+                const backoffMs = parseInt(retryAfterHeader, 10) * 1000;
+                if (!isNaN(backoffMs) && backoffMs > 0) {
+                    console.warn(`HTTP 429 rate limit encountered. Retrying in ${backoffMs}ms...`);
+                    await new Promise(r => setTimeout(r, backoffMs));
+
+                    if (!task.options.signal?.aborted) {
+                        const retryTimeoutSignal = AbortSignal.timeout(getDynamicNetworkTimeout());
+                        const retryCombinedSignal = task.options.signal
+                            ? AbortSignal.any([task.options.signal, retryTimeoutSignal])
+                            : retryTimeoutSignal;
+
+                        response = await fetch(task.url, {
+                            ...task.options,
+                            signal: retryCombinedSignal
+                        });
+                    }
+                }
+            }
+
+            task.resolve(response);
+        } catch (error) {
+            task.reject(error);
+        }
     }
 
     async processQueue() {
@@ -126,43 +170,8 @@ class RequestQueue {
 
                 this.lastRequestTime = Date.now();
 
-                try {
-                    const timeoutSignal = AbortSignal.timeout(getDynamicNetworkTimeout());
-                    const combinedSignal = task.options.signal
-                        ? AbortSignal.any([task.options.signal, timeoutSignal])
-                        : timeoutSignal;
-
-                    let response = await fetch(task.url, {
-                        ...task.options,
-                        signal: combinedSignal
-                    });
-
-                    // Conditional retry for HTTP 429 strictly when Retry-After is explicitly specified
-                    const retryAfterHeader = response.headers.get('Retry-After');
-                    if (response.status === 429 && retryAfterHeader && !task.options.signal?.aborted) {
-                        const backoffMs = parseInt(retryAfterHeader, 10) * 1000;
-                        if (!isNaN(backoffMs) && backoffMs > 0) {
-                            console.warn(`HTTP 429 rate limit encountered. Retrying in ${backoffMs}ms...`);
-                            await new Promise(r => setTimeout(r, backoffMs));
-
-                            if (!task.options.signal?.aborted) {
-                                const retryTimeoutSignal = AbortSignal.timeout(getDynamicNetworkTimeout());
-                                const retryCombinedSignal = task.options.signal
-                                    ? AbortSignal.any([task.options.signal, retryTimeoutSignal])
-                                    : retryTimeoutSignal;
-
-                                response = await fetch(task.url, {
-                                    ...task.options,
-                                    signal: retryCombinedSignal
-                                });
-                            }
-                        }
-                    }
-
-                    task.resolve(response);
-                } catch (error) {
-                    task.reject(error);
-                }
+                // Fire task asynchronously so the processing loop can continue dispatching next queued items
+                this._executeTask(task);
             }
         } finally {
             this.isProcessing = false;
