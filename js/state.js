@@ -58,7 +58,12 @@ const initialState = {
         isMediaLoaded: false,
 
         zoomMediaUrl: null,
-        isZoomedIn: false
+        isZoomedIn: false,
+
+        isLicenseModalOpen: false,
+        licenseText: null,
+        isLoadingLicense: false,
+        licenseError: null
     },
 
     // 4. Core Game Data

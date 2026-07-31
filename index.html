@@ -267,13 +267,28 @@
                 </button>
             </div>
         </dialog>
+
+        <!-- Accessible License Modal -->
+        <dialog id="license-modal" class="license-modal" aria-label="Software License">
+            <div class="license-modal-container">
+                <div class="license-modal-header">
+                    <h2>Software License</h2>
+                    <button type="button" id="btn-close-license-modal" class="btn-close-modal" aria-label="Close license modal">&times;</button>
+                </div>
+                <div id="license-modal-content" class="license-modal-content">
+                    <div id="license-loading" class="license-loading">Loading license...</div>
+                    <div id="license-error" class="inline-error" style="display: none; text-align: center; padding: 10px;"></div>
+                    <pre id="license-text" class="license-text" style="display: none;"></pre>
+                </div>
+            </div>
+        </dialog>
     </main>
 
     <footer class="app-footer">
         Species data, sound clips, and photos provided by <a href="https://www.inaturalist.org" target="_blank" rel="noopener">iNaturalist</a>.<br>
         This application is an independent open-source project and is not officially affiliated with iNaturalist.<br>
         <span class="footer-meta">
-            Released under the <a href="LICENSE" target="_blank" rel="noopener">MIT License</a> |
+            Released under the <button type="button" id="btn-license-modal" class="btn-license-link">MIT License</button> |
             <a href="https://github.com/arthurdick/local-biodiversity-trainer" target="_blank" rel="noopener">Source Code on GitHub</a>
         </span>
     </footer>

@@ -520,6 +520,44 @@ export function render(state) {
             zoomImg.style.display = 'none';
         }
     }
+
+    // 6. License Modal
+    const licenseModal = document.getElementById('license-modal');
+    const licenseTextEl = document.getElementById('license-text');
+    const licenseLoadingEl = document.getElementById('license-loading');
+    const licenseErrorEl = document.getElementById('license-error');
+
+    if (licenseModal) {
+        if (state.ui.isLicenseModalOpen) {
+            if (!licenseModal.open && typeof licenseModal.showModal === 'function') {
+                licenseModal.showModal();
+            }
+
+            if (state.ui.isLoadingLicense) {
+                if (licenseLoadingEl) licenseLoadingEl.style.display = 'block';
+                if (licenseErrorEl) licenseErrorEl.style.display = 'none';
+                if (licenseTextEl) licenseTextEl.style.display = 'none';
+            } else if (state.ui.licenseError) {
+                if (licenseLoadingEl) licenseLoadingEl.style.display = 'none';
+                if (licenseErrorEl) {
+                    licenseErrorEl.textContent = state.ui.licenseError;
+                    licenseErrorEl.style.display = 'block';
+                }
+                if (licenseTextEl) licenseTextEl.style.display = 'none';
+            } else if (state.ui.licenseText) {
+                if (licenseLoadingEl) licenseLoadingEl.style.display = 'none';
+                if (licenseErrorEl) licenseErrorEl.style.display = 'none';
+                if (licenseTextEl) {
+                    licenseTextEl.textContent = state.ui.licenseText;
+                    licenseTextEl.style.display = 'block';
+                }
+            }
+        } else {
+            if (licenseModal.open && typeof licenseModal.close === 'function') {
+                licenseModal.close();
+            }
+        }
+    }
 }
 
 // --- SUB-RENDERERS ---

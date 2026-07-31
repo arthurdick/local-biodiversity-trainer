@@ -633,6 +633,58 @@ document.getElementById('btn-zoom-modal-toggle').addEventListener('click', (e) =
     }
 });
 
+// License Modal Bindings
+document.getElementById('btn-license-modal').addEventListener('click', async () => {
+    const currentState = store.getState();
+
+    store.setState(prev => ({
+        ui: {
+            ...prev.ui,
+            isLicenseModalOpen: true,
+            isLoadingLicense: !prev.ui.licenseText,
+            licenseError: null
+        }
+    }));
+
+    if (!currentState.ui.licenseText) {
+        try {
+            const text = await api.fetchLicense();
+            store.setState(prev => ({
+                ui: {
+                    ...prev.ui,
+                    licenseText: text,
+                    isLoadingLicense: false
+                }
+            }));
+        } catch (err) {
+            console.warn('Failed to fetch LICENSE file:', err);
+            store.setState(prev => ({
+                ui: {
+                    ...prev.ui,
+                    isLoadingLicense: false,
+                    licenseError: '⚠️ Unable to load license text.'
+                }
+            }));
+        }
+    }
+});
+
+document.getElementById('btn-close-license-modal').addEventListener('click', () => {
+    store.setState(prev => ({ ui: { ...prev.ui, isLicenseModalOpen: false } }));
+});
+
+document.getElementById('license-modal').addEventListener('close', () => {
+    if (store.getState().ui.isLicenseModalOpen) {
+        store.setState(prev => ({ ui: { ...prev.ui, isLicenseModalOpen: false } }));
+    }
+});
+
+document.getElementById('license-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+        store.setState(prev => ({ ui: { ...prev.ui, isLicenseModalOpen: false } }));
+    }
+});
+
 // Answer Loop
 document.getElementById('clear-answer').addEventListener('click', () => {
     store.setState(prev => ({ form: { ...prev.form, answerInput: '' } }));

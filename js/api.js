@@ -332,6 +332,17 @@ export const checkTaxonSearch = async (inputStr, guessedRank, signal, locale = g
 };
 
 /**
+ * Fetches the application LICENSE text.
+ */
+export const fetchLicense = async (signal) => {
+    const res = await fetch('LICENSE', { signal });
+    if (!res.ok) {
+        throw new Error(`Failed to fetch LICENSE file: ${res.status}`);
+    }
+    return res.text();
+};
+
+/**
  * Flushes the global request throttler and waits for in-flight requests to settle.
  */
 export const clearApiQueue = () => {

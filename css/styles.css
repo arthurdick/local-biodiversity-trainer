@@ -643,3 +643,105 @@ select[multiple] {
     margin-top: 6px;
     opacity: 0.9;
 }
+
+/* ==========================================================================
+   11. License Modal
+   ========================================================================== */
+.license-modal {
+    border: none;
+    padding: 0;
+    background: transparent;
+    max-width: 850px; /* Increased from 600px to allow clean un-wrapped lines */
+    width: 92%;
+    border-radius: var(--radius);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.license-modal::backdrop {
+    background: rgba(0, 0, 0, 0.8);
+}
+
+.license-modal-container {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    max-height: 85vh;
+}
+
+.license-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+    margin-bottom: 15px;
+}
+
+.license-modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: var(--primary);
+}
+
+.license-modal-header .btn-close-modal {
+    position: static;
+    font-size: 20px;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+}
+
+.license-modal-content {
+    overflow-y: auto;
+    max-height: 60vh;
+}
+
+.license-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0;
+    background: var(--bg-color);
+    padding: 15px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    color: var(--text-main);
+}
+
+.license-loading {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-muted);
+    font-weight: bold;
+}
+
+.btn-license-link {
+    background: none;
+    border: none;
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: bold;
+    font-size: inherit;
+    padding: 0;
+    cursor: pointer;
+    display: inline;
+    width: auto;
+    font-family: inherit;
+    transition: color 0.2s;
+}
+
+.btn-license-link:hover {
+    background: transparent;
+    color: var(--primary-hover);
+    text-decoration: underline;
+}
+
+.btn-license-link:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
