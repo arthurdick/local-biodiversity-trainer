@@ -404,6 +404,9 @@ export function render(state) {
         if (isReadyForMedia && !isAnswered && !state.ui.isCheckingAnswer) {
             if (lastFocusedQuestionIndex !== state.currentIndex) {
                 lastFocusedQuestionIndex = state.currentIndex;
+                
+                const quizCounter = document.getElementById('quiz-counter');
+                if (quizCounter) quizCounter.focus();
             }
         }
         
@@ -464,6 +467,9 @@ export function render(state) {
             if (feedbackCache?.lastQuestionIndex !== state.currentIndex) {
                 buildFeedbackDom(q, feedback);
                 domCache.set(feedback, { ...feedbackCache, lastQuestionIndex: state.currentIndex });
+                
+                const btnNext = document.getElementById('btn-next');
+                if (btnNext) btnNext.focus();
             }
         } else {
             feedback.style.display = 'none';
