@@ -43,7 +43,7 @@ export const getDynamicNetworkTimeout = (defaultTimeout = 10000) => {
 /**
  * Global Request Throttler
  * Ensures requests to the API are spaced by at least `interval` milliseconds,
- * while isolating network timeouts strictly to active HTTP fetch executions.
+ * using modern AbortSignal compositions and conditional HTTP 429 backoff retries.
  */
 class RequestQueue {
     constructor(interval = 1000) {
@@ -90,9 +90,8 @@ class RequestQueue {
         try {
             while (this.queue.length > 0) {
                 const task = this.queue.shift();
-                task.cleanup(); // Task dequeued; remove queue-level listener
+                task.cleanup();
 
-                // 1. CHECK BEFORE SLEEPING:
                 if (task.options.signal?.aborted) {
                     task.reject(new DOMException('Aborted before execution', 'AbortError'));
                     continue;
@@ -101,11 +100,9 @@ class RequestQueue {
                 const now = Date.now();
                 const timeSinceLast = now - this.lastRequestTime;
 
-                // Wait if throttling interval hasn't elapsed
                 if (timeSinceLast < this.interval) {
                     await new Promise(resolve => {
                         let timeoutId;
-
                         const wakeUp = () => {
                             clearTimeout(timeoutId);
                             if (task.options.signal) {
@@ -122,7 +119,6 @@ class RequestQueue {
                     });
                 }
 
-                // 2. CHECK AFTER SLEEPING:
                 if (task.options.signal?.aborted) {
                     task.reject(new DOMException('Aborted during delay', 'AbortError'));
                     continue;
@@ -130,33 +126,42 @@ class RequestQueue {
 
                 this.lastRequestTime = Date.now();
 
-                // 3. NETWORK EXECUTION (Timeout active strictly during active fetch)
-                const fetchController = new AbortController();
-                const timeoutMs = getDynamicNetworkTimeout();
-                const timeoutId = setTimeout(() => fetchController.abort(), timeoutMs);
-
-                const onParentAbort = () => fetchController.abort();
-                if (task.options.signal) {
-                    if (task.options.signal.aborted) {
-                        fetchController.abort();
-                    } else {
-                        task.options.signal.addEventListener('abort', onParentAbort, { once: true });
-                    }
-                }
-
                 try {
-                    const response = await fetch(task.url, {
+                    const timeoutSignal = AbortSignal.timeout(getDynamicNetworkTimeout());
+                    const combinedSignal = task.options.signal
+                        ? AbortSignal.any([task.options.signal, timeoutSignal])
+                        : timeoutSignal;
+
+                    let response = await fetch(task.url, {
                         ...task.options,
-                        signal: fetchController.signal
+                        signal: combinedSignal
                     });
+
+                    // Conditional retry for HTTP 429 strictly when Retry-After is explicitly specified
+                    const retryAfterHeader = response.headers.get('Retry-After');
+                    if (response.status === 429 && retryAfterHeader && !task.options.signal?.aborted) {
+                        const backoffMs = parseInt(retryAfterHeader, 10) * 1000;
+                        if (!isNaN(backoffMs) && backoffMs > 0) {
+                            console.warn(`HTTP 429 rate limit encountered. Retrying in ${backoffMs}ms...`);
+                            await new Promise(r => setTimeout(r, backoffMs));
+
+                            if (!task.options.signal?.aborted) {
+                                const retryTimeoutSignal = AbortSignal.timeout(getDynamicNetworkTimeout());
+                                const retryCombinedSignal = task.options.signal
+                                    ? AbortSignal.any([task.options.signal, retryTimeoutSignal])
+                                    : retryTimeoutSignal;
+
+                                response = await fetch(task.url, {
+                                    ...task.options,
+                                    signal: retryCombinedSignal
+                                });
+                            }
+                        }
+                    }
+
                     task.resolve(response);
                 } catch (error) {
                     task.reject(error);
-                } finally {
-                    clearTimeout(timeoutId);
-                    if (task.options.signal) {
-                        task.options.signal.removeEventListener('abort', onParentAbort);
-                    }
                 }
             }
         } finally {
@@ -167,6 +172,25 @@ class RequestQueue {
 
 // Instantiate the throttler with a 1000ms limit
 const apiQueue = new RequestQueue(1000);
+
+/**
+ * Unified execution helper for building API requests and handling HTTP errors.
+ */
+async function request(endpoint, paramsObj, options = {}) {
+    const { signal, cache, ...fetchOpts } = options;
+    const params = paramsObj instanceof URLSearchParams ? paramsObj : new URLSearchParams(paramsObj);
+
+    const res = await apiQueue.enqueue(`${API_BASE}${endpoint}?${params}`, { signal, cache, ...fetchOpts });
+
+    if (!res.ok) {
+        const error = new Error(`Failed to fetch ${endpoint}`);
+        error.status = res.status;
+        error.endpoint = endpoint;
+        throw error;
+    }
+
+    return res.json();
+}
 
 /**
  * Appends URL query parameters for media requirements.
@@ -212,9 +236,7 @@ export const fetchPlaces = async (query, signal, locale = getLocale()) => {
         locale: locale
     });
 
-    const res = await apiQueue.enqueue(`${API_BASE}/places?${params}`, { signal });
-    if (!res.ok) throw new Error('Failed to fetch places');
-    return res.json();
+    return request('/places', params, { signal });
 };
 
 export const fetchTaxaAutocomplete = async (query, signal, locale = getLocale()) => {
@@ -224,9 +246,7 @@ export const fetchTaxaAutocomplete = async (query, signal, locale = getLocale())
         locale: locale
     });
 
-    const res = await apiQueue.enqueue(`${API_BASE}/taxa/autocomplete?${params}`, { signal });
-    if (!res.ok) throw new Error('Failed to fetch taxa');
-    return res.json();
+    return request('/taxa/autocomplete', params, { signal });
 };
 
 export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, taxonId, establishmentStatus, page = 1, perPage = null, locale = getLocale() }, signal) => {
@@ -258,13 +278,7 @@ export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, m
         params.set('taxon_id', String(taxonId));
     }
 
-    const res = await apiQueue.enqueue(`${API_BASE}/observations/species_counts?${params}`, { signal });
-    if (!res.ok) {
-        const err = new Error('Failed to fetch species pool');
-        err.status = res.status;
-        throw err;
-    }
-    return res.json();
+    return request('/observations/species_counts', params, { signal });
 };
 
 export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, difficulty, taxonId, establishmentStatus, withoutTaxonIds = [], notObsIds = [], locale = getLocale() }, signal) => {
@@ -303,13 +317,7 @@ export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, place
         params.set('not_id', notObsIds.join(','));
     }
 
-    const res = await apiQueue.enqueue(`${API_BASE}/observations?${params}`, { cache: 'no-store', signal });
-    if (!res.ok) {
-        const err = new Error('Failed to fetch observation');
-        err.status = res.status;
-        throw err;
-    }
-    return res.json();
+    return request('/observations', params, { cache: 'no-store', signal });
 };
 
 export const checkTaxonSearch = async (inputStr, guessedRank, signal, locale = getLocale()) => {
@@ -323,7 +331,5 @@ export const checkTaxonSearch = async (inputStr, guessedRank, signal, locale = g
         locale: locale
     });
 
-    const res = await apiQueue.enqueue(`${API_BASE}/taxa?${params}`, { signal });
-    if (!res.ok) throw new Error('Failed to fetch search validation');
-    return res.json();
+    return request('/taxa', params, { signal });
 };
