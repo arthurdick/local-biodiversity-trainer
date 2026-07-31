@@ -293,6 +293,27 @@ function setupAutocomplete(config) {
     const inputEl = document.getElementById(inputId);
     const clearBtn = document.getElementById(clearBtnId);
 
+    /**
+     * Checks if user input matches an autocomplete item across formatted and raw fields.
+     */
+    const isItemMatch = (item, query) => {
+        if (!item || typeof query !== 'string') return false;
+        const normQuery = query.trim().toLowerCase();
+        if (!normQuery) return false;
+
+        const candidateFields = [
+            formatDisplay(item),
+            item.display_name,
+            item.name,
+            item.preferred_common_name,
+            item.matched_term
+        ];
+
+        return candidateFields.some(candidate =>
+            typeof candidate === 'string' && candidate.trim().toLowerCase() === normQuery
+        );
+    };
+
     const performSearch = debounce(async (query) => {
         if (inputEl.value.trim() !== query.trim() || query.length < 3) {
             store.setState(prev => ({ ui: { ...prev.ui, [results]: [] } }));
@@ -321,7 +342,7 @@ function setupAutocomplete(config) {
             abortController = null;
         }
 
-        const selectedItem = currentResults.find(item => formatDisplay(item) === query);
+        const selectedItem = currentResults.find(item => isItemMatch(item, query));
 
         store.setState(prev => ({
             form: { ...prev.form, [id]: selectedItem ? selectedItem.id : null, [name]: query },
