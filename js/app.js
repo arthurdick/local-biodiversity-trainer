@@ -69,7 +69,8 @@ subscribeSelector(
         activeView: s.ui.activeView,
         isMediaLoaded: s.ui.isMediaLoaded,
         currentIndex: s.currentIndex,
-        mediaIndex: s.currentMediaIndex
+        mediaIndex: s.currentMediaIndex,
+        obs: s.questions[s.currentIndex]?.observation
     }),
     ({ activeView, isMediaLoaded, mediaIndex }, _, newState) => {
         if (activeView !== 'quiz-view' || isMediaLoaded) return;
@@ -92,7 +93,8 @@ subscribeSelector(
     (a, b) => a.activeView === b.activeView &&
               a.isMediaLoaded === b.isMediaLoaded &&
               a.currentIndex === b.currentIndex &&
-              a.mediaIndex === b.mediaIndex
+              a.mediaIndex === b.mediaIndex &&
+              a.obs === b.obs
 );
 
 // 5. Sequential Prefetch Trigger
