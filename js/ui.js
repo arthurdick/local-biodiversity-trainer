@@ -386,7 +386,11 @@ export function render(state) {
 
     // 4. Results View
     if (state.ui.activeView === 'results-view') {
-        document.getElementById('final-score').textContent = `${formatPoints(state.score)} / ${state.questions.length}`;
+        const totalQuestions = state.questions.length;
+        document.getElementById('final-score').textContent = totalQuestions > 0
+            ? `${formatPoints(state.score)} / ${totalQuestions}`
+            : 'Session Aborted';
+
         const container = document.getElementById('review-container');
         if (!container.hasChildNodes()) { 
             buildResultsDom(state.questions, container);
@@ -788,6 +792,18 @@ function buildFeedbackDom(q, feedbackEl) {
 
 function buildResultsDom(questions, container) {
     container.replaceChildren();
+
+    if (questions.length === 0) {
+        const abortedDiv = document.createElement('div');
+        abortedDiv.className = 'perfect-score-banner';
+        abortedDiv.style.background = '#fff3cd';
+        abortedDiv.style.color = '#856404';
+        abortedDiv.style.border = '1px solid #ffeeba';
+        abortedDiv.textContent = '⚠️ Quiz session ended before any questions were completed.';
+        container.appendChild(abortedDiv);
+        return;
+    }
+
     const questionsToReview = questions.filter(q => q.pointsEarned !== 10);
 
     if (questionsToReview.length === 0) {
