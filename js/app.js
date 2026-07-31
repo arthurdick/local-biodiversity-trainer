@@ -325,10 +325,25 @@ function setupAutocomplete(config) {
         try {
             const data = await fetchDataFn(query, abortController.signal);
             if (inputEl.value.trim() === query.trim()) {
-                store.setState(prev => ({ ui: { ...prev.ui, [results]: data.results } }));
+                // Clear any lingering errors if the fetch succeeds
+                store.setState(prev => ({
+                    ui: { ...prev.ui, [results]: data.results, [error]: null }
+                }));
             }
         } catch (err) {
-            if (err.name !== 'AbortError') console.warn(`${inputId} search offline`);
+            if (err.name !== 'AbortError') {
+                console.warn(`${inputId} search offline:`, err);
+                
+                // Determine user-friendly error message
+                const errorMessage = err.status === 429
+                    ? "⏳ Too many requests. Please wait a moment before typing."
+                    : "⚠️ Network error: Unable to load suggestions. Check your connection.";
+                
+                // Dispatch the error to the UI state and clear results
+                store.setState(prev => ({
+                    ui: { ...prev.ui, [error]: errorMessage, [results]: [] }
+                }));
+            }
         }
     }, 250);
 
