@@ -5,7 +5,15 @@ import { generateResultShareText } from './urlService.js';
 
 let currentView = null;
 
-const domCache = new WeakMap();
+// Changed to `let` so the WeakMap can be reinitialized on session resets
+let domCache = new WeakMap();
+
+/**
+ * Resets the DOM cache to release all retained UI signatures and scalar state.
+ */
+export function clearDOMCache() {
+    domCache = new WeakMap();
+}
 
 let announceTimeout = null;
 
@@ -717,6 +725,7 @@ function renderAutocomplete(config, results, show, activeIdx) {
         input.removeAttribute('aria-activedescendant');
     }
 }
+
 function renderError(id, msg) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -774,9 +783,12 @@ function renderQuizMedia(state, isReadyForMedia) {
     
     if (mediaContainer) {
         const mediaCache = domCache.get(mediaContainer);
+        // Store scalar primitive key instead of retaining the entire `media` object
+        const mediaKey = media ? (media.mediumUrl || media.fileUrl) : null;
+        
         const cacheKeyChanged =
             !mediaCache ||
-            mediaCache.media !== media ||
+            mediaCache.mediaKey !== mediaKey ||
             mediaCache.isReady !== isReadyForMedia ||
             mediaCache.isLoaded !== state.ui.isMediaLoaded ||
             mediaCache.mediaIndex !== state.currentMediaIndex ||
@@ -785,7 +797,7 @@ function renderQuizMedia(state, isReadyForMedia) {
         if (!cacheKeyChanged) return;
 
         domCache.set(mediaContainer, {
-            media,
+            mediaKey,
             isReady: isReadyForMedia,
             isLoaded: state.ui.isMediaLoaded,
             mediaIndex: state.currentMediaIndex,
@@ -900,20 +912,13 @@ function renderQuizMeta(state, isReadyForMedia) {
     if (metaEl) {
         const metaCache = domCache.get(metaEl);
         
-        // Helper to check value equality rather than object reference
-        const isMetaEqual = (m1, m2) => {
-            if (m1 === m2) return true;
-            if (!m1 || !m2) return false;
-            return m1.date === m2.date &&
-                   m1.locationText === m2.locationText &&
-                   m1.coordinates === m2.coordinates &&
-                   m1.observer === m2.observer &&
-                   m1.license === m2.license &&
-                   m1.isObscured === m2.isObscured;
-        };
+        // Scalar string signature instead of keeping direct reference to `meta` object
+        const metaSignature = meta 
+            ? `${meta.date}_${meta.locationText}_${meta.coordinates}_${meta.observer}_${meta.license}_${meta.isObscured}` 
+            : null;
 
-        if (!isMetaEqual(metaCache?.meta, meta) || metaCache?.isReady !== isReadyForMedia) {
-            domCache.set(metaEl, { meta, isReady: isReadyForMedia });
+        if (metaCache?.metaSignature !== metaSignature || metaCache?.isReady !== isReadyForMedia) {
+            domCache.set(metaEl, { metaSignature, isReady: isReadyForMedia });
 
             metaEl.style.display = (isReadyForMedia && meta) ? 'flex' : 'none';
             if (meta) {
@@ -984,10 +989,12 @@ function renderQuizMeta(state, isReadyForMedia) {
 
     if (hintContent && hintBtn) {
         const cache = domCache.get(hintContent) || {};
+        const obsId = q?.observation?.id || q?.observation?.uuid || null;
+        const taxonId = taxon?.id || null;
 
         if (
-            cache.lastObs === q?.observation &&
-            cache.lastTaxon === taxon &&
+            cache.lastObsId === obsId &&
+            cache.lastTaxonId === taxonId &&
             cache.lastIsReady === isReadyForMedia &&
             cache.lastHintVisible === state.ui.isHintVisible &&
             cache.lastIndex === state.currentIndex
@@ -998,7 +1005,7 @@ function renderQuizMeta(state, isReadyForMedia) {
         if (isReadyForMedia && rawDesc) {
             let descToDisplay = '';
 
-            if (cache.lastRawDesc === rawDesc && cache.lastTaxonForRedaction === taxon) {
+            if (cache.lastRawDesc === rawDesc && cache.lastTaxonId === taxonId) {
                 descToDisplay = cache.lastRedactedDesc;
             } else {
                 descToDisplay = redactSpoilers(rawDesc, taxon);
@@ -1010,13 +1017,12 @@ function renderQuizMeta(state, isReadyForMedia) {
 
             domCache.set(hintContent, {
                 ...cache,
-                lastObs: q?.observation,
-                lastTaxon: taxon,
+                lastObsId: obsId,
+                lastTaxonId: taxonId,
                 lastIsReady: isReadyForMedia,
                 lastHintVisible: state.ui.isHintVisible,
                 lastIndex: state.currentIndex,
                 lastRawDesc: rawDesc,
-                lastTaxonForRedaction: taxon,
                 lastRedactedDesc: descToDisplay
             });
 
@@ -1029,8 +1035,8 @@ function renderQuizMeta(state, isReadyForMedia) {
         } else {
             domCache.set(hintContent, {
                 ...cache,
-                lastObs: q?.observation,
-                lastTaxon: taxon,
+                lastObsId: obsId,
+                lastTaxonId: taxonId,
                 lastIsReady: isReadyForMedia,
                 lastHintVisible: state.ui.isHintVisible,
                 lastIndex: state.currentIndex
@@ -1045,12 +1051,15 @@ function renderQuizMeta(state, isReadyForMedia) {
 function renderMCOptions(state, container, question, isAnswered) {
     const options = question?.mcOptions || [];
     const cache = domCache.get(container);
+    
+    // Primitive scalar key signature
+    const questionKey = question ? `${state.currentIndex}_${question.observation?.id || ''}` : null;
 
-    if (cache?.lastQuestion === question && cache?.isAnswered === isAnswered && cache?.optionsCount === options.length) {
+    if (cache?.lastQuestionKey === questionKey && cache?.isAnswered === isAnswered && cache?.optionsCount === options.length) {
         return;
     }
 
-    domCache.set(container, { lastQuestion: question, isAnswered, optionsCount: options.length });
+    domCache.set(container, { lastQuestionKey: questionKey, isAnswered, optionsCount: options.length });
     container.replaceChildren();
 
     if (options.length === 0) {

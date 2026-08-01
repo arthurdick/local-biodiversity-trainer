@@ -672,6 +672,8 @@ function exitDailyMode() {
         console.warn('Could not read saved preferences on exit:', e);
     }
 
+    ui.clearDOMCache(); // Clear UI cache on mode exit
+
     store.setState(prev => ({
         form: {
             ...prev.form,
@@ -740,6 +742,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     debouncedSavePreferences.cancel();
     savePreferences();
     observationService.clearCache();
+    ui.clearDOMCache();
 
     // Determine if this Daily Challenge run is a Replay!
     let isReplay = false;
@@ -1168,6 +1171,7 @@ document.getElementById('btn-skip-end').addEventListener('click', () => {
 
 document.getElementById('btn-restart').addEventListener('click', () => {
     observationService.clearCache();
+    ui.clearDOMCache();
     store.setState(prev => ({
         currentIndex: 0,
         score: 0,
