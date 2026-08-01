@@ -32,8 +32,8 @@ export function parseUrlParams() {
 
         if (!isNaN(lat) && lat >= -90 && lat <= 90 && !isNaN(lng) && lng >= -180 && lng <= 180) {
             urlConfig.locMode = 'coords';
-            urlConfig.lat = lat;
-            urlConfig.lng = lng;
+            urlConfig.lat = Number(lat.toFixed(3));
+            urlConfig.lng = Number(lng.toFixed(3));
             urlConfig.radius = (!isNaN(rad) && rad >= 1 && rad <= 100) ? rad : 10;
         }
     }
@@ -167,7 +167,7 @@ export function generateResultShareText(state) {
     if (form.locMode === 'search' && form.placeName) {
         locationLine = `📍 ${form.placeName}`;
     } else if (form.locMode === 'coords' && form.lat !== null && form.lng !== null) {
-        locationLine = `📍 Coordinates (${Number(form.lat).toFixed(2)}, ${Number(form.lng).toFixed(2)})`;
+        locationLine = `📍 Coordinates (${Number(form.lat).toFixed(3)}, ${Number(form.lng).toFixed(3)})`;
     }
 
     // 3. Score Line

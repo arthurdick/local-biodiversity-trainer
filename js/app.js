@@ -218,12 +218,12 @@ function sanitizePreferences(raw) {
 
     if (raw.lat !== null && raw.lat !== undefined) {
         const lat = parseFloat(raw.lat);
-        if (!isNaN(lat) && lat >= -90 && lat <= 90) sanitized.lat = lat;
+        if (!isNaN(lat) && lat >= -90 && lat <= 90) sanitized.lat = Number(lat.toFixed(3));
     }
 
     if (raw.lng !== null && raw.lng !== undefined) {
         const lng = parseFloat(raw.lng);
-        if (!isNaN(lng) && lng >= -180 && lng <= 180) sanitized.lng = lng;
+        if (!isNaN(lng) && lng >= -180 && lng <= 180) sanitized.lng = Number(lng.toFixed(3));
     }
 
     if (raw.radius !== undefined) {

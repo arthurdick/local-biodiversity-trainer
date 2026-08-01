@@ -33,8 +33,9 @@ export function buildLocationSeedKey(config) {
     if (config.locMode === 'search' && config.placeId) {
         locStr = `place_${config.placeId}`;
     } else if (config.lat !== null && config.lng !== null) {
-        const latRound = Number(config.lat).toFixed(2);
-        const lngRound = Number(config.lng).toFixed(2);
+        // Enforce 3 decimal places for seed alignment
+        const latRound = Number(config.lat).toFixed(3);
+        const lngRound = Number(config.lng).toFixed(3);
         locStr = `coords_${latRound}_${lngRound}_r${config.radius || 10}`;
     } else {
         locStr = 'global';
