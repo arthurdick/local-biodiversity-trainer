@@ -988,6 +988,8 @@ window.addEventListener('keydown', (e) => {
         return;
     }
     
+    if (store.getState().ui.zoomMediaUrl || store.getState().ui.isLicenseModalOpen) return;
+    
     const s = store.getState();
     if (s.ui.activeView !== 'quiz-view' || !s.config.isMultipleChoice) return;
 
