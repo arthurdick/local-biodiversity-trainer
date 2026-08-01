@@ -177,14 +177,21 @@ export function generateResultShareText(state) {
         scoreLine += ` (Replay)`;
     }
 
-    // 4. Emoji Row Generation
-    const emojiRow = questions.map(q => {
+    // 4. Emoji Row Generation (Chunked in rows of 10)
+    const emojis = questions.map(q => {
         if (q.isSkipped) return '⬜';
         if (q.isCorrect) {
             return q.pointsEarned === 10 ? '🟩' : '🟨';
         }
         return '🟥';
-    }).join('');
+    });
+
+    const chunkSize = 10;
+    const emojiRows = [];
+    for (let i = 0; i < emojis.length; i += chunkSize) {
+        emojiRows.push(emojis.slice(i, i + chunkSize).join(''));
+    }
+    const emojiBlock = emojiRows.join('\n');
 
     // 5. Challenge Link
     const mode = isDaily ? 'daily' : 'custom';
@@ -194,7 +201,7 @@ export function generateResultShareText(state) {
         header,
         locationLine,
         scoreLine,
-        emojiRow,
+        emojiBlock,
         shareUrl
     ].filter(Boolean).join('\n');
 }
