@@ -106,8 +106,12 @@ class RequestQueue {
     async _executeTask(task) {
         try {
             const timeoutSignal = AbortSignal.timeout(getDynamicNetworkTimeout());
+            
+            // Fallback for older browsers lacking AbortSignal.any support
             const combinedSignal = task.options.signal
-                ? AbortSignal.any([task.options.signal, timeoutSignal])
+                ? (typeof AbortSignal.any === 'function'
+                    ? AbortSignal.any([task.options.signal, timeoutSignal])
+                    : task.options.signal)
                 : timeoutSignal;
 
             const response = await fetch(task.url, {
