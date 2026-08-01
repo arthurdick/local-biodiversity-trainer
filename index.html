@@ -60,6 +60,7 @@
                             <!-- Search Mode Section -->
                             <div id="section-search" class="location-section active autocomplete-wrapper z-high">
                                 <div class="input-relative-wrapper">
+                                    <label for="input-place" class="visually-hidden">Search Location</label>
                                     <input type="text" id="input-place" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="list-place" aria-haspopup="listbox" placeholder="Search a city, park, or country..." autocomplete="off">
                                     <button type="button" id="clear-place" class="btn-clear" aria-label="Clear location input" title="Clear location">&times;</button>
                                 </div>
@@ -258,7 +259,7 @@
                         
                         <div id="quiz-meta" class="quiz-meta">
                             <span id="meta-date"></span>
-                            <a id="meta-location" target="_blank" href="#"></a>
+                            <a id="meta-location" target="_blank" href="#" aria-label="Observation location"></a>
                             <span id="meta-observer"></span>
                         </div>
                     </div>
@@ -316,7 +317,7 @@
         <!-- Results View -->
         <div id="results-view" class="view">
             <h1 id="results-heading" tabindex="-1">Quiz Complete!</h1>
-            <h2 id="final-score"></h2>
+            <h2 id="final-score">Final Score</h2>
             
             <!-- Score Card Visual Preview -->
             <div id="score-card-preview" class="score-card-preview">
