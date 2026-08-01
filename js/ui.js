@@ -899,7 +899,20 @@ function renderQuizMeta(state, isReadyForMedia) {
     const metaEl = document.getElementById('quiz-meta');
     if (metaEl) {
         const metaCache = domCache.get(metaEl);
-        if (metaCache?.meta !== meta || metaCache?.isReady !== isReadyForMedia) {
+        
+        // Helper to check value equality rather than object reference
+        const isMetaEqual = (m1, m2) => {
+            if (m1 === m2) return true;
+            if (!m1 || !m2) return false;
+            return m1.date === m2.date &&
+                   m1.locationText === m2.locationText &&
+                   m1.coordinates === m2.coordinates &&
+                   m1.observer === m2.observer &&
+                   m1.license === m2.license &&
+                   m1.isObscured === m2.isObscured;
+        };
+
+        if (!isMetaEqual(metaCache?.meta, meta) || metaCache?.isReady !== isReadyForMedia) {
             domCache.set(metaEl, { meta, isReady: isReadyForMedia });
 
             metaEl.style.display = (isReadyForMedia && meta) ? 'flex' : 'none';
