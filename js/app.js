@@ -1003,7 +1003,7 @@ document.getElementById('mc-options-container')?.addEventListener('click', (e) =
 
     store.updateQuestion(s.currentIndex, {
         isAnswered: true,
-        userAnswer: btn.textContent,
+        userAnswer: cleanDisplayName,
         userAnswerId: chosenId,
         guessedRank: 'species',
         isCorrect,
