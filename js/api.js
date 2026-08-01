@@ -321,11 +321,6 @@ export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, place
     appendMonthParams(params, months);
     appendEstablishmentParams(params, establishmentStatus);
 
-    // Only filter individual observation fetching by user when doing broad sampling without an explicit target taxon ID
-    if (!taxonId) {
-        appendUserParams(params, lifeListMode, userLogin, userId);
-    }
-
     if (placeId) {
         params.set('place_id', String(placeId));
     } else if (lat !== null && lat !== undefined && lng !== null && lng !== undefined) {

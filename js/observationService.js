@@ -41,7 +41,10 @@ export async function loadObservationForQuestion(index) {
         try {
             let targetTaxon = q.taxon;
             
-            if (isRareExpert && !targetTaxon) {
+            // Require species pre-selection if in Rare Expert mode OR if in Standard Expert mode with active Life List filtering
+            const needsPreSelection = isRareExpert || (isStandardExpert && currentConfig.lifeListMode !== 'off');
+
+            if (needsPreSelection && !targetTaxon) {
                 const previousLock = expertRareLock;
                 let releaseLock;
                 expertRareLock = new Promise(resolve => releaseLock = resolve);
@@ -53,16 +56,21 @@ export async function loadObservationForQuestion(index) {
 
                     if (!targetTaxon) {
                         const totalSpecies = currentConfig.expertTotalSpecies || 0;
-                        let deepPage = engine.calculateDeepPage(totalSpecies);
+                        
+                        // Select page strategy: calculateDeepPage for Rare Mode, calculateStandardPage for Standard Mode
+                        let targetPage = isRareExpert
+                            ? engine.calculateDeepPage(totalSpecies)
+                            : engine.calculateStandardPage(totalSpecies);
+
                         let validResults = [];
                         let attempts = 0;
                         const maxAttempts = 2;
 
-                        while (validResults.length === 0 && attempts < maxAttempts && deepPage >= 1) {
+                        while (validResults.length === 0 && attempts < maxAttempts && targetPage >= 1) {
                             attempts++;
 
                             const deepData = await api.fetchSpeciesPool({
-                                perPage: 50, page: deepPage,
+                                perPage: 50, page: targetPage,
                                 wantsPhotos: currentConfig.wantsPhotos, wantsSounds: currentConfig.wantsSounds,
                                 months: currentConfig.months, placeId: currentConfig.placeId,
                                 lat: currentConfig.lat, lng: currentConfig.lng, radius: currentConfig.radius,
@@ -88,7 +96,7 @@ export async function loadObservationForQuestion(index) {
                                 }
                             }
                             
-                            if (validResults.length === 0) deepPage--;
+                            if (validResults.length === 0) targetPage--;
                         }
                         
                         if (requestSessionId !== currentSessionId) return null;
@@ -102,8 +110,20 @@ export async function loadObservationForQuestion(index) {
                             return emptyData;
                         }
 
-                        const randomItem = engine.selectRareTaxonFromPool(validResults, currentConfig.weightingMethod);
-                        targetTaxon = randomItem.taxon;
+                        if (isRareExpert) {
+                            const randomItem = engine.selectRareTaxonFromPool(validResults, currentConfig.weightingMethod);
+                            targetTaxon = randomItem.taxon;
+                        } else {
+                            // Standard Expert uses generateWeightedPool to maintain linear/log frequency weighting
+                            const generatedPool = engine.generateWeightedPool(
+                                validResults,
+                                1,
+                                currentConfig.preventDuplicates,
+                                false,
+                                currentConfig.weightingMethod
+                            );
+                            targetTaxon = generatedPool[0].taxon;
+                        }
                         
                         if (requestSessionId !== currentSessionId) return null;
                         store.updateQuestion(index, { taxon: targetTaxon });
@@ -113,13 +133,13 @@ export async function loadObservationForQuestion(index) {
                 }
             }
             
-            const withoutTaxonIds = (isStandardExpert && currentConfig.preventDuplicates)
+            const withoutTaxonIds = (isStandardExpert && currentConfig.preventDuplicates && !targetTaxon)
                 ? store.getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined)
                 : [];
                 
             let notObsIds = [];
             
-            if (isStandardExpert && currentConfig.preventDuplicates) {
+            if (isStandardExpert && currentConfig.preventDuplicates && !targetTaxon) {
                 notObsIds = [];
             } else if (targetTaxon) {
                 notObsIds = store.getState().questions
@@ -136,8 +156,8 @@ export async function loadObservationForQuestion(index) {
                 wantsPhotos: currentConfig.wantsPhotos, wantsSounds: currentConfig.wantsSounds,
                 months: currentConfig.months, placeId: currentConfig.placeId,
                 lat: currentConfig.lat, lng: currentConfig.lng, radius: currentConfig.radius,
-                difficulty: isStandardExpert ? 'all' : 'specific',
-                taxonId: isStandardExpert ? currentConfig.taxonId : targetTaxon?.id,
+                difficulty: (isStandardExpert && !targetTaxon) ? 'all' : 'specific',
+                taxonId: targetTaxon ? targetTaxon.id : currentConfig.taxonId,
                 establishmentStatus: currentConfig.establishmentStatus,
                 lifeListMode: currentConfig.lifeListMode, userLogin: currentConfig.userLogin, userId: currentConfig.userId,
                 withoutTaxonIds, notObsIds
@@ -149,7 +169,7 @@ export async function loadObservationForQuestion(index) {
                 const obs = data.results[0];
                 const updates = { observation: obs };
                 
-                if (isStandardExpert) updates.taxon = obs.taxon;
+                if (isStandardExpert && !targetTaxon) updates.taxon = obs.taxon;
                 
                 if (requestSessionId !== currentSessionId) return null;
                 

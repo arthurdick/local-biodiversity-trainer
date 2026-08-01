@@ -114,6 +114,29 @@ export function calculateDeepPage(totalSpecies) {
     return deepPage;
 }
 
+/**
+ * Calculates a standard page number favoring earlier pages via a Zipf's law distribution (1 / p^2)
+ * to reflect natural ecological frequency curves in Expert Mode.
+ */
+export function calculateStandardPage(totalSpecies) {
+    let page = 1;
+    if (totalSpecies > 50) {
+        const maxPages = Math.min(Math.ceil(totalSpecies / 50), 200);
+        let totalWeight = 0;
+        const pageWeights = [];
+        
+        for (let p = 1; p <= maxPages; p++) {
+            const weight = 1 / Math.pow(p, 2);
+            totalWeight += weight;
+            pageWeights.push({ page: p, threshold: totalWeight });
+        }
+        
+        const roll = Math.random() * totalWeight;
+        page = (pageWeights.find(pw => roll <= pw.threshold) || pageWeights[0]).page;
+    }
+    return page;
+}
+
 export function selectRareTaxonFromPool(validResults, weightingMethod = 'linear') {
     let totalWeight = 0;
     const weightedResults = validResults.map(r => {
