@@ -301,6 +301,19 @@ function loadPreferences() {
     }
 }
 
+const debouncedSavePreferences = debounce(savePreferences, 300);
+
+// Subscribe URL syncing and preference persistence to store updates
+store.addEventListener('statechange', (e) => {
+    ui.render(e.detail);
+    syncUrlWithState(e.detail);
+
+    // Auto-save user preferences when editing settings on the setup screen
+    if (e.detail.ui.activeView === 'setup-view') {
+        debouncedSavePreferences();
+    }
+});
+
 ['lat', 'lng', 'radius', 'difficulty', 'questionLimit', 'answerInput', 'rankInput', 'weightingMethod', 'establishmentStatus', 'lifeListMode'].forEach(prop => {
     let elId = `input-${prop.replace('Input', '')}`;
     if (prop === 'questionLimit') elId = 'input-questions';
@@ -607,6 +620,8 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
         store.setState(prev => ({ ui: { ...prev.ui, placeError, setupError, taxonError, userError } })); return;
     }
 
+    // Cancel pending debounced save and persist preferences immediately
+    debouncedSavePreferences.cancel();
     savePreferences();
     observationService.clearCache();
 
