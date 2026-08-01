@@ -162,6 +162,10 @@ class RequestQueue {
     }
 
     async drain() {
+        this.queue.forEach(task => {
+            task.cleanup();
+            task.reject(new DOMException('Queue drained', 'AbortError'));
+        });
         this.queue = [];
         await Promise.allSettled(this.activeRequests);
     }
