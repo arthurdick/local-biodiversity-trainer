@@ -354,19 +354,12 @@ export const fetchSpeciesPool = async ({
     appendEstablishmentParams(params, establishmentStatus);
     appendUserParams(params, lifeListMode, userLogin, userId);
 
-    // Prioritize lat/lng coordinates if locMode is explicitly set to 'coords'
-    if (locMode === 'coords') {
-        if (lat !== null && lat !== undefined && lng !== null && lng !== undefined) {
-            params.set('lat', Number(lat).toFixed(3));
-            params.set('lng', Number(lng).toFixed(3));
-            params.set('radius', String(radius || 10));
-        }
-    } else if (placeId) {
-        params.set('place_id', String(placeId));
-    } else if (lat !== null && lat !== undefined && lng !== null && lng !== undefined) {
+    if (locMode === 'coords' && lat !== null && lng !== null) {
         params.set('lat', Number(lat).toFixed(3));
         params.set('lng', Number(lng).toFixed(3));
         params.set('radius', String(radius || 10));
+    } else if (locMode === 'search' && placeId) {
+        params.set('place_id', String(placeId));
     }
 
     if (taxonId) {
@@ -403,19 +396,12 @@ export const fetchObservation = async ({
     appendMonthParams(params, months);
     appendEstablishmentParams(params, establishmentStatus);
 
-    // Prioritize lat/lng coordinates if locMode is explicitly set to 'coords'
-    if (locMode === 'coords') {
-        if (lat !== null && lat !== undefined && lng !== null && lng !== undefined) {
-            params.set('lat', Number(lat).toFixed(3));
-            params.set('lng', Number(lng).toFixed(3));
-            params.set('radius', String(radius || 10));
-        }
-    } else if (placeId) {
-        params.set('place_id', String(placeId));
-    } else if (lat !== null && lat !== undefined && lng !== null && lng !== undefined) {
+    if (locMode === 'coords' && lat !== null && lng !== null) {
         params.set('lat', Number(lat).toFixed(3));
         params.set('lng', Number(lng).toFixed(3));
         params.set('radius', String(radius || 10));
+    } else if (locMode === 'search' && placeId) {
+        params.set('place_id', String(placeId));
     }
 
     if (difficulty === 'all') {
