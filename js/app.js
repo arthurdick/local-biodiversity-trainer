@@ -969,6 +969,11 @@ document.getElementById('mc-options-container')?.addEventListener('click', (e) =
 window.addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     
+    const targetTag = e.target?.tagName;
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(targetTag) || e.target?.isContentEditable) {
+        return;
+    }
+    
     const s = store.getState();
     if (s.ui.activeView !== 'quiz-view' || !s.config.isMultipleChoice) return;
 
