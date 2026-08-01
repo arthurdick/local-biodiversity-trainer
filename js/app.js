@@ -282,7 +282,15 @@ function savePreferences() {
         if (currentForm.isDailyMode || store.getState().ui.isUrlChallenge) {
             return;
         }
-        localStorage.setItem('bio_trainer_prefs', JSON.stringify(currentForm));
+        
+        const prefsToSave = { ...currentForm };
+        
+        // Wipe raw text from preferences if no valid item ID is tied to it
+        if (!prefsToSave.placeId) prefsToSave.placeName = '';
+        if (!prefsToSave.taxonId) prefsToSave.taxonName = '';
+        if (!prefsToSave.userId) prefsToSave.userLogin = '';
+
+        localStorage.setItem('bio_trainer_prefs', JSON.stringify(prefsToSave));
     } catch (e) {
         console.warn("Unable to save preferences:", e);
     }
