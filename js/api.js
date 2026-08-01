@@ -322,8 +322,8 @@ export const fetchSpeciesPool = async ({
     if (placeId) {
         params.set('place_id', String(placeId));
     } else if (lat !== null && lat !== undefined && lng !== null && lng !== undefined) {
-        params.set('lat', String(lat));
-        params.set('lng', String(lng));
+        params.set('lat', Number(lat).toFixed(3));
+        params.set('lng', Number(lng).toFixed(3));
         params.set('radius', String(radius || 10));
     }
 
