@@ -140,11 +140,6 @@ class Store extends EventTarget {
             return { questions: newQuestions };
         });
     }
-
-    resetState() {
-        this.#state = deepFreeze(structuredClone(this.initialState));
-        this.dispatchEvent(new CustomEvent('statechange', { detail: this.#state }));
-    }
 }
 
 // Export Singleton Store

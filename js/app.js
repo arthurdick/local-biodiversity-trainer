@@ -377,20 +377,6 @@ function savePreferences() {
     }
 }
 
-function loadPreferences() {
-    try {
-        const saved = localStorage.getItem('bio_trainer_prefs');
-        if (!saved) return;
-
-        const sanitized = sanitizePreferences(JSON.parse(saved));
-        if (Object.keys(sanitized).length > 0) {
-            store.setState(prev => ({ form: { ...prev.form, ...sanitized } }));
-        }
-    } catch (e) {
-        console.warn("Could not load preferences:", e);
-    }
-}
-
 ['lat', 'lng', 'radius', 'difficulty', 'questionLimit', 'answerInput', 'rankInput', 'weightingMethod', 'establishmentStatus', 'lifeListMode'].forEach(prop => {
     let elId = `input-${prop.replace('Input', '')}`;
     if (prop === 'questionLimit') elId = 'input-questions';
