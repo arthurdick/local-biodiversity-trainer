@@ -11,6 +11,7 @@ import { parseUrlParams, copyResultToClipboard, copyShareLinkToClipboard, buildS
 
 store.addEventListener('statechange', (e) => {
     ui.render(e.detail);
+    syncUrlWithState(e.detail);
 });
 
 store.addEventListener('quiz:start', () => {
@@ -149,12 +150,6 @@ function syncUrlWithState(state) {
         window.history.replaceState(null, '', cleanBase);
     }
 }
-
-// Subscribe URL syncing to store updates
-store.addEventListener('statechange', (e) => {
-    ui.render(e.detail);
-    syncUrlWithState(e.detail);
-});
 
 const setupForm = document.getElementById('setup-form');
 if (setupForm) {
