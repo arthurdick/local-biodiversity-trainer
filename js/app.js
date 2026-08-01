@@ -118,11 +118,12 @@ store.addEventListener('observation:loaded', async (e) => {
                         wantsPhotos: config.wantsPhotos,
                         wantsSounds: config.wantsSounds,
                         months: config.months,
+                        locMode: config.locMode,
                         placeId: config.placeId,
                         lat: config.lat,
                         lng: config.lng,
                         radius: config.radius,
-                        taxonId: targetTaxon.iconic_taxon_id || null, // Same iconic group (e.g., Aves, Insecta)
+                        taxonId: targetTaxon.iconic_taxon_id || null,
                         establishmentStatus: config.establishmentStatus
                     });
 
@@ -144,6 +145,7 @@ store.addEventListener('observation:loaded', async (e) => {
                         wantsPhotos: config.wantsPhotos,
                         wantsSounds: config.wantsSounds,
                         months: config.months,
+                        locMode: config.locMode,
                         placeId: config.placeId,
                         lat: config.lat,
                         lng: config.lng,
@@ -760,6 +762,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
                 wantsPhotos: updatedState.config.wantsPhotos,
                 wantsSounds: updatedState.config.wantsSounds,
                 months: updatedState.config.months,
+                locMode: updatedState.config.locMode,
                 placeId: updatedState.form.placeId,
                 lat: updatedState.form.lat,
                 lng: updatedState.form.lng,
@@ -790,6 +793,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
                 wantsPhotos: updatedState.config.wantsPhotos,
                 wantsSounds: updatedState.config.wantsSounds,
                 months: updatedState.config.months,
+                locMode: updatedState.config.locMode,
                 placeId: updatedState.form.placeId,
                 lat: updatedState.form.lat,
                 lng: updatedState.form.lng,

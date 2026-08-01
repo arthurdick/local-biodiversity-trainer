@@ -68,7 +68,9 @@ export async function loadObservationForQuestion(index) {
                             const deepData = await api.fetchSpeciesPool({
                                 perPage: 50, page: targetPage,
                                 wantsPhotos: currentConfig.wantsPhotos, wantsSounds: currentConfig.wantsSounds,
-                                months: currentConfig.months, placeId: currentConfig.placeId,
+                                months: currentConfig.months,
+                                locMode: currentConfig.locMode,
+                                placeId: currentConfig.placeId,
                                 lat: currentConfig.lat, lng: currentConfig.lng, radius: currentConfig.radius,
                                 taxonId: currentConfig.taxonId, establishmentStatus: currentConfig.establishmentStatus,
                                 lifeListMode: currentConfig.lifeListMode, userLogin: currentConfig.userLogin, userId: currentConfig.userId,
@@ -163,7 +165,9 @@ export async function loadObservationForQuestion(index) {
 
             const data = await api.fetchObservation({
                 wantsPhotos: currentConfig.wantsPhotos, wantsSounds: currentConfig.wantsSounds,
-                months: currentConfig.months, placeId: currentConfig.placeId,
+                months: currentConfig.months,
+                locMode: currentConfig.locMode,
+                placeId: currentConfig.placeId,
                 lat: currentConfig.lat, lng: currentConfig.lng, radius: currentConfig.radius,
                 difficulty: (isStandardExpert && !targetTaxon) ? 'all' : 'specific',
                 taxonId: targetTaxon ? targetTaxon.id : currentConfig.taxonId,

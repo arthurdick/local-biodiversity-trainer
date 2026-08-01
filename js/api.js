@@ -329,7 +329,7 @@ export const fetchUsersAutocomplete = async (query, signal) => {
 };
 
 export const fetchSpeciesPool = async ({
-    difficulty, wantsPhotos, wantsSounds, months, placeId, lat, lng, radius,
+    difficulty, wantsPhotos, wantsSounds, months, locMode, placeId, lat, lng, radius,
     taxonId, establishmentStatus, lifeListMode, userLogin, userId,
     isDailyMode = false, dailySeedDate = null, createdD2 = null, page = 1, perPage = null, locale = getLocale()
 }, signal) => {
@@ -354,7 +354,14 @@ export const fetchSpeciesPool = async ({
     appendEstablishmentParams(params, establishmentStatus);
     appendUserParams(params, lifeListMode, userLogin, userId);
 
-    if (placeId) {
+    // Prioritize lat/lng coordinates if locMode is explicitly set to 'coords'
+    if (locMode === 'coords') {
+        if (lat !== null && lat !== undefined && lng !== null && lng !== undefined) {
+            params.set('lat', Number(lat).toFixed(3));
+            params.set('lng', Number(lng).toFixed(3));
+            params.set('radius', String(radius || 10));
+        }
+    } else if (placeId) {
         params.set('place_id', String(placeId));
     } else if (lat !== null && lat !== undefined && lng !== null && lng !== undefined) {
         params.set('lat', Number(lat).toFixed(3));
@@ -370,7 +377,7 @@ export const fetchSpeciesPool = async ({
 };
 
 export const fetchObservation = async ({
-    wantsPhotos, wantsSounds, months, placeId, lat, lng, radius,
+    wantsPhotos, wantsSounds, months, locMode, placeId, lat, lng, radius,
     difficulty, taxonId, establishmentStatus, lifeListMode, userLogin, userId,
     isDailyMode = false, dailySeedDate = null, createdD2 = null, page = 1, withoutTaxonIds = [], notObsIds = [], locale = getLocale()
 }, signal) => {
@@ -396,7 +403,14 @@ export const fetchObservation = async ({
     appendMonthParams(params, months);
     appendEstablishmentParams(params, establishmentStatus);
 
-    if (placeId) {
+    // Prioritize lat/lng coordinates if locMode is explicitly set to 'coords'
+    if (locMode === 'coords') {
+        if (lat !== null && lat !== undefined && lng !== null && lng !== undefined) {
+            params.set('lat', Number(lat).toFixed(3));
+            params.set('lng', Number(lng).toFixed(3));
+            params.set('radius', String(radius || 10));
+        }
+    } else if (placeId) {
         params.set('place_id', String(placeId));
     } else if (lat !== null && lat !== undefined && lng !== null && lng !== undefined) {
         params.set('lat', Number(lat).toFixed(3));
