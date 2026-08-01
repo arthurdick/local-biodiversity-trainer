@@ -79,111 +79,130 @@ store.addEventListener('observation:loaded', async (e) => {
     const { index, error } = e.detail;
     const initialState = store.getState();
 
-    if (!error && initialState.config.isMultipleChoice) {
-        const q = initialState.questions[index];
-        const targetTaxon = q?.observation?.taxon || q?.taxon;
+    // Early exit if the observation failed to load or multiple choice mode is disabled
+    if (error || !initialState.config.isMultipleChoice) return;
 
-        if (targetTaxon && !q.mcOptions) {
-            let distractorPool = [];
-            const config = store.getState().config;
+    const q = initialState.questions[index];
+    const targetTaxon = q?.observation?.taxon || q?.taxon;
 
-            // Gather all taxon IDs assigned to questions in the active session
-            const sessionTaxonIds = new Set(
-                store.getState().questions
-                    .map(quest => quest.taxon?.id || quest.observation?.taxon?.id)
-                    .filter(Boolean)
-            );
-            // Always exclude the target taxon itself
-            sessionTaxonIds.add(targetTaxon.id);
+    // Early exit if there is no valid target taxon or options are already generated
+    if (!targetTaxon || q.mcOptions) return;
 
-            const isExcluded = (id) => sessionTaxonIds.has(id) || distractorPool.some(d => d.id === id);
+    /**
+     * Helper guard to verify that the session state, view, and target question
+     * remain valid and unfulfilled across asynchronous network boundary awaits.
+     */
+    const isStillValid = (idx, targetId) => {
+        const s = store.getState();
+        if (s.ui.activeView !== 'quiz-view') return false;
+        
+        const currentQ = s.questions[idx];
+        if (!currentQ) return false;
 
-            // --- TIER 1: Fetch Lookalikes from iNaturalist API ---
-            try {
-                const similarData = await api.fetchSimilarTaxa(targetTaxon.id);
-                (similarData?.results || []).forEach(item => {
-                    if (item.taxon && !isExcluded(item.taxon.id)) {
-                        distractorPool.push(item.taxon);
-                    }
-                });
-            } catch (err) {
-                console.warn('Could not fetch similar species API:', err);
+        const currentTaxon = currentQ.observation?.taxon || currentQ.taxon;
+        return currentTaxon?.id === targetId && !currentQ.mcOptions;
+    };
+
+    let distractorPool = [];
+
+    // Gather all taxon IDs currently assigned to questions in the active session
+    const sessionTaxonIds = new Set(
+        initialState.questions
+            .map(quest => quest.taxon?.id || quest.observation?.taxon?.id)
+            .filter(Boolean)
+    );
+    // Always exclude the target taxon itself from candidate distractors
+    sessionTaxonIds.add(targetTaxon.id);
+
+    const isExcluded = (id) => sessionTaxonIds.has(id) || distractorPool.some(d => d.id === id);
+
+    // --- GUARD CHECK BEFORE TIER 1 ---
+    if (!isStillValid(index, targetTaxon.id)) return;
+
+    // --- TIER 1: Fetch Lookalikes from iNaturalist API ---
+    try {
+        const similarData = await api.fetchSimilarTaxa(targetTaxon.id);
+        (similarData?.results || []).forEach(item => {
+            if (item.taxon && !isExcluded(item.taxon.id)) {
+                distractorPool.push(item.taxon);
             }
+        });
+    } catch (err) {
+        console.warn('Could not fetch similar species API:', err);
+    }
 
-            // --- TIER 2: Fetch Regional Iconic Taxon Species (Same Group in Region) ---
-            if (distractorPool.length < 3 && targetTaxon.iconic_taxon_name) {
-                try {
-                    const iconicData = await api.fetchSpeciesPool({
-                        perPage: 20,
-                        wantsPhotos: config.wantsPhotos,
-                        wantsSounds: config.wantsSounds,
-                        months: config.months,
-                        locMode: config.locMode,
-                        placeId: config.placeId,
-                        lat: config.lat,
-                        lng: config.lng,
-                        radius: config.radius,
-                        taxonId: targetTaxon.iconic_taxon_id || null,
-                        establishmentStatus: config.establishmentStatus
-                    });
+    // --- GUARD CHECK BEFORE TIER 2 ---
+    if (!isStillValid(index, targetTaxon.id)) return;
 
-                    (iconicData?.results || []).forEach(r => {
-                        if (r.taxon && !isExcluded(r.taxon.id)) {
-                            distractorPool.push(r.taxon);
-                        }
-                    });
-                } catch (err) {
-                    console.warn('Could not fetch iconic taxon distractors:', err);
+    // --- TIER 2: Fetch Regional Iconic Taxon Species (Same Group in Region) ---
+    if (distractorPool.length < 3 && targetTaxon.iconic_taxon_name) {
+        const currentConfig = store.getState().config;
+        try {
+            const iconicData = await api.fetchSpeciesPool({
+                perPage: 20,
+                wantsPhotos: currentConfig.wantsPhotos,
+                wantsSounds: currentConfig.wantsSounds,
+                months: currentConfig.months,
+                locMode: currentConfig.locMode,
+                placeId: currentConfig.placeId,
+                lat: currentConfig.lat,
+                lng: currentConfig.lng,
+                radius: currentConfig.radius,
+                taxonId: targetTaxon.iconic_taxon_id || null,
+                establishmentStatus: currentConfig.establishmentStatus
+            });
+
+            (iconicData?.results || []).forEach(r => {
+                if (r.taxon && !isExcluded(r.taxon.id)) {
+                    distractorPool.push(r.taxon);
                 }
-            }
-
-            // --- TIER 3: Fetch Broad Regional Species (Any Local Species) ---
-            if (distractorPool.length < 3) {
-                try {
-                    const regionalData = await api.fetchSpeciesPool({
-                        perPage: 20,
-                        wantsPhotos: config.wantsPhotos,
-                        wantsSounds: config.wantsSounds,
-                        months: config.months,
-                        locMode: config.locMode,
-                        placeId: config.placeId,
-                        lat: config.lat,
-                        lng: config.lng,
-                        radius: config.radius,
-                        establishmentStatus: config.establishmentStatus
-                    });
-
-                    (regionalData?.results || []).forEach(r => {
-                        if (r.taxon && !isExcluded(r.taxon.id)) {
-                            distractorPool.push(r.taxon);
-                        }
-                    });
-                } catch (err) {
-                    console.warn('Could not fetch broad regional distractors:', err);
-                }
-            }
-
-            // --- POST-ASYNC VALIDATION & RENDER ---
-            const currentState = store.getState();
-            const currentQ = currentState.questions[index];
-            const currentTaxon = currentQ?.observation?.taxon || currentQ?.taxon;
-
-            if (
-                currentState.ui.activeView === 'quiz-view' &&
-                currentQ &&
-                currentTaxon?.id === targetTaxon.id &&
-                !currentQ.mcOptions
-            ) {
-                const options = engine.generateMultipleChoiceOptions(
-                    targetTaxon,
-                    currentState.regionalPool,
-                    distractorPool,
-                    sessionTaxonIds
-                );
-
-                store.updateQuestion(index, { mcOptions: options });
-            }
+            });
+        } catch (err) {
+            console.warn('Could not fetch iconic taxon distractors:', err);
         }
+    }
+
+    // --- GUARD CHECK BEFORE TIER 3 ---
+    if (!isStillValid(index, targetTaxon.id)) return;
+
+    // --- TIER 3: Fetch Broad Regional Species (Any Local Species) ---
+    if (distractorPool.length < 3) {
+        const currentConfig = store.getState().config;
+        try {
+            const regionalData = await api.fetchSpeciesPool({
+                perPage: 20,
+                wantsPhotos: currentConfig.wantsPhotos,
+                wantsSounds: currentConfig.wantsSounds,
+                months: currentConfig.months,
+                locMode: currentConfig.locMode,
+                placeId: currentConfig.placeId,
+                lat: currentConfig.lat,
+                lng: currentConfig.lng,
+                radius: currentConfig.radius,
+                establishmentStatus: currentConfig.establishmentStatus
+            });
+
+            (regionalData?.results || []).forEach(r => {
+                if (r.taxon && !isExcluded(r.taxon.id)) {
+                    distractorPool.push(r.taxon);
+                }
+            });
+        } catch (err) {
+            console.warn('Could not fetch broad regional distractors:', err);
+        }
+    }
+
+    // --- FINAL VALIDATION & RENDER ---
+    if (isStillValid(index, targetTaxon.id)) {
+        const currentState = store.getState();
+        const options = engine.generateMultipleChoiceOptions(
+            targetTaxon,
+            currentState.regionalPool,
+            distractorPool,
+            sessionTaxonIds
+        );
+
+        store.updateQuestion(index, { mcOptions: options });
     }
 });
 
