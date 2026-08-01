@@ -9,9 +9,15 @@ import { parseUrlParams, copyResultToClipboard, copyShareLinkToClipboard, buildS
 // EVENT TARGET LIFECYCLE ROUTER
 // ==========================================================================
 
+const debouncedSavePreferences = debounce(savePreferences, 300);
+
 store.addEventListener('statechange', (e) => {
     ui.render(e.detail);
     syncUrlWithState(e.detail);
+
+    if (e.detail.ui.activeView === 'setup-view') {
+        debouncedSavePreferences();
+    }
 });
 
 store.addEventListener('quiz:start', () => {
@@ -295,19 +301,6 @@ function loadPreferences() {
         console.warn("Could not load preferences:", e);
     }
 }
-
-const debouncedSavePreferences = debounce(savePreferences, 300);
-
-// Subscribe URL syncing and preference persistence to store updates
-store.addEventListener('statechange', (e) => {
-    ui.render(e.detail);
-    syncUrlWithState(e.detail);
-
-    // Auto-save user preferences when editing settings on the setup screen
-    if (e.detail.ui.activeView === 'setup-view') {
-        debouncedSavePreferences();
-    }
-});
 
 ['lat', 'lng', 'radius', 'difficulty', 'questionLimit', 'answerInput', 'rankInput', 'weightingMethod', 'establishmentStatus', 'lifeListMode'].forEach(prop => {
     let elId = `input-${prop.replace('Input', '')}`;
