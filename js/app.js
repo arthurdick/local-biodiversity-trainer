@@ -631,7 +631,8 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
                 lifeListMode: updatedState.config.lifeListMode,
                 userLogin: updatedState.config.userLogin,
                 userId: updatedState.config.userId,
-                isDailyMode: isDaily
+                isDailyMode: isDaily,
+                dailySeedDate: updatedState.config.dailySeedDate
             });
             expertCount = preFlightData.total_results || 0;
 
@@ -660,7 +661,8 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
                 lifeListMode: updatedState.config.lifeListMode,
                 userLogin: updatedState.config.userLogin,
                 userId: updatedState.config.userId,
-                isDailyMode: isDaily
+                isDailyMode: isDaily,
+                dailySeedDate: updatedState.config.dailySeedDate
             });
             if (!data.results || data.results.length === 0) {
                 store.setState(prev => ({ ui: { ...prev.ui, isLoadingQuizPool: false, setupError: "No research-grade observations found." } }));

@@ -40,7 +40,6 @@ export async function loadObservationForQuestion(index) {
 
         try {
             let targetTaxon = q.taxon;
-            
             const needsPreSelection = isRareExpert || (isStandardExpert && currentConfig.lifeListMode !== 'off');
 
             if (needsPreSelection && !targetTaxon) {
@@ -73,7 +72,8 @@ export async function loadObservationForQuestion(index) {
                                 lat: currentConfig.lat, lng: currentConfig.lng, radius: currentConfig.radius,
                                 taxonId: currentConfig.taxonId, establishmentStatus: currentConfig.establishmentStatus,
                                 lifeListMode: currentConfig.lifeListMode, userLogin: currentConfig.userLogin, userId: currentConfig.userId,
-                                isDailyMode: currentConfig.isDailyMode
+                                isDailyMode: currentConfig.isDailyMode,
+                                dailySeedDate: currentConfig.dailySeedDate
                             }, controller.signal);
 
                             if (deepData.results && deepData.results.length > 0) {
@@ -152,7 +152,6 @@ export async function loadObservationForQuestion(index) {
             let dailyPage = 1;
             if (currentConfig.isDailyMode) {
                 const totalObs = q.count || 1;
-                // Sample uniformly across up to the top 30 most recent observations
                 const maxPages = Math.min(totalObs, 30);
 
                 const seedKey = engine.buildLocationSeedKey(currentConfig);
@@ -171,6 +170,7 @@ export async function loadObservationForQuestion(index) {
                 establishmentStatus: currentConfig.establishmentStatus,
                 lifeListMode: currentConfig.lifeListMode, userLogin: currentConfig.userLogin, userId: currentConfig.userId,
                 isDailyMode: currentConfig.isDailyMode,
+                dailySeedDate: currentConfig.dailySeedDate,
                 page: dailyPage,
                 withoutTaxonIds, notObsIds
             }, controller.signal);
@@ -207,7 +207,6 @@ export async function loadObservationForQuestion(index) {
             if (requestSessionId !== currentSessionId) return null;
 
             const errorData = { error: true };
-            
             if (e.status === 429) {
                 errorData.isRateLimited = true;
             } 

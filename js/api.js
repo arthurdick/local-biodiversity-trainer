@@ -5,13 +5,21 @@ const CC_LICENSES = 'cc0,cc-by,cc-by-nc,cc-by-sa,cc-by-nd,cc-by-nc-sa,cc-by-nc-n
 
 /**
  * Calculates a UTC cutoff timestamp offset by a buffer window (default: 7 days ago).
- * This allows the initial community identification queue to settle before observations
- * are sampled for Daily Challenges.
+ * Derives the timestamp from baseDate (e.g., '2026-08-01') to preserve session determinism.
  */
-export const getDailyCutoffDate = (bufferDays = 7) => {
-    const cutoff = new Date();
-    cutoff.setUTCDate(cutoff.getUTCDate() - bufferDays);
-    return `${cutoff.toISOString().split('T')[0]}T23:59:59Z`;
+export const getDailyCutoffDate = (bufferDays = 7, baseDate = null) => {
+    let dateObj;
+    if (typeof baseDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(baseDate)) {
+        const [year, month, day] = baseDate.split('-').map(Number);
+        dateObj = new Date(Date.UTC(year, month - 1, day));
+    } else if (baseDate instanceof Date) {
+        dateObj = new Date(baseDate.getTime());
+    } else {
+        dateObj = new Date();
+    }
+
+    dateObj.setUTCDate(dateObj.getUTCDate() - bufferDays);
+    return `${dateObj.toISOString().split('T')[0]}T23:59:59Z`;
 };
 
 /**
@@ -285,7 +293,11 @@ export const fetchUsersAutocomplete = async (query, signal) => {
     return request('/users/autocomplete', params, { signal });
 };
 
-export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, taxonId, establishmentStatus, lifeListMode, userLogin, userId, isDailyMode = false, createdD2 = null, page = 1, perPage = null, locale = getLocale() }, signal) => {
+export const fetchSpeciesPool = async ({
+    difficulty, wantsPhotos, wantsSounds, months, placeId, lat, lng, radius,
+    taxonId, establishmentStatus, lifeListMode, userLogin, userId,
+    isDailyMode = false, dailySeedDate = null, createdD2 = null, page = 1, perPage = null, locale = getLocale()
+}, signal) => {
     const limit = perPage !== null ? String(perPage) : String(difficulty);
     
     const params = new URLSearchParams({
@@ -299,7 +311,7 @@ export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, m
     });
 
     if (isDailyMode || createdD2) {
-        params.set('created_d2', createdD2 || getDailyCutoffDate(7));
+        params.set('created_d2', createdD2 || getDailyCutoffDate(7, dailySeedDate));
     }
 
     appendMediaParams(params, wantsPhotos, wantsSounds);
@@ -322,7 +334,11 @@ export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, m
     return request('/observations/species_counts', params, { signal });
 };
 
-export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, difficulty, taxonId, establishmentStatus, lifeListMode, userLogin, userId, isDailyMode = false, createdD2 = null, page = 1, withoutTaxonIds = [], notObsIds = [], locale = getLocale() }, signal) => {
+export const fetchObservation = async ({
+    wantsPhotos, wantsSounds, months, placeId, lat, lng, radius,
+    difficulty, taxonId, establishmentStatus, lifeListMode, userLogin, userId,
+    isDailyMode = false, dailySeedDate = null, createdD2 = null, page = 1, withoutTaxonIds = [], notObsIds = [], locale = getLocale()
+}, signal) => {
     const params = new URLSearchParams({
         quality_grade: 'research',
         captive: 'false',
@@ -334,7 +350,7 @@ export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, place
     });
 
     if (isDailyMode || createdD2) {
-        params.set('created_d2', createdD2 || getDailyCutoffDate(7));
+        params.set('created_d2', createdD2 || getDailyCutoffDate(7, dailySeedDate));
         params.set('order_by', 'id');
         params.set('order', 'desc');
     } else {
@@ -366,7 +382,6 @@ export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, place
         params.set('not_id', notObsIds.join(','));
     }
 
-    // Enable standard browser HTTP caching for Daily Mode requests; use no-store for random practice requests
     const fetchOptions = { signal };
     if (!isDailyMode) {
         fetchOptions.cache = 'no-store';
