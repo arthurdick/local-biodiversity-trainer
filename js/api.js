@@ -69,6 +69,8 @@ class RequestQueue {
         this.isProcessing = false;
         this.interval = interval;
         this.lastRequestTime = 0;
+        this.currentTask = null;
+        this.cancelCurrentDelay = null;
     }
 
     enqueue(url, options = {}) {
@@ -77,7 +79,7 @@ class RequestQueue {
                 return reject(new DOMException('Aborted before execution', 'AbortError'));
             }
 
-            const task = { url, options, resolve, reject, cleanup: () => {} };
+            const task = { url, options, resolve, reject, isDrained: false, cleanup: () => {} };
 
             if (options.signal) {
                 const abortHandler = () => {
@@ -126,10 +128,14 @@ class RequestQueue {
         try {
             while (this.queue.length > 0) {
                 const task = this.queue.shift();
+                this.currentTask = task;
                 task.cleanup();
 
-                if (task.options.signal?.aborted) {
-                    task.reject(new DOMException('Aborted before execution', 'AbortError'));
+                if (task.options.signal?.aborted || task.isDrained) {
+                    if (!task.isDrained) {
+                        task.reject(new DOMException('Aborted before execution', 'AbortError'));
+                    }
+                    this.currentTask = null;
                     continue;
                 }
 
@@ -141,11 +147,14 @@ class RequestQueue {
                         let timeoutId;
                         const wakeUp = () => {
                             clearTimeout(timeoutId);
+                            this.cancelCurrentDelay = null;
                             if (task.options.signal) {
                                 task.options.signal.removeEventListener('abort', wakeUp);
                             }
                             resolve();
                         };
+
+                        this.cancelCurrentDelay = wakeUp;
 
                         if (task.options.signal) {
                             task.options.signal.addEventListener('abort', wakeUp);
@@ -155,8 +164,11 @@ class RequestQueue {
                     });
                 }
 
-                if (task.options.signal?.aborted) {
-                    task.reject(new DOMException('Aborted during delay', 'AbortError'));
+                if (task.options.signal?.aborted || task.isDrained) {
+                    if (!task.isDrained) {
+                        task.reject(new DOMException('Aborted during delay', 'AbortError'));
+                    }
+                    this.currentTask = null;
                     continue;
                 }
 
@@ -172,18 +184,37 @@ class RequestQueue {
                     });
 
                 this.activeRequests.add(executionPromise);
+                this.currentTask = null;
             }
         } finally {
             this.isProcessing = false;
+            this.currentTask = null;
         }
     }
 
     async drain() {
+        const drainError = new DOMException('Queue drained', 'AbortError');
+
+        // 1. Reject and clean up queued tasks
         this.queue.forEach(task => {
             task.cleanup();
-            task.reject(new DOMException('Queue drained', 'AbortError'));
+            task.reject(drainError);
         });
         this.queue = [];
+
+        // 2. Intercept and reject task currently waiting inside setTimeout delay
+        if (this.currentTask) {
+            this.currentTask.isDrained = true;
+            this.currentTask.cleanup();
+            this.currentTask.reject(drainError);
+
+            if (typeof this.cancelCurrentDelay === 'function') {
+                this.cancelCurrentDelay();
+            }
+            this.currentTask = null;
+        }
+
+        // 3. Await settlement of active in-flight HTTP requests
         await Promise.allSettled(this.activeRequests);
     }
 }
