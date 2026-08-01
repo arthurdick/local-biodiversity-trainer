@@ -341,7 +341,7 @@ export const fetchSpeciesPool = async ({
         hrank: 'species',
         per_page: limit,
         page: String(page),
-        fields: '(count:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,ancestor_ids:!t))',
+        fields: '(count:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,iconic_taxon_id:!t,ancestor_ids:!t))',
         locale: locale
     });
 
@@ -380,7 +380,7 @@ export const fetchObservation = async ({
         per_page: '1',
         page: String(page),
         rank: 'species,subspecies',
-        fields: '(id:!t,uuid:!t,description:!t,observed_on:!t,place_guess:!t,location:!t,geoprivacy:!t,taxon_geoprivacy:!t,license_code:!t,user:(login:!t,name:!t),taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,ancestor_ids:!t),photos:(url:!t,attribution:!t,license_code:!t),sounds:(file_url:!t,attribution:!t,license_code:!t))',
+        fields: '(id:!t,uuid:!t,description:!t,observed_on:!t,place_guess:!t,location:!t,geoprivacy:!t,taxon_geoprivacy:!t,license_code:!t,user:(login:!t,name:!t),taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,iconic_taxon_id:!t,ancestor_ids:!t),photos:(url:!t,attribution:!t,license_code:!t),sounds:(file_url:!t,attribution:!t,license_code:!t))',
         locale: locale
     });
 
@@ -428,7 +428,7 @@ export const fetchObservation = async ({
 export const fetchSimilarTaxa = async (taxonId, signal) => {
     const params = new URLSearchParams({
         taxon_id: String(taxonId),
-        fields: '(count:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t))'
+        fields: '(count:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,iconic_taxon_id:!t))'
     });
 
     return request('/identifications/similar_species', params, { signal });
