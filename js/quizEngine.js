@@ -239,7 +239,7 @@ function getPointsForRank(rank) {
     }
 }
 
-export function generateMultipleChoiceOptions(targetTaxon, fallbackPool = [], apiSimilarResults = []) {
+export function generateMultipleChoiceOptions(targetTaxon, fallbackPool = [], candidateTaxa = [], excludedIds = new Set()) {
     if (!targetTaxon) return [];
 
     const formatName = (t) => t.preferred_common_name
@@ -254,67 +254,48 @@ export function generateMultipleChoiceOptions(targetTaxon, fallbackPool = [], ap
     };
 
     const distractorCandidates = [];
+    const usedIds = new Set([targetId, ...excludedIds]);
 
-    if (Array.isArray(apiSimilarResults) && apiSimilarResults.length > 0) {
-        const sortedByCount = [...apiSimilarResults]
-            .filter(item => item.taxon && item.taxon.id !== targetId)
-            .sort((a, b) => (b.count || 0) - (a.count || 0));
-
-        const topLookalikes = sortedByCount.slice(0, 8);
-
-        topLookalikes.forEach(item => {
-            distractorCandidates.push({
-                id: item.taxon.id,
-                displayName: formatName(item.taxon),
-                isCorrect: false
-            });
-        });
-    }
-
-    // Fallback 1: Sample from fallbackPool matching the target iconic_taxon_name
-    if (distractorCandidates.length < 3 && Array.isArray(fallbackPool)) {
-        const existingIds = new Set(distractorCandidates.map(d => d.id));
-        
-        fallbackPool.forEach(item => {
-            const t = item.taxon;
-            if (t && t.id !== targetId && !existingIds.has(t.id)) {
-                if (t.iconic_taxon_name && t.iconic_taxon_name === targetTaxon.iconic_taxon_name) {
-                    distractorCandidates.push({
-                        id: t.id,
-                        displayName: formatName(t),
-                        isCorrect: false
-                    });
-                    existingIds.add(t.id);
-                }
-            }
-        });
-    }
-
-    // Fallback 2: Sample broadly from fallbackPool if more distractors are needed
-    if (distractorCandidates.length < 3 && Array.isArray(fallbackPool)) {
-        const existingIds = new Set(distractorCandidates.map(d => d.id));
-
-        fallbackPool.forEach(item => {
-            const t = item.taxon;
-            if (t && t.id !== targetId && !existingIds.has(t.id)) {
+    // 1. Add candidates fetched from API tiers
+    if (Array.isArray(candidateTaxa)) {
+        candidateTaxa.forEach(t => {
+            if (t && t.id && !usedIds.has(t.id)) {
                 distractorCandidates.push({
                     id: t.id,
                     displayName: formatName(t),
                     isCorrect: false
                 });
-                existingIds.add(t.id);
+                usedIds.add(t.id);
             }
         });
     }
 
+    // 2. Fallback pool (Beginner / Easy / Hard non-expert regional cache)
+    if (distractorCandidates.length < 3 && Array.isArray(fallbackPool)) {
+        fallbackPool.forEach(item => {
+            const t = item.taxon;
+            if (t && t.id && !usedIds.has(t.id)) {
+                distractorCandidates.push({
+                    id: t.id,
+                    displayName: formatName(t),
+                    isCorrect: false
+                });
+                usedIds.add(t.id);
+            }
+        });
+    }
+
+    // Shuffle distractor options
     for (let i = distractorCandidates.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [distractorCandidates[i], distractorCandidates[j]] = [distractorCandidates[j], distractorCandidates[i]];
     }
 
+    // Select top 3 distractors
     const selectedDistractors = distractorCandidates.slice(0, 3);
     const finalOptions = [targetOption, ...selectedDistractors];
 
+    // Final shuffle of the 4 grid options
     for (let i = finalOptions.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [finalOptions[i], finalOptions[j]] = [finalOptions[j], finalOptions[i]];

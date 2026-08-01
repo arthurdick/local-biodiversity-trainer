@@ -84,22 +84,88 @@ store.addEventListener('observation:loaded', async (e) => {
         const targetTaxon = q?.observation?.taxon || q?.taxon;
 
         if (targetTaxon && !q.mcOptions) {
-            let apiSimilarResults = [];
+            let distractorPool = [];
+            const config = store.getState().config;
 
+            // Gather all taxon IDs assigned to questions in the active session
+            const sessionTaxonIds = new Set(
+                store.getState().questions
+                    .map(quest => quest.taxon?.id || quest.observation?.taxon?.id)
+                    .filter(Boolean)
+            );
+            // Always exclude the target taxon itself
+            sessionTaxonIds.add(targetTaxon.id);
+
+            const isExcluded = (id) => sessionTaxonIds.has(id) || distractorPool.some(d => d.id === id);
+
+            // --- TIER 1: Fetch Lookalikes from iNaturalist API ---
             try {
                 const similarData = await api.fetchSimilarTaxa(targetTaxon.id);
-                apiSimilarResults = similarData?.results || [];
+                (similarData?.results || []).forEach(item => {
+                    if (item.taxon && !isExcluded(item.taxon.id)) {
+                        distractorPool.push(item.taxon);
+                    }
+                });
             } catch (err) {
-                console.warn('Could not fetch similar species API, falling back to regional pool:', err);
+                console.warn('Could not fetch similar species API:', err);
             }
 
-            // --- POST-ASYNC VALIDATION CHECK ---
+            // --- TIER 2: Fetch Regional Iconic Taxon Species (Same Group in Region) ---
+            if (distractorPool.length < 3 && targetTaxon.iconic_taxon_name) {
+                try {
+                    const iconicData = await api.fetchSpeciesPool({
+                        perPage: 20,
+                        wantsPhotos: config.wantsPhotos,
+                        wantsSounds: config.wantsSounds,
+                        months: config.months,
+                        placeId: config.placeId,
+                        lat: config.lat,
+                        lng: config.lng,
+                        radius: config.radius,
+                        taxonId: targetTaxon.iconic_taxon_id || null, // Same iconic group (e.g., Aves, Insecta)
+                        establishmentStatus: config.establishmentStatus
+                    });
+
+                    (iconicData?.results || []).forEach(r => {
+                        if (r.taxon && !isExcluded(r.taxon.id)) {
+                            distractorPool.push(r.taxon);
+                        }
+                    });
+                } catch (err) {
+                    console.warn('Could not fetch iconic taxon distractors:', err);
+                }
+            }
+
+            // --- TIER 3: Fetch Broad Regional Species (Any Local Species) ---
+            if (distractorPool.length < 3) {
+                try {
+                    const regionalData = await api.fetchSpeciesPool({
+                        perPage: 20,
+                        wantsPhotos: config.wantsPhotos,
+                        wantsSounds: config.wantsSounds,
+                        months: config.months,
+                        placeId: config.placeId,
+                        lat: config.lat,
+                        lng: config.lng,
+                        radius: config.radius,
+                        establishmentStatus: config.establishmentStatus
+                    });
+
+                    (regionalData?.results || []).forEach(r => {
+                        if (r.taxon && !isExcluded(r.taxon.id)) {
+                            distractorPool.push(r.taxon);
+                        }
+                    });
+                } catch (err) {
+                    console.warn('Could not fetch broad regional distractors:', err);
+                }
+            }
+
+            // --- POST-ASYNC VALIDATION & RENDER ---
             const currentState = store.getState();
             const currentQ = currentState.questions[index];
             const currentTaxon = currentQ?.observation?.taxon || currentQ?.taxon;
 
-            // Ensure the user is still in the quiz, the question at `index` exists,
-            // the taxon ID matches our original request, and options haven't already been set.
             if (
                 currentState.ui.activeView === 'quiz-view' &&
                 currentQ &&
@@ -109,7 +175,8 @@ store.addEventListener('observation:loaded', async (e) => {
                 const options = engine.generateMultipleChoiceOptions(
                     targetTaxon,
                     currentState.regionalPool,
-                    apiSimilarResults
+                    distractorPool,
+                    sessionTaxonIds
                 );
 
                 store.updateQuestion(index, { mcOptions: options });
