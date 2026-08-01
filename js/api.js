@@ -228,6 +228,20 @@ const appendEstablishmentParams = (params, status) => {
     if (status === 'endemic') params.set('endemic', 'true');
 };
 
+/**
+ * Appends user life list query parameters for filtering observed or unobserved species.
+ */
+const appendUserParams = (params, lifeListMode, userLogin, userId) => {
+    const userIdentifier = userId || userLogin;
+    if (!userIdentifier || !lifeListMode || lifeListMode === 'off') return;
+
+    if (lifeListMode === 'observed') {
+        params.set('user_id', String(userIdentifier));
+    } else if (lifeListMode === 'unobserved') {
+        params.set('unobserved_by_user_id', String(userIdentifier));
+    }
+};
+
 export const fetchPlaces = async (query, signal, locale = getLocale()) => {
     const params = new URLSearchParams({
         q: query,
@@ -250,7 +264,16 @@ export const fetchTaxaAutocomplete = async (query, signal, locale = getLocale())
     return request('/taxa/autocomplete', params, { signal });
 };
 
-export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, taxonId, establishmentStatus, page = 1, perPage = null, locale = getLocale() }, signal) => {
+export const fetchUsersAutocomplete = async (query, signal) => {
+    const params = new URLSearchParams({
+        q: query,
+        fields: '(id:!t,login:!t,name:!t,icon:!t)'
+    });
+
+    return request('/users/autocomplete', params, { signal });
+};
+
+export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, taxonId, establishmentStatus, lifeListMode, userLogin, userId, page = 1, perPage = null, locale = getLocale() }, signal) => {
     const limit = perPage !== null ? String(perPage) : String(difficulty);
     
     const params = new URLSearchParams({
@@ -266,6 +289,7 @@ export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, m
     appendMediaParams(params, wantsPhotos, wantsSounds);
     appendMonthParams(params, months);
     appendEstablishmentParams(params, establishmentStatus);
+    appendUserParams(params, lifeListMode, userLogin, userId);
 
     if (placeId) {
         params.set('place_id', String(placeId));
@@ -282,7 +306,7 @@ export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, m
     return request('/observations/species_counts', params, { signal });
 };
 
-export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, difficulty, taxonId, establishmentStatus, withoutTaxonIds = [], notObsIds = [], locale = getLocale() }, signal) => {
+export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, difficulty, taxonId, establishmentStatus, lifeListMode, userLogin, userId, withoutTaxonIds = [], notObsIds = [], locale = getLocale() }, signal) => {
     const params = new URLSearchParams({
         quality_grade: 'research',
         captive: 'false',
@@ -296,6 +320,11 @@ export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, place
     appendMediaParams(params, wantsPhotos, wantsSounds);
     appendMonthParams(params, months);
     appendEstablishmentParams(params, establishmentStatus);
+
+    // Only filter individual observation fetching by user when doing broad sampling without an explicit target taxon ID
+    if (!taxonId) {
+        appendUserParams(params, lifeListMode, userLogin, userId);
+    }
 
     if (placeId) {
         params.set('place_id', String(placeId));

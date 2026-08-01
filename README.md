@@ -9,6 +9,9 @@ An interactive web application designed to help users test and improve their ide
 ## Key Features
 
 * **Location-Based Quizzing:** Practice identifying species specific to any region by searching for a city, park, or country, or by using exact GPS/custom coordinates with customizable search radiuses. Handles obscured or private location geoprivacy by falling back gracefully to text-based map links.
+* **iNaturalist Life List Import:** Enter an iNaturalist username to filter quiz pools:
+  * **Observed Species Only:** Test on species you’ve already logged in real life to reinforce memory.
+  * **Unobserved Species Only:** Test strictly on species in your target region that you HAVEN'T logged yet to target "lifers".
 * **Multiple Choice & Smart Distractor Engine:** Toggle between free-text answer inputs and an accessible 4-option multiple choice grid. Distractor options are dynamically fetched and weighted by real-world community confusion counts so options present authentic identification challenges. Includes desktop keyboard shortcuts (`1`–`4`).
 * **Taxon Filtering & Target Badges:** Focus training on specific groups of organisms (e.g., Birds, Fungi, Owls) with target taxon autocomplete, and toggle an iconic taxon badge overlay (e.g., *Aves*, *Insecta*) on active quiz cards.
 * **Establishment Status Filtering:** Filter species selection by establishment status to train specifically on **Native**, **Introduced**, or **Endemic** species, or include all taxa.
@@ -27,7 +30,7 @@ An interactive web application designed to help users test and improve their ide
   * **Connection-Aware Network Timeouts:** Automatically detects slow connections (2G/3G) and extends network request timeouts up to 30 seconds. Includes a manual retry mechanism if network calls fail.
 * **Accessibility & Screen Reader Support:** Centralized screen reader live-region announcer (`aria-live` polite/assertive), accessible modal dialogs (`<dialog>`), high-contrast focus rings, and full keyboard navigation across form controls, quiz cards, and multiple choice options.
 * **Missed & Partial Credit Species Review:** Review missed or partially correct species at the end of each session with thumbnail cards, audio indicators, guess comparison, and direct links to iNaturalist taxon and observation pages.
-* **Preference Memory:** Automatically remembers location, taxon, media options, seasonality filters, weighting methods, establishment status, quiz difficulty, and multiple choice preferences between sessions using `localStorage`.
+* **Preference Memory:** Automatically remembers location, taxon, user life list settings, media options, seasonality filters, weighting methods, establishment status, quiz difficulty, and multiple choice preferences between sessions using `localStorage`.
 
 ---
 
@@ -43,7 +46,7 @@ This application weights species selection based on community observation data f
 
 ## How to Use
 
-1. **Configure Setup:** Choose your target location, optional target taxon, establishment status filter, weighting method (Linear/Logarithmic), media types (photos/sounds), month filters (via manual selection or seasonal presets), pool size, question limit, and gameplay toggles (Multiple Choice mode, Rare Mode, unique species, iconic taxon badge).
+1. **Configure Setup:** Choose your target location, optional target taxon, optional iNaturalist user life list filter, establishment status filter, weighting method (Linear/Logarithmic), media types (photos/sounds), month filters (via manual selection or seasonal presets), pool size, question limit, and gameplay toggles (Multiple Choice mode, Rare Mode, unique species, iconic taxon badge).
 2. **Take the Quiz:** Examine research-grade observation images or listen to recorded audio clips fetched dynamically. Use the full-resolution image zoom or toggle field note hints if needed.
 3. **Submit Answers:** In Multiple Choice mode, click or press `1`–`4` to select the species. In Free-Text mode, select your confidence rank (Species, Genus, Family, Order) and type common or scientific names to check your answer against the database.
 4. **Review:** Analyze missed or partially correct species at the end of the session with direct references to strengthen your local ecological knowledge.
@@ -56,7 +59,7 @@ This project is built using vanilla JavaScript with modular **ES Modules** (`typ
 
 ### Architecture Highlights
 * `js/state.js`: Single source of truth state store with deep freezing (`Object.freeze`) in development mode, immutable state updates, and custom event dispatching.
-* `js/api.js`: Low-level wrapper for the iNaturalist v2 API featuring a custom `RequestQueue` throttler, parameter builders, taxa verification, similar species lookups, dynamic network timeout calculation, and license file fetching.
+* `js/api.js`: Low-level wrapper for the iNaturalist v2 API featuring a custom `RequestQueue` throttler, parameter builders, user autocomplete, taxa verification, similar species lookups, dynamic network timeout calculation, and license file fetching.
 * `js/observationService.js`: Prefetching pipeline, connection-aware network timeout calculator, and deep-paging selection manager.
 * `js/quizEngine.js`: Core domain algorithms for frequency weighting, deep page calculations, real-world lookalike distractor ranking, exact/alias taxonomic matching, answer evaluation, and hint spoiler redaction.
 * `js/stopwords.js`: Curated stop-word dictionary filtering generic grammar, observer terms, and environmental descriptors to prevent over-redacting field notes.

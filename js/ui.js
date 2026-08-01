@@ -71,6 +71,15 @@ export function formatTaxonDisplay(item) {
     return main;
 }
 
+export function formatUserDisplay(item) {
+    if (!item) return '';
+    const login = item.login || item.matched_term || '';
+    if (item.name && item.name.toLowerCase() !== login.toLowerCase()) {
+        return `${login} (${item.name})`;
+    }
+    return login;
+}
+
 const autocompleteConfigs = [
     {
         inputId: 'input-place',
@@ -89,6 +98,15 @@ const autocompleteConfigs = [
         errorKey: 'taxonError',
         resultsKey: 'taxonResults',
         formatDisplay: formatTaxonDisplay
+    },
+    {
+        inputId: 'input-username',
+        listId: 'list-username',
+        clearBtnId: 'clear-username',
+        nameKey: 'userLogin',
+        errorKey: 'userError',
+        resultsKey: 'userResults',
+        formatDisplay: formatUserDisplay
     }
 ];
 
@@ -249,9 +267,16 @@ export function render(state) {
     if (state.ui.activeView === 'setup-view') {
         syncInput('input-place', state.form.placeName || '');
         syncInput('input-taxon', state.form.taxonName || '');
+        syncInput('input-username', state.form.userLogin || '');
+        syncInput('input-lifelist', state.form.lifeListMode || 'off');
         syncInput('input-lat', state.form.lat ?? '');
         syncInput('input-lng', state.form.lng ?? '');
         syncInput('input-radius', state.form.radius);
+
+        const groupUsername = document.getElementById('group-username');
+        if (groupUsername) {
+            groupUsername.style.display = (state.form.lifeListMode && state.form.lifeListMode !== 'off') ? 'block' : 'none';
+        }
         
         syncCheckbox('mode-search', state.form.locMode === 'search');
         syncCheckbox('mode-coords', state.form.locMode === 'coords');

@@ -66,7 +66,8 @@ export async function loadObservationForQuestion(index) {
                                 wantsPhotos: currentConfig.wantsPhotos, wantsSounds: currentConfig.wantsSounds,
                                 months: currentConfig.months, placeId: currentConfig.placeId,
                                 lat: currentConfig.lat, lng: currentConfig.lng, radius: currentConfig.radius,
-                                taxonId: currentConfig.taxonId, establishmentStatus: currentConfig.establishmentStatus
+                                taxonId: currentConfig.taxonId, establishmentStatus: currentConfig.establishmentStatus,
+                                lifeListMode: currentConfig.lifeListMode, userLogin: currentConfig.userLogin, userId: currentConfig.userId
                             }, controller.signal);
 
                             if (deepData.results && deepData.results.length > 0) {
@@ -138,6 +139,7 @@ export async function loadObservationForQuestion(index) {
                 difficulty: isStandardExpert ? 'all' : 'specific',
                 taxonId: isStandardExpert ? currentConfig.taxonId : targetTaxon?.id,
                 establishmentStatus: currentConfig.establishmentStatus,
+                lifeListMode: currentConfig.lifeListMode, userLogin: currentConfig.userLogin, userId: currentConfig.userId,
                 withoutTaxonIds, notObsIds
             }, controller.signal);
 

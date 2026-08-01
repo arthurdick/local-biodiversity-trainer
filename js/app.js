@@ -191,6 +191,12 @@ function sanitizePreferences(raw) {
     if (typeof raw.taxonName === 'string') sanitized.taxonName = raw.taxonName;
     if (raw.taxonId === null || typeof raw.taxonId === 'number') sanitized.taxonId = raw.taxonId;
 
+    if (typeof raw.userLogin === 'string') sanitized.userLogin = raw.userLogin;
+    if (raw.userId === null || typeof raw.userId === 'number') sanitized.userId = raw.userId;
+    
+    const validLifeList = ['off', 'observed', 'unobserved'];
+    if (validLifeList.includes(raw.lifeListMode)) sanitized.lifeListMode = raw.lifeListMode;
+
     if (typeof raw.showIconicTaxonBadge === 'boolean') sanitized.showIconicTaxonBadge = raw.showIconicTaxonBadge;
     if (typeof raw.preventDuplicates === 'boolean') sanitized.preventDuplicates = raw.preventDuplicates;
     if (typeof raw.isRarityMode === 'boolean') sanitized.isRarityMode = raw.isRarityMode;
@@ -250,11 +256,12 @@ function loadPreferences() {
 }
 
 // --- DECLARATIVE FORM TWO-WAY BINDING ---
-['lat', 'lng', 'radius', 'difficulty', 'questionLimit', 'answerInput', 'rankInput', 'weightingMethod', 'establishmentStatus'].forEach(prop => {
+['lat', 'lng', 'radius', 'difficulty', 'questionLimit', 'answerInput', 'rankInput', 'weightingMethod', 'establishmentStatus', 'lifeListMode'].forEach(prop => {
     let elId = `input-${prop.replace('Input', '')}`;
     if (prop === 'questionLimit') elId = 'input-questions';
     if (prop === 'weightingMethod') elId = 'input-weighting';
     if (prop === 'establishmentStatus') elId = 'input-establishment';
+    if (prop === 'lifeListMode') elId = 'input-lifelist';
 
     const el = document.getElementById(elId);
     if (el) el.addEventListener('input', (e) => {
@@ -351,7 +358,8 @@ function setupAutocomplete(config) {
             item.display_name,
             item.name,
             item.preferred_common_name,
-            item.matched_term
+            item.matched_term,
+            item.login
         ];
 
         return candidateFields.some(candidate =>
@@ -459,6 +467,15 @@ setupAutocomplete({
     errorMsg: "⚠️ Please select a valid target taxon from the suggestions list."
 });
 
+setupAutocomplete({
+    inputId: 'input-username', listId: 'list-username', clearBtnId: 'clear-username',
+    fetchDataFn: api.fetchUsersAutocomplete,
+    stateKeys: { id: 'userId', name: 'userLogin', error: 'userError', results: 'userResults' },
+    formatDisplay: ui.formatUserDisplay,
+    validateOnBlur: (s) => true,
+    errorMsg: "⚠️ Please enter a valid iNaturalist username."
+});
+
 document.getElementById('btn-gps').addEventListener('click', () => {
     store.setState(prev => ({ ui: { ...prev.ui, isLocatingGps: true } }));
     navigator.geolocation.getCurrentPosition(
@@ -477,7 +494,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const s = store.getState();
     let hasError = false;
-    let placeError = null, setupError = null, taxonError = null;
+    let placeError = null, setupError = null, taxonError = null, userError = null;
 
     if (s.form.locMode === 'search' && !s.form.placeId) {
         placeError = "⚠️ Please search and select a location."; hasError = true;
@@ -497,11 +514,12 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     }
 
     if ((s.form.taxonName || '').trim() !== '' && !s.form.taxonId) { taxonError = "⚠️ Please select a valid target taxon from the list, or clear this field."; hasError = true; }
+    if (s.form.lifeListMode !== 'off' && (!s.form.userLogin || !s.form.userLogin.trim())) { userError = "⚠️ Please enter an iNaturalist username to use Life List filtering."; hasError = true; }
     if (!s.form.wantsPhotos && !s.form.wantsSounds) { setupError = "Please select at least one media type (Photos or Sounds)."; hasError = true; }
     if (s.form.months.length === 0) { setupError = "Please select at least one month for seasonality."; hasError = true; }
 
     if (hasError) {
-        store.setState(prev => ({ ui: { ...prev.ui, placeError, setupError, taxonError } })); return;
+        store.setState(prev => ({ ui: { ...prev.ui, placeError, setupError, taxonError, userError } })); return;
     }
 
     savePreferences();
@@ -509,7 +527,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
 
     store.setState(prev => ({
         config: { ...prev.form, expertTotalSpecies: 0 },
-        ui: { ...prev.ui, isLoadingQuizPool: true, setupError: null, placeError: null, taxonError: null }
+        ui: { ...prev.ui, isLoadingQuizPool: true, setupError: null, placeError: null, taxonError: null, userError: null }
     }));
 
     const updatedState = store.getState();
@@ -530,7 +548,10 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
                 lng: updatedState.form.lng,
                 radius: updatedState.form.radius,
                 taxonId: updatedState.form.taxonId,
-                establishmentStatus: updatedState.config.establishmentStatus
+                establishmentStatus: updatedState.config.establishmentStatus,
+                lifeListMode: updatedState.config.lifeListMode,
+                userLogin: updatedState.config.userLogin,
+                userId: updatedState.config.userId
             });
             expertCount = preFlightData.total_results || 0;
 
@@ -546,7 +567,19 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
             
         } else {
             const data = await api.fetchSpeciesPool({
-                difficulty: updatedState.config.difficulty, wantsPhotos: updatedState.config.wantsPhotos, wantsSounds: updatedState.config.wantsSounds, months: updatedState.config.months, placeId: updatedState.form.placeId, lat: updatedState.form.lat, lng: updatedState.form.lng, radius: updatedState.form.radius, taxonId: updatedState.form.taxonId, establishmentStatus: updatedState.config.establishmentStatus
+                difficulty: updatedState.config.difficulty,
+                wantsPhotos: updatedState.config.wantsPhotos,
+                wantsSounds: updatedState.config.wantsSounds,
+                months: updatedState.config.months,
+                placeId: updatedState.form.placeId,
+                lat: updatedState.form.lat,
+                lng: updatedState.form.lng,
+                radius: updatedState.form.radius,
+                taxonId: updatedState.form.taxonId,
+                establishmentStatus: updatedState.config.establishmentStatus,
+                lifeListMode: updatedState.config.lifeListMode,
+                userLogin: updatedState.config.userLogin,
+                userId: updatedState.config.userId
             });
             if (!data.results || data.results.length === 0) {
                 store.setState(prev => ({ ui: { ...prev.ui, isLoadingQuizPool: false, setupError: "No research-grade observations found." } }));
@@ -869,7 +902,7 @@ document.getElementById('btn-retry').addEventListener('click', () => {
     if (audioPlayer) { audioPlayer.removeAttribute('src'); delete audioPlayer.dataset.src; }
     
     store.setState(prev => ({ ui: { ...prev.ui, quizError: null, isMediaLoaded: false } }));
-    store.dispatchEvent(new CustomEvent('quiz:retry'));
+    store.dispatchEvent(new CustomEvent('media:retry'));
 });
 
 document.getElementById('btn-skip-end').addEventListener('click', () => {

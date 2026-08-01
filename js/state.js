@@ -9,6 +9,9 @@ const initialState = {
         radius: 10,
         taxonId: null,
         taxonName: '',
+        userLogin: '',
+        userId: null,
+        lifeListMode: 'off',
         wantsPhotos: true,
         wantsSounds: false,
         months: ['1','2','3','4','5','6','7','8','9','10','11','12'],
@@ -37,7 +40,10 @@ const initialState = {
         expertTotalSpecies: 0,
         questionLimit: 10,
         weightingMethod: 'linear',
-        establishmentStatus: 'any'
+        establishmentStatus: 'any',
+        userLogin: '',
+        userId: null,
+        lifeListMode: 'off'
     },
 
     // 3. Centralized UI & View Flags
@@ -49,9 +55,11 @@ const initialState = {
         setupError: null,
         placeError: null,
         taxonError: null,
+        userError: null,
 
         placeResults: [],
         taxonResults: [],
+        userResults: [],
 
         quizError: null,
         answerError: null,
