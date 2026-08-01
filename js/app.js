@@ -587,19 +587,28 @@ function setupAutocomplete(config) {
 
     listEl.addEventListener('mousemove', (e) => e.currentTarget.classList.remove('using-keyboard'));
 
-    listEl.addEventListener('pointerdown', (e) => {
+    // Prevent input blur when pressing down on list items
+    listEl.addEventListener('mousedown', (e) => {
+        if (e.target.closest('li')) {
+            e.preventDefault();
+        }
+    });
+
+    // Handle item selection cleanly on standard click event
+    listEl.addEventListener('click', (e) => {
         const li = e.target.closest('li');
         if (li) {
-            e.preventDefault();
             const idx = parseInt(li.id.split('-').pop(), 10);
             const item = store.getState().ui[results][idx];
 
-            store.setState(prev => ({
-                form: { ...prev.form, [id]: item.id, [name]: formatDisplay(item) },
-                ui: { ...prev.ui, [showList]: false, [error]: null }
-            }));
+            if (item) {
+                store.setState(prev => ({
+                    form: { ...prev.form, [id]: item.id, [name]: formatDisplay(item) },
+                    ui: { ...prev.ui, [showList]: false, [error]: null }
+                }));
 
-            inputEl.focus();
+                inputEl.focus();
+            }
         }
     });
 
