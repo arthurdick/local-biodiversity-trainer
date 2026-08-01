@@ -136,13 +136,16 @@ function syncUrlWithState(state) {
 
     const cleanBase = window.location.protocol + "//" + window.location.host + window.location.pathname;
 
+    // Do not wipe URL search parameters if the session was loaded via a deep link / URL challenge
+    if (state.ui.isUrlChallenge) return;
+
     if (state.form.isDailyMode) {
         const activeDailyUrl = buildShareableUrl(state.form, 'daily');
         if (window.location.href !== activeDailyUrl) {
             window.history.replaceState(null, '', activeDailyUrl);
         }
     } else if (window.location.search) {
-        // Clear query parameters in Custom Mode
+        // Clear query parameters in standard Custom Mode
         window.history.replaceState(null, '', cleanBase);
     }
 }
@@ -1055,26 +1058,50 @@ document.getElementById('btn-share-link')?.addEventListener('click', async (e) =
 
 // --- APP BOOTSTRAPPING ---
 async function bootApplication() {
-    loadPreferences();
-
+    // 1. Parse URL parameters FIRST before any state changes occur
     const urlOverrides = parseUrlParams();
     const hasUrlOverrides = Object.keys(urlOverrides).length > 0;
 
-    if (hasUrlOverrides) {
-        let initialForm = { ...store.getState().form, ...urlOverrides };
+    // 2. Read saved localStorage preferences without committing to state yet
+    let savedPrefs = {};
+    try {
+        const saved = localStorage.getItem('bio_trainer_prefs');
+        if (saved) {
+            savedPrefs = sanitizePreferences(JSON.parse(saved));
+        }
+    } catch (e) {
+        console.warn("Could not load preferences:", e);
+    }
 
-        // Apply daily enforcements synchronously if launching via daily link
+    // 3. Compose initial form state (base -> preferences -> URL overrides)
+    let initialForm = {
+        ...store.getState().form,
+        ...savedPrefs
+    };
+
+    if (hasUrlOverrides) {
+        initialForm = {
+            ...initialForm,
+            ...urlOverrides,
+            isDailyMode: urlOverrides.quizMode === 'daily'
+        };
+
         if (urlOverrides.quizMode === 'daily') {
             initialForm = engine.applyDailyEnforcements(initialForm);
         }
+    }
 
-        // Commit initial URL config immutably
-        store.setState(prev => ({
-            form: initialForm,
-            ui: { ...prev.ui, isUrlChallenge: true }
-        }));
+    // 4. Commit settled state in a SINGLE store update
+    store.setState(prev => ({
+        form: initialForm,
+        ui: {
+            ...prev.ui,
+            isUrlChallenge: hasUrlOverrides
+        }
+    }));
 
-        // Fetch place display name asynchronously without mutating state
+    // 5. Asynchronously hydrate place and taxon display names if loaded via ID
+    if (hasUrlOverrides) {
         if (urlOverrides.placeId && !store.getState().form.placeName) {
             try {
                 const placeData = await api.fetchPlaceById(urlOverrides.placeId);
@@ -1091,7 +1118,6 @@ async function bootApplication() {
             }
         }
 
-        // Fetch taxon display name asynchronously without mutating state
         if (urlOverrides.taxonId && !store.getState().form.taxonName) {
             try {
                 const taxonData = await api.fetchTaxonById(urlOverrides.taxonId);
@@ -1109,7 +1135,7 @@ async function bootApplication() {
         }
     }
 
-    // Render final resolved state and remove booting screen
+    // Render final resolved state and reveal the application
     ui.render(store.getState());
     document.getElementById('app').classList.remove('booting');
 }
