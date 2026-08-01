@@ -151,36 +151,60 @@ class Store extends EventTarget {
 export const store = new Store(initialState);
 
 // --- DAILY SCORES PERSISTENCE HELPERS ---
+
+/**
+ * Retrieves saved daily scores from localStorage.
+ * Automatically prunes entries older than 30 days without wiping existing daily records.
+ */
 export function getDailyScores() {
     try {
         const raw = localStorage.getItem('bio_trainer_daily_scores');
-        if (!raw) return { date: null, scores: {} };
+        if (!raw) return { scores: {} };
+        
         const data = JSON.parse(raw);
-        const todayUTC = new Date().toISOString().split('T')[0];
-        if (data.date !== todayUTC) {
-            localStorage.removeItem('bio_trainer_daily_scores');
-            return { date: todayUTC, scores: {} };
+        const scores = data.scores || {};
+        
+        // Rolling retention: Purge entries older than 7 days
+        const now = Date.now();
+        const retentionPeriod = 7 * 24 * 60 * 60 * 1000;
+        let isModified = false;
+
+        Object.keys(scores).forEach(key => {
+            const completedAt = scores[key]?.completedAt;
+            if (completedAt && (now - new Date(completedAt).getTime() > retentionPeriod)) {
+                delete scores[key];
+                isModified = true;
+            }
+        });
+
+        if (isModified) {
+            localStorage.setItem('bio_trainer_daily_scores', JSON.stringify({ scores }));
         }
-        return data;
+
+        return { scores };
     } catch (e) {
-        return { date: null, scores: {} };
+        return { scores: {} };
     }
 }
 
+/**
+ * Persists an initial daily challenge score under the specified location key.
+ */
 export function saveInitialDailyScore(locationKey, scoreVal, totalQuestions) {
     try {
-        const todayUTC = new Date().toISOString().split('T')[0];
         const currentRecord = getDailyScores();
         
         if (!currentRecord.scores[locationKey]) {
             const formattedScore = `${Number((scoreVal / 10).toFixed(1))} / ${totalQuestions}`;
-            currentRecord.date = todayUTC;
             currentRecord.scores[locationKey] = {
                 initialScore: scoreVal,
                 formattedScore,
                 completedAt: new Date().toISOString()
             };
-            localStorage.setItem('bio_trainer_daily_scores', JSON.stringify(currentRecord));
+
+            localStorage.setItem('bio_trainer_daily_scores', JSON.stringify({
+                scores: currentRecord.scores
+            }));
         }
     } catch (e) {
         console.warn('Could not save daily score:', e);
