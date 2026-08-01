@@ -45,7 +45,7 @@ export async function loadObservationForQuestion(index) {
                 const previousLock = expertRareLock;
                 let releaseLock;
                 expertRareLock = new Promise(resolve => releaseLock = resolve);
-                await previousLock;
+                await previousLock.catch(() => {});
 
                 try {
                     // Re-check state just in case this taxon was populated while waiting in the queue
