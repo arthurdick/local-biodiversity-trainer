@@ -776,6 +776,7 @@ function renderQuizMedia(state, isReadyForMedia) {
             if (audioPlayer.dataset.src) {
                 audioPlayer.removeAttribute('src');
                 delete audioPlayer.dataset.src;
+                audioPlayer.load();
             }
             audioContainer.style.display = 'none';
             zoomBtn.style.display = 'flex';
@@ -850,6 +851,7 @@ function renderQuizMedia(state, isReadyForMedia) {
         if (audioPlayer.dataset.src) {
             audioPlayer.removeAttribute('src');
             delete audioPlayer.dataset.src;
+            audioPlayer.load();
         }
         zoomBtn.style.display = 'none';
         imgEl.style.display = 'none';

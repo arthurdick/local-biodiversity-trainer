@@ -1030,7 +1030,7 @@ document.getElementById('btn-retry').addEventListener('click', () => {
     const audioPlayer = document.getElementById('quiz-audio-player');
     
     if (imgEl) { imgEl.removeAttribute('src'); delete imgEl.dataset.src; }
-    if (audioPlayer) { audioPlayer.removeAttribute('src'); delete audioPlayer.dataset.src; }
+    if (audioPlayer) { audioPlayer.removeAttribute('src'); delete audioPlayer.dataset.src; audioPlayer.load(); }
     
     store.setState(prev => ({ ui: { ...prev.ui, quizError: null, isMediaLoaded: false } }));
     store.dispatchEvent(new CustomEvent('media:retry'));
