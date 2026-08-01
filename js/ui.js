@@ -36,16 +36,6 @@ function announce(message, isAssertive = false) {
 export function formatPlaceDisplay(item) {
     if (!item) return '';
     const displayName = item.display_name || item.name || '';
-
-    if (item.matched_term) {
-        const match = item.matched_term.trim();
-        if (match && !displayName.toLowerCase().includes(match.toLowerCase())) {
-            return `${displayName} — Matched: ${match}`;
-        }
-    } else if (item.name && !displayName.toLowerCase().includes(item.name.toLowerCase())) {
-        return `${displayName} (${item.name})`;
-    }
-
     return displayName;
 }
 
@@ -54,13 +44,6 @@ export function formatTaxonDisplay(item) {
     const main = item.preferred_common_name
         ? `${item.preferred_common_name} (${item.name})`
         : item.name;
-
-    if (item.matched_term) {
-        const match = item.matched_term.trim();
-        if (match && !main.toLowerCase().includes(match.toLowerCase())) {
-            return `${main} — Matched: ${match}`;
-        }
-    }
     return main;
 }
 
