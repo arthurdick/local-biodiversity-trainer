@@ -438,22 +438,38 @@ export function render(state) {
         const isMC = state.config.isMultipleChoice;
         const formEl = document.getElementById('answer-form');
         const mcContainer = document.getElementById('mc-options-container');
+        const answerInputsRow = document.querySelector('.answer-inputs-row');
+        const btnSubmit = document.getElementById('btn-submit');
+        const answerLabel = formEl ? formEl.querySelector('label[for="input-answer"]') : null;
 
         if (isMC) {
-            if (formEl) formEl.style.display = 'none';
+            // Show answer form wrapper when active so the Skip button inside remains visible
+            if (formEl) formEl.style.display = (!isAnswered && isReadyForMedia) ? 'block' : 'none';
+            if (answerLabel) answerLabel.style.display = 'none';
+            if (answerInputsRow) answerInputsRow.style.display = 'none';
+            if (btnSubmit) btnSubmit.style.display = 'none';
             if (mcContainer) {
                 mcContainer.style.display = isReadyForMedia ? 'grid' : 'none';
                 renderMCOptions(state, mcContainer, q, isAnswered);
             }
         } else {
             if (formEl) formEl.style.display = 'block';
+            if (answerLabel) answerLabel.style.display = 'block';
+            if (answerInputsRow) answerInputsRow.style.display = 'flex';
             if (mcContainer) mcContainer.style.display = 'none';
+            if (btnSubmit) {
+                btnSubmit.style.display = (!isAnswered && isReadyForMedia) ? 'block' : 'none';
+                btnSubmit.disabled = state.ui.isCheckingAnswer;
+                if (state.ui.isCheckingAnswer) {
+                    btnSubmit.textContent = "Checking...";
+                } else if (state.ui.answerError) {
+                    btnSubmit.textContent = "↻ Retry Submission";
+                } else {
+                    btnSubmit.textContent = "Check Answer";
+                }
+            }
         }
-        
-        const btnSubmit = document.getElementById('btn-submit');
-        btnSubmit.style.display = (!isAnswered && isReadyForMedia) ? 'block' : 'none';
-        btnSubmit.disabled = state.ui.isCheckingAnswer;
-        
+
         let answerErrEl = document.getElementById('answer-error');
         if (!answerErrEl) {
             answerErrEl = document.createElement('div');
@@ -462,7 +478,7 @@ export function render(state) {
             answerErrEl.style.marginBottom = '10px';
             
             const buttonsRow = document.querySelector('.answer-buttons-row');
-            if (buttonsRow) buttonsRow.parentNode.insertBefore(answerErrEl, buttonsRow);
+            if (buttonsRow && buttonsRow.parentNode) buttonsRow.parentNode.insertBefore(answerErrEl, buttonsRow);
         }
         
         if (state.ui.answerError) {
@@ -472,35 +488,7 @@ export function render(state) {
             answerErrEl.style.display = 'none';
         }
 
-        if (state.ui.isCheckingAnswer) {
-            btnSubmit.textContent = "Checking...";
-        } else if (state.ui.answerError) {
-            btnSubmit.textContent = "↻ Retry Submission";
-        } else {
-            btnSubmit.textContent = "Check Answer";
-        }
-
-        const answerInputsRow = document.querySelector('.answer-inputs-row');
-
-        if (isMC) {
-            // Hide free-text inputs and Submit button, show MC grid
-            if (answerInputsRow) answerInputsRow.style.display = 'none';
-            if (btnSubmit) btnSubmit.style.display = 'none';
-            if (mcContainer) {
-                mcContainer.style.display = isReadyForMedia ? 'grid' : 'none';
-                renderMCOptions(state, mcContainer, q, isAnswered);
-            }
-        } else {
-            // Restore free-text inputs and Submit button, hide MC grid
-            if (answerInputsRow) answerInputsRow.style.display = 'flex';
-            if (mcContainer) mcContainer.style.display = 'none';
-            if (btnSubmit) {
-                btnSubmit.style.display = (!isAnswered && isReadyForMedia) ? 'block' : 'none';
-                btnSubmit.disabled = state.ui.isCheckingAnswer;
-            }
-        }
-
-        // Skip Button logic: never moves DOM nodes!
+        // Skip Button logic
         const btnSkip = document.getElementById('btn-skip');
         if (btnSkip) {
             btnSkip.style.display = (!isAnswered && isReadyForMedia) ? 'block' : 'none';
