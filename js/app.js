@@ -77,10 +77,10 @@ store.addEventListener('observation:loaded', (e) => {
 
 store.addEventListener('observation:loaded', async (e) => {
     const { index, error } = e.detail;
-    const s = store.getState();
+    const initialState = store.getState();
 
-    if (!error && s.config.isMultipleChoice) {
-        const q = s.questions[index];
+    if (!error && initialState.config.isMultipleChoice) {
+        const q = initialState.questions[index];
         const targetTaxon = q?.observation?.taxon || q?.taxon;
 
         if (targetTaxon && !q.mcOptions) {
@@ -93,13 +93,27 @@ store.addEventListener('observation:loaded', async (e) => {
                 console.warn('Could not fetch similar species API, falling back to regional pool:', err);
             }
 
-            const options = engine.generateMultipleChoiceOptions(
-                targetTaxon,
-                s.regionalPool,
-                apiSimilarResults
-            );
+            // --- POST-ASYNC VALIDATION CHECK ---
+            const currentState = store.getState();
+            const currentQ = currentState.questions[index];
+            const currentTaxon = currentQ?.observation?.taxon || currentQ?.taxon;
 
-            store.updateQuestion(index, { mcOptions: options });
+            // Ensure the user is still in the quiz, the question at `index` exists,
+            // the taxon ID matches our original request, and options haven't already been set.
+            if (
+                currentState.ui.activeView === 'quiz-view' &&
+                currentQ &&
+                currentTaxon?.id === targetTaxon.id &&
+                !currentQ.mcOptions
+            ) {
+                const options = engine.generateMultipleChoiceOptions(
+                    targetTaxon,
+                    currentState.regionalPool,
+                    apiSimilarResults
+                );
+
+                store.updateQuestion(index, { mcOptions: options });
+            }
         }
     }
 });
