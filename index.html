@@ -8,7 +8,7 @@
 </head>
 <body>
 
-<div id="app">
+<div id="app" class="booting">
     <!-- Centralized Screen Reader Announcer -->
     <div id="a11y-polite" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
     <div id="a11y-assertive" class="visually-hidden" aria-live="assertive" aria-atomic="true"></div>
@@ -20,6 +20,24 @@
             <p class="subtitle">Learn local species weighted by observation frequency. <em>Subject to synanthropic & observer bias.</em></p>
 
             <form id="setup-form">
+
+                <!-- Daily Challenge Banner -->
+                <div id="daily-challenge-banner" class="daily-banner" style="display: none;">
+                    <div class="daily-banner-content">
+                        <div class="daily-banner-title">
+                            <span class="daily-badge">📅 DAILY CHALLENGE</span>
+                            <span id="daily-banner-date" class="daily-date">August 1, 2026</span>
+                            <span id="daily-completion-badge" class="daily-completed-badge" style="display: none;"></span>
+                        </div>
+                        <p class="daily-banner-text">
+                            Rules are locked to <strong>10 questions</strong> with <strong>linear weighting</strong> for global score consistency.
+                        </p>
+                    </div>
+                    <button type="button" id="btn-exit-daily" class="btn-secondary-small">
+                        ↩ Exit Daily Mode
+                    </button>
+                </div>
+
                 <div class="setup-grid">
                     
                     <!-- Panel 1: Target Ecosystem Scope -->
@@ -200,7 +218,11 @@
                 </div>
 
                 <div id="form-error-message" class="inline-error"></div>
-                <button type="submit" id="btn-start" class="btn-primary-large">Load Quiz Pool</button>
+                
+                <div class="setup-actions-row">
+                    <button type="submit" id="btn-start" class="btn-primary-large" style="flex: 2; margin: 0;">Load Quiz Pool</button>
+                    <button type="button" id="btn-trigger-daily" class="btn-primary-large btn-daily-trigger" style="flex: 1; margin: 0;">📅 Daily Mode</button>
+                </div>
             </form>
         </div>
 
@@ -296,9 +318,23 @@
             <h1 id="results-heading" tabindex="-1">Quiz Complete!</h1>
             <h2 id="final-score"></h2>
             
+            <!-- Score Card Visual Preview -->
+            <div id="score-card-preview" class="score-card-preview">
+                <pre id="score-card-text" class="score-card-text"></pre>
+            </div>
+            
+            <div class="results-actions">
+                <button type="button" id="btn-share-results" class="btn-primary-large btn-share-results">
+                    📊 Share Score Card
+                </button>
+                <button type="button" id="btn-share-link" class="btn-primary-large btn-share-link">
+                    🔗 Share Link Only
+                </button>
+            </div>
+
             <div id="review-container"></div>
             
-            <button type="button" id="btn-restart" class="btn-primary-large">Play Again</button>
+            <button type="button" id="btn-restart" class="btn-primary-large" style="margin-top: 10px;">Play Again</button>
         </div>
         
         <!-- Accessible Zoom Modal -->

@@ -1,20 +1,17 @@
-import { selectCurrentMedia, selectCurrentMeta } from './state.js';
+import { selectCurrentMedia, selectCurrentMeta, getDailyScores } from './state.js';
 import { filterSignificantFragments, isStopWord } from './stopwords.js';
+import { buildLocationSeedKey } from './quizEngine.js';
+import { generateResultShareText } from './urlService.js';
 
 let currentView = null;
 
-// Private WeakMap to track render cache without polluting DOM node properties
 const domCache = new WeakMap();
 
-/**
- * Pushes a coherent string to the central screen reader live region.
- */
 let announceTimeout = null;
 
 function announce(message, isAssertive = false) {
     if (!message) return;
 
-    // Clear any pending rapid announcements to prevent stuttering
     if (announceTimeout) clearTimeout(announceTimeout);
 
     announceTimeout = setTimeout(() => {
@@ -22,7 +19,6 @@ function announce(message, isAssertive = false) {
         const announcer = document.getElementById(targetId);
         
         if (announcer) {
-            // Append a non-breaking space if the text is identical to force a new mutation event
             if (announcer.textContent === message) {
                 announcer.textContent = message + '\u00A0';
             } else {
@@ -30,15 +26,12 @@ function announce(message, isAssertive = false) {
             }
         }
         
-        // Clear the *other* region so they don't visually clutter the DOM or conflict
         const otherId = isAssertive ? 'a11y-polite' : 'a11y-assertive';
         const otherAnnouncer = document.getElementById(otherId);
         if (otherAnnouncer) otherAnnouncer.textContent = '';
         
-    }, 250); // 250ms debounce allows rapid DOM updates to settle
+    }, 250);
 }
-
-// --- AUTOCOMPLETE FORMATTERS ---
 
 export function formatPlaceDisplay(item) {
     if (!item) return '';
@@ -110,14 +103,9 @@ const autocompleteConfigs = [
     }
 ];
 
-/**
- * Redacts the taxon's scientific name, common names, possessive variants,
- * hyphenated space variants, and significant fragments from field note strings.
- */
 function redactSpoilers(text, taxon) {
     if (!text || !taxon) return text;
 
-    // 1. Canonicalize Unicode (NFC) and normalize typographic quotes/dashes in both text and taxonomy
     const normalizeTypography = (str) => {
         if (!str) return '';
         return str
@@ -131,7 +119,6 @@ function redactSpoilers(text, taxon) {
     const scientificTerms = new Set();
     const commonTerms = new Set();
 
-    // 2. Add Scientific Name & Genus/Epithet parts
     if (taxon.name) {
         const safeSciName = normalizeTypography(taxon.name);
         scientificTerms.add(safeSciName);
@@ -142,21 +129,17 @@ function redactSpoilers(text, taxon) {
         });
     }
 
-    // 3. Add Common Name & Variant Terms
     if (taxon.preferred_common_name) {
         const safeCommonName = normalizeTypography(taxon.preferred_common_name);
         commonTerms.add(safeCommonName);
 
-        // Convert hyphenated full names to space variants (e.g., "Red-tailed Hawk" -> "Red tailed Hawk")
         if (safeCommonName.includes('-')) {
             commonTerms.add(safeCommonName.replace(/-/g, ' '));
         }
 
-        // Process space-delimited word tokens
         const words = safeCommonName.split(/\s+/);
 
         words.forEach(word => {
-            // Handle possessive variants (e.g., "Steller's" -> "Steller's", "Stellers", "Steller")
             if (word.includes("'")) {
                 commonTerms.add(word);
                 const noApostrophe = word.replace(/'/g, '');
@@ -168,7 +151,6 @@ function redactSpoilers(text, taxon) {
                 }
             }
 
-            // Handle hyphenated token variants (e.g., "Red-tailed" -> "Red-tailed", "Red tailed")
             if (word.includes('-')) {
                 commonTerms.add(word);
                 commonTerms.add(word.replace(/-/g, ' '));
@@ -178,7 +160,6 @@ function redactSpoilers(text, taxon) {
                 significantSubParts.forEach(sub => commonTerms.add(sub));
             }
 
-            // Standard single tokens
             if (!word.includes("'") && !word.includes('-')) {
                 const clean = word.toLowerCase().replace(/[^\w]/g, '');
                 if (clean.length >= 3 && !isStopWord(clean)) {
@@ -188,7 +169,6 @@ function redactSpoilers(text, taxon) {
         });
     }
 
-    // 4. Pluralize significant common terms
     const termsToRedact = new Set([...scientificTerms, ...commonTerms]);
     
     commonTerms.forEach(term => {
@@ -200,7 +180,6 @@ function redactSpoilers(text, taxon) {
         }
     });
 
-    // 5. Sort descending by length so full phrases match before single words
     const sortedTerms = Array.from(termsToRedact)
         .filter(term => term && term.trim().length > 0)
         .sort((a, b) => b.length - a.length)
@@ -208,14 +187,12 @@ function redactSpoilers(text, taxon) {
 
     if (sortedTerms.length === 0) return safeText;
 
-    // 6. Global, case-insensitive redaction
     const regex = new RegExp(`(?<=\\P{L}|^)(?:${sortedTerms.join('|')})(?=\\P{L}|$)`, 'giu');
     return safeText.replace(regex, '[REDACTED]');
 }
 
 const formatPoints = (points) => Number((points / 10).toFixed(1));
 
-// Helper to safely pause and reset audio playback
 function stopAudio() {
     const audioPlayer = document.getElementById('quiz-audio-player');
     if (audioPlayer && !audioPlayer.paused) {
@@ -224,7 +201,6 @@ function stopAudio() {
     }
 }
 
-// Safe text input sync (prevents cursor jumping)
 function syncInput(id, value) {
     const el = document.getElementById(id);
     if (el && el.value !== String(value)) el.value = value;
@@ -236,12 +212,7 @@ function syncCheckbox(id, checked) {
     if (el && el.checked !== isChecked) el.checked = isChecked;
 }
 
-/**
- * The single declarative rendering pipeline. 
- * Maps the entire state tree to the DOM visually using safe DOM construction.
- */
 export function render(state) {
-    // 1. View Routing
     const isNewView = currentView !== state.ui.activeView;
     
     document.querySelectorAll('.view').forEach(el => el.classList.toggle('active', el.id === state.ui.activeView));
@@ -249,7 +220,6 @@ export function render(state) {
     if (isNewView) {
         currentView = state.ui.activeView;
         
-        // Derives 'setup-heading' from 'setup-view', etc.
         const headingId = currentView.replace('-view', '-heading');
         const headingEl = document.getElementById(headingId);
         
@@ -258,13 +228,56 @@ export function render(state) {
         }
     }
 
-    // Stop audio if navigating away from the quiz view
     if (state.ui.activeView !== 'quiz-view') {
         stopAudio();
     }
 
     // 2. Setup View
     if (state.ui.activeView === 'setup-view') {
+        const isDaily = !!state.form.isDailyMode;
+
+        const bannerEl = document.getElementById('daily-challenge-banner');
+        if (bannerEl) {
+            bannerEl.style.display = isDaily ? 'flex' : 'none';
+            if (isDaily) {
+                const bannerDateEl = document.getElementById('daily-banner-date');
+                if (bannerDateEl) {
+                    const dateParts = (state.form.dailySeedDate || '').split('-');
+                    if (dateParts.length === 3) {
+                        const formattedDate = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]))
+                            .toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+                        bannerDateEl.textContent = formattedDate;
+                    }
+                }
+
+                const badgeEl = document.getElementById('daily-completion-badge');
+                if (badgeEl) {
+                    const locKey = buildLocationSeedKey(state.form);
+                    const dailyScores = getDailyScores();
+                    const existingRecord = dailyScores.scores[locKey];
+
+                    if (existingRecord) {
+                        badgeEl.textContent = `⭐ Today's Score: ${existingRecord.formattedScore}`;
+                        badgeEl.style.display = 'inline-block';
+                    } else {
+                        badgeEl.style.display = 'none';
+                    }
+                }
+            }
+        }
+
+        // Toggle Launcher Button Text & Active Styling
+        const btnDailyTrigger = document.getElementById('btn-trigger-daily');
+        if (btnDailyTrigger) {
+            if (isDaily) {
+                btnDailyTrigger.textContent = "📅 Exit Daily Mode";
+                btnDailyTrigger.classList.add('btn-daily-active');
+            } else {
+                btnDailyTrigger.textContent = "📅 Daily Mode";
+                btnDailyTrigger.classList.remove('btn-daily-active');
+            }
+        }
+
         syncInput('input-place', state.form.placeName || '');
         syncInput('input-taxon', state.form.taxonName || '');
         syncInput('input-username', state.form.userLogin || '');
@@ -307,15 +320,62 @@ export function render(state) {
         syncInput('input-weighting', state.form.weightingMethod);
         syncInput('input-establishment', state.form.establishmentStatus);
 
+        const lockedInputs = [
+            { id: 'input-questions', lockedVal: 10 },
+            { id: 'input-difficulty', lockedVal: '125' },
+            { id: 'input-lifelist', lockedVal: 'off' },
+            { id: 'input-weighting', lockedVal: 'linear' },
+            { id: 'input-establishment', lockedVal: 'any' },
+            { id: 'chk-unique', lockedVal: true },
+            { id: 'chk-rarity', lockedVal: false },
+            { id: 'chk-mc', lockedVal: false },
+            { id: 'chk-badge', lockedVal: true }
+        ];
+
+        lockedInputs.forEach(({ id, lockedVal }) => {
+            const inputEl = document.getElementById(id);
+            if (!inputEl) return;
+
+            if (isDaily) {
+                inputEl.disabled = true;
+                inputEl.classList.add('input-locked');
+                inputEl.setAttribute('title', 'Locked in Daily Challenge Mode');
+
+                if (inputEl.type === 'checkbox') {
+                    inputEl.checked = lockedVal;
+                } else {
+                    inputEl.value = String(lockedVal);
+                }
+            } else {
+                inputEl.disabled = false;
+                inputEl.classList.remove('input-locked');
+                inputEl.removeAttribute('title');
+            }
+        });
+
+        if (selectMonths) {
+            selectMonths.disabled = isDaily;
+            if (isDaily) selectMonths.classList.add('input-locked');
+            else selectMonths.classList.remove('input-locked');
+        }
+        
+        document.querySelectorAll('.btn-quick-select').forEach(btn => {
+            btn.disabled = isDaily;
+            if (isDaily) {
+                btn.classList.add('input-locked');
+            } else {
+                btn.classList.remove('input-locked');
+            }
+        });
+
         const btnStart = document.getElementById('btn-start');
         btnStart.disabled = state.ui.isLoadingQuizPool;
-        btnStart.textContent = state.ui.isLoadingQuizPool ? "Analyzing Regional Ecology..." : "Load Quiz Pool";
+        btnStart.textContent = state.ui.isLoadingQuizPool ? "Analyzing Regional Ecology..." : (isDaily ? "Start Daily Challenge" : "Load Quiz Pool");
 
         const btnGps = document.getElementById('btn-gps');
         btnGps.disabled = state.ui.isLocatingGps;
         btnGps.textContent = state.ui.isLocatingGps ? "⏳ Locating..." : "📍 Use My Exact Location (GPS)";
         
-        // Dynamic Autocomplete Rendering
         autocompleteConfigs.forEach(config => {
             const clearBtn = document.getElementById(config.clearBtnId);
             if (clearBtn) {
@@ -339,7 +399,6 @@ export function render(state) {
         
         const isReadyForMedia = hasObservation && !hasError;
 
-        // --- Coherent Screen Reader Announcements ---
         let currentPhase = '';
         if (state.ui.answerError) {
             currentPhase = `Error: ${state.ui.answerError}`;
@@ -368,7 +427,6 @@ export function render(state) {
         document.getElementById('quiz-counter').textContent = `Question ${state.currentIndex + 1} of ${state.questions.length}`;
         document.getElementById('quiz-score').textContent = `Score: ${formatPoints(state.score)}`;
 
-        // Loading Overlay
         const loadingEl = document.getElementById('quiz-loading');
         if (!hasObservation && !hasError) {
             loadingEl.style.display = 'block';
@@ -389,7 +447,6 @@ export function render(state) {
             
             const errCache = domCache.get(errDiv) || {};
 
-            // Rebuild the error nodes only if the specific error signature changes or if it's empty
             if (errCache.isMissing !== isMissing || errCache.isRateLimited !== isRateLimited || !errDiv.hasChildNodes()) {
                 let mainTextContent = '❌ Failed to load observation data.';
                 let hintTextContent = 'Please check your internet connection or filters.';
@@ -408,8 +465,6 @@ export function render(state) {
                 hint.textContent = hintTextContent;
                 
                 errDiv.replaceChildren(mainText, document.createElement('br'), document.createElement('br'), hint);
-                
-                // Update cache with the latest error signature
                 domCache.set(errDiv, { isMissing, isRateLimited });
             }
         } else {
@@ -417,14 +472,12 @@ export function render(state) {
             if (errDiv.hasChildNodes()) {
                 errDiv.replaceChildren();
             }
-            // Clear the cache when the error is resolved
             domCache.set(errDiv, { isMissing: null, isRateLimited: null });
         }
 
         renderQuizMedia(state, isReadyForMedia);
         renderQuizMeta(state, isReadyForMedia);
 
-        // Forms & Buttons
         syncInput('input-answer', state.form.answerInput);
         syncInput('input-rank', state.form.rankInput);
 
@@ -443,7 +496,6 @@ export function render(state) {
         const answerLabel = formEl ? formEl.querySelector('label[for="input-answer"]') : null;
 
         if (isMC) {
-            // Show answer form wrapper when active so the Skip button inside remains visible
             if (formEl) formEl.style.display = (!isAnswered && isReadyForMedia) ? 'block' : 'none';
             if (answerLabel) answerLabel.style.display = 'none';
             if (answerInputsRow) answerInputsRow.style.display = 'none';
@@ -488,7 +540,6 @@ export function render(state) {
             answerErrEl.style.display = 'none';
         }
 
-        // Skip Button logic
         const btnSkip = document.getElementById('btn-skip');
         if (btnSkip) {
             btnSkip.style.display = (!isAnswered && isReadyForMedia) ? 'block' : 'none';
@@ -509,7 +560,6 @@ export function render(state) {
         document.getElementById('btn-retry').style.display = hasError ? 'block' : 'none';
         document.getElementById('btn-skip-end').style.display = hasError ? 'block' : 'none';
 
-        // Feedback Template Rendering
         const feedback = document.getElementById('feedback');
         const feedbackCache = domCache.get(feedback);
 
@@ -537,6 +587,12 @@ export function render(state) {
             ? `${formatPoints(state.score)} / ${totalQuestions}`
             : 'Session Aborted';
 
+        // Render the Live Score Card Preview block
+        const scoreCardEl = document.getElementById('score-card-text');
+        if (scoreCardEl && totalQuestions > 0) {
+            scoreCardEl.textContent = generateResultShareText(state);
+        }
+
         const container = document.getElementById('review-container');
         if (!container.hasChildNodes()) { 
             buildResultsDom(state.questions, container);
@@ -553,8 +609,6 @@ export function render(state) {
     if (state.ui.zoomMediaUrl) {
         if (!modal.open && typeof modal.showModal === 'function') modal.showModal();
         if (zoomImg.dataset.src !== state.ui.zoomMediaUrl) {
-            
-            // Show loading spinner, reset its animation, and hide the image until loaded
             if (zoomLoading) {
                 zoomLoading.textContent = 'Loading high-resolution image...';
                 zoomLoading.style.animation = '';
@@ -613,8 +667,6 @@ export function render(state) {
         }
     }
 }
-
-// --- SUB-RENDERERS ---
 
 function renderAutocomplete(config, results) {
     const list = document.getElementById(config.listId);
@@ -751,7 +803,6 @@ function renderQuizMedia(state, isReadyForMedia) {
             }
         }
         
-        // --- Hyperlinked TASL Attribution Rendering ---
         attrEl.style.display = 'block';
         attrEl.replaceChildren();
 
@@ -813,7 +864,6 @@ function renderQuizMeta(state, isReadyForMedia) {
     const taxon = q?.observation?.taxon || q?.taxon;
     const meta = selectCurrentMeta(state);
 
-    // 1. Observation Metadata
     const metaEl = document.getElementById('quiz-meta');
     if (metaEl) {
         const metaCache = domCache.get(metaEl);
@@ -844,11 +894,10 @@ function renderQuizMeta(state, isReadyForMedia) {
                     locLink.className = 'disabled-link';
                 }
                 
-                // --- Interactive Observation License Link ---
                 const observerEl = document.getElementById('meta-observer');
                 const licInfo = getLicenseInfo(meta.license);
                 
-                observerEl.replaceChildren(); // Clear plain text
+                observerEl.replaceChildren();
                 
                 const observerText = document.createTextNode(`👤 ${meta.observer} `);
                 observerEl.appendChild(observerText);
@@ -858,7 +907,6 @@ function renderQuizMeta(state, isReadyForMedia) {
                     licLink.href = licInfo.url;
                     licLink.target = '_blank';
                     licLink.rel = 'noopener';
-                    // We don't need .license-link class here because .quiz-meta a handles the styling natively
                     licLink.textContent = `(${licInfo.label})`;
                     observerEl.appendChild(licLink);
                 } else {
@@ -868,7 +916,6 @@ function renderQuizMeta(state, isReadyForMedia) {
         }
     }
 
-    // 2. Target Taxon Badge
     const badge = document.getElementById('quiz-target-badge');
     if (badge) {
         const badgeCache = domCache.get(badge);
@@ -886,7 +933,6 @@ function renderQuizMeta(state, isReadyForMedia) {
         }
     }
 
-    // 3. Field Notes Hint
     const hintContent = document.getElementById('quiz-hint-content');
     const hintBtn = document.getElementById('btn-toggle-hint');
     const rawDesc = q?.observation?.description?.trim();
@@ -962,7 +1008,6 @@ function renderMCOptions(state, container, question, isAnswered) {
     domCache.set(container, { lastQuestion: question, isAnswered, optionsCount: options.length });
     container.replaceChildren();
 
-    // If options are still fetching from the API, render 4 disabled skeleton buttons
     if (options.length === 0) {
         for (let i = 1; i <= 4; i++) {
             const skeletonBtn = document.createElement('button');
@@ -983,7 +1028,6 @@ function renderMCOptions(state, container, question, isAnswered) {
         btn.dataset.taxonId = opt.id;
         btn.dataset.isCorrect = opt.isCorrect;
         btn.dataset.displayName = opt.displayName;
-        // Prefix with [1], [2], [3], [4] so keyboard users see the key bindings!
         btn.textContent = `${idx + 1}. ${opt.displayName}`;
 
         if (isAnswered) {
@@ -998,8 +1042,6 @@ function renderMCOptions(state, container, question, isAnswered) {
         container.appendChild(btn);
     });
 }
-
-// --- PURE DOM ELEMENT GENERATORS ---
 
 function buildFeedbackDom(q, feedbackEl) {
     feedbackEl.replaceChildren();
@@ -1019,13 +1061,11 @@ function buildFeedbackDom(q, feedbackEl) {
 
         const strong = document.createElement('strong');
 
-        // Normalize strings for comparison
         const normMatched = (q.matchedNameDisplay || '').trim().toLowerCase();
         const normCommon = (taxon.preferred_common_name || '').trim().toLowerCase();
         const normSci = (taxon.name || '').trim().toLowerCase();
         const normPrimary = primaryDisplayName.trim().toLowerCase();
 
-        // Check if the matched name is an actual alias (and not the primary, common, or sci name)
         const isAliasMatch = normMatched &&
             normMatched !== normCommon &&
             normMatched !== normSci &&
@@ -1216,9 +1256,6 @@ function buildResultsDom(questions, container) {
     gridDiv.scrollTop = 0;
 }
 
-/**
- * Resolves a Creative Commons license code to its official deed URL and display label.
- */
 export function getLicenseInfo(licenseCode) {
     if (!licenseCode) return { label: 'All Rights Reserved', url: null };
 

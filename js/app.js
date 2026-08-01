@@ -1,19 +1,18 @@
-import { store, selectCurrentMedia } from './state.js';
+import { store, selectCurrentMedia, saveInitialDailyScore, getDailyScores } from './state.js';
 import * as api from './api.js';
 import * as engine from './quizEngine.js';
 import * as ui from './ui.js';
 import * as observationService from './observationService.js';
+import { parseUrlParams, copyResultToClipboard, copyShareLinkToClipboard, buildShareableUrl } from './urlService.js';
 
 // ==========================================================================
 // EVENT TARGET LIFECYCLE ROUTER
 // ==========================================================================
 
-// 1. Pure Declarative DOM Rendering
 store.addEventListener('statechange', (e) => {
     ui.render(e.detail);
 });
 
-// 2. Question Navigation & JIT Prefetch Triggers
 store.addEventListener('quiz:start', () => {
     observationService.loadObservationForQuestion(store.getState().currentIndex);
 });
@@ -26,7 +25,6 @@ store.addEventListener('quiz:retry', () => {
     const s = store.getState();
     const q = s.questions[s.currentIndex];
     
-    // If we already have a valid observation, just retry loading the media
     if (q.observation && !q.observation.error) {
         checkMediaReadiness();
     } else {
@@ -35,12 +33,10 @@ store.addEventListener('quiz:retry', () => {
     }
 });
 
-// 3. Observation Data Arrival Reaction
 store.addEventListener('observation:loaded', (e) => {
     const { index, error, emptyPool } = e.detail;
     const s = store.getState();
     
-    // Ignore if the user navigated away while the fetch was pending
     if (index !== s.currentIndex) return;
     
     if (error) {
@@ -54,10 +50,7 @@ store.addEventListener('observation:loaded', (e) => {
                     }
                 }));
             } else {
-                store.setState(prev => ({
-                    questions: prev.questions.slice(0, prev.currentIndex),
-                    ui: { ...prev.ui, activeView: 'results-view' }
-                }));
+                finishQuizSession();
             }
         } else {
             store.setState(prev => ({ ui: { ...prev.ui, quizError: { isMissingMedia: false } } }));
@@ -87,14 +80,12 @@ store.addEventListener('observation:loaded', async (e) => {
             let apiSimilarResults = [];
 
             try {
-                // Fetch visually/taxonomically similar taxa from iNaturalist
                 const similarData = await api.fetchSimilarTaxa(targetTaxon.id);
                 apiSimilarResults = similarData?.results || [];
             } catch (err) {
                 console.warn('Could not fetch similar species API, falling back to regional pool:', err);
             }
 
-            // Generate options with API similar species + pool fallbacks
             const options = engine.generateMultipleChoiceOptions(
                 targetTaxon,
                 s.questions,
@@ -106,7 +97,6 @@ store.addEventListener('observation:loaded', async (e) => {
     }
 });
 
-// 4. Sequential Prefetch Trigger
 store.addEventListener('media:ready', () => {
     const s = store.getState();
     if (s.ui.activeView === 'quiz-view') {
@@ -118,7 +108,6 @@ store.addEventListener('media:navigate', () => {
     checkMediaReadiness();
 });
 
-// Media Controller Helper
 function checkMediaReadiness() {
     const s = store.getState();
     if (s.ui.activeView !== 'quiz-view' || s.ui.isMediaLoaded) return;
@@ -141,7 +130,42 @@ function checkMediaReadiness() {
     }
 }
 
-// --- NAVIGATION PROTECTION ---
+function syncUrlWithState(state) {
+    // Only update address bar while on the setup screen
+    if (state.ui.activeView !== 'setup-view') return;
+
+    const cleanBase = window.location.protocol + "//" + window.location.host + window.location.pathname;
+
+    if (state.form.isDailyMode) {
+        const activeDailyUrl = buildShareableUrl(state.form, 'daily');
+        if (window.location.href !== activeDailyUrl) {
+            window.history.replaceState(null, '', activeDailyUrl);
+        }
+    } else if (window.location.search) {
+        // Clear query parameters in Custom Mode
+        window.history.replaceState(null, '', cleanBase);
+    }
+}
+
+// Subscribe URL syncing to store updates
+store.addEventListener('statechange', (e) => {
+    ui.render(e.detail);
+    syncUrlWithState(e.detail);
+});
+
+function finishQuizSession() {
+    const s = store.getState();
+    
+    if (s.config.isDailyMode) {
+        const locKey = engine.buildLocationSeedKey(s.config);
+        saveInitialDailyScore(locKey, s.score, s.questions.length);
+    }
+
+    store.setState(prev => ({
+        ui: { ...prev.ui, activeView: 'results-view' }
+    }));
+}
+
 window.addEventListener('beforeunload', (e) => {
     const s = store.getState();
     if (s.ui.activeView === 'quiz-view') {
@@ -151,7 +175,6 @@ window.addEventListener('beforeunload', (e) => {
     }
 });
 
-// --- STORAGE ---
 function debounce(func, timeout = 250) {
     let timer;
     const debounced = function(...args) {
@@ -235,6 +258,9 @@ function sanitizePreferences(raw) {
 function savePreferences() {
     try {
         const currentForm = store.getState().form;
+        if (currentForm.isDailyMode || store.getState().ui.isUrlChallenge) {
+            return;
+        }
         localStorage.setItem('bio_trainer_prefs', JSON.stringify(currentForm));
     } catch (e) {
         console.warn("Unable to save preferences:", e);
@@ -255,7 +281,6 @@ function loadPreferences() {
     }
 }
 
-// --- DECLARATIVE FORM TWO-WAY BINDING ---
 ['lat', 'lng', 'radius', 'difficulty', 'questionLimit', 'answerInput', 'rankInput', 'weightingMethod', 'establishmentStatus', 'lifeListMode'].forEach(prop => {
     let elId = `input-${prop.replace('Input', '')}`;
     if (prop === 'questionLimit') elId = 'input-questions';
@@ -317,6 +342,7 @@ const seasonalPresets = {
 
 document.querySelectorAll('.btn-quick-select').forEach(btn => {
     btn.addEventListener('click', (e) => {
+        if (store.getState().form.isDailyMode) return;
         const presetKey = e.target.dataset.months;
         if (seasonalPresets[presetKey]) {
             store.setState(prev => ({ form: { ...prev.form, months: seasonalPresets[presetKey] } }));
@@ -333,7 +359,6 @@ document.querySelectorAll('input[name="loc-mode"]').forEach(radio => {
     });
 });
 
-// --- AUTOCOMPLETE LOGIC ---
 function setupAutocomplete(config) {
     const {
         inputId, listId, clearBtnId, fetchDataFn,
@@ -345,9 +370,6 @@ function setupAutocomplete(config) {
     const inputEl = document.getElementById(inputId);
     const clearBtn = document.getElementById(clearBtnId);
 
-    /**
-     * Checks if user input matches an autocomplete item across formatted and raw fields.
-     */
     const isItemMatch = (item, query) => {
         if (!item || typeof query !== 'string') return false;
         const normQuery = query.trim().toLowerCase();
@@ -378,7 +400,6 @@ function setupAutocomplete(config) {
         try {
             const data = await fetchDataFn(query, abortController.signal);
             if (inputEl.value.trim() === query.trim()) {
-                // Clear any lingering errors if the fetch succeeds
                 store.setState(prev => ({
                     ui: { ...prev.ui, [results]: data.results, [error]: null }
                 }));
@@ -386,13 +407,10 @@ function setupAutocomplete(config) {
         } catch (err) {
             if (err.name !== 'AbortError') {
                 console.warn(`${inputId} search offline:`, err);
-                
-                // Determine user-friendly error message
                 const errorMessage = err.status === 429
                     ? "⏳ Too many requests. Please wait a moment before typing."
                     : "⚠️ Network error: Unable to load suggestions. Check your connection.";
                 
-                // Dispatch the error to the UI state and clear results
                 store.setState(prev => ({
                     ui: { ...prev.ui, [error]: errorMessage, [results]: [] }
                 }));
@@ -480,13 +498,60 @@ document.getElementById('btn-gps').addEventListener('click', () => {
     store.setState(prev => ({ ui: { ...prev.ui, isLocatingGps: true } }));
     navigator.geolocation.getCurrentPosition(
         (pos) => {
+            // Round to 3 decimal places immediately on capture
+            const lat = Number(pos.coords.latitude.toFixed(3));
+            const lng = Number(pos.coords.longitude.toFixed(3));
+
             store.setState(prev => ({
-                form: { ...prev.form, lat: pos.coords.latitude, lng: pos.coords.longitude, placeId: null, placeName: '' },
+                form: { ...prev.form, lat, lng, placeId: null, placeName: '' },
                 ui: { ...prev.ui, isLocatingGps: false }
             }));
         },
         () => store.setState(prev => ({ ui: { ...prev.ui, isLocatingGps: false, setupError: 'Could not get location' } }))
     );
+});
+
+function exitDailyMode() {
+    const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+    window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
+
+    let savedPrefs = {};
+    try {
+        const saved = localStorage.getItem('bio_trainer_prefs');
+        if (saved) savedPrefs = JSON.parse(saved);
+    } catch (e) {
+        console.warn('Could not read saved preferences on exit:', e);
+    }
+
+    store.setState(prev => ({
+        form: {
+            ...prev.form,
+            ...savedPrefs,
+            isDailyMode: false,
+            dailySeedDate: null
+        },
+        ui: {
+            ...prev.ui,
+            isUrlChallenge: false,
+            setupError: null
+        }
+    }));
+}
+
+document.getElementById('btn-trigger-daily')?.addEventListener('click', () => {
+    const isDaily = store.getState().form.isDailyMode;
+    if (isDaily) {
+        exitDailyMode();
+    } else {
+        store.setState(prev => ({
+            form: engine.applyDailyEnforcements(prev.form),
+            ui: { ...prev.ui, isUrlChallenge: false }
+        }));
+    }
+});
+
+document.getElementById('btn-exit-daily')?.addEventListener('click', () => {
+    exitDailyMode();
 });
 
 // --- GAME BOOTSTRAPPING ---
@@ -525,13 +590,24 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     savePreferences();
     observationService.clearCache();
 
+    // Determine if this Daily Challenge run is a Replay!
+    let isReplay = false;
+    if (s.form.isDailyMode) {
+        const locKey = engine.buildLocationSeedKey(s.form);
+        const dailyScores = getDailyScores();
+        if (dailyScores.scores[locKey]) {
+            isReplay = true;
+        }
+    }
+
     store.setState(prev => ({
-        config: { ...prev.form, expertTotalSpecies: 0 },
+        config: { ...prev.form, expertTotalSpecies: 0, isReplay },
         ui: { ...prev.ui, isLoadingQuizPool: true, setupError: null, placeError: null, taxonError: null, userError: null }
     }));
 
     const updatedState = store.getState();
     const isExpert = updatedState.config.difficulty === 'all';
+    const isDaily = !!updatedState.config.isDailyMode;
 
     try {
         let pool = [];
@@ -551,7 +627,8 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
                 establishmentStatus: updatedState.config.establishmentStatus,
                 lifeListMode: updatedState.config.lifeListMode,
                 userLogin: updatedState.config.userLogin,
-                userId: updatedState.config.userId
+                userId: updatedState.config.userId,
+                isDailyMode: isDaily
             });
             expertCount = preFlightData.total_results || 0;
 
@@ -579,14 +656,28 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
                 establishmentStatus: updatedState.config.establishmentStatus,
                 lifeListMode: updatedState.config.lifeListMode,
                 userLogin: updatedState.config.userLogin,
-                userId: updatedState.config.userId
+                userId: updatedState.config.userId,
+                isDailyMode: isDaily
             });
             if (!data.results || data.results.length === 0) {
                 store.setState(prev => ({ ui: { ...prev.ui, isLoadingQuizPool: false, setupError: "No research-grade observations found." } }));
                 return;
             }
+
+            let poolRng = Math.random;
+            if (isDaily) {
+                const seedKey = engine.buildLocationSeedKey(updatedState.config);
+                const seedInt = engine.hashString(seedKey);
+                poolRng = engine.createPRNG(seedInt);
+            }
+
             pool = engine.generateWeightedPool(
-                data.results, updatedState.config.questionLimit, updatedState.config.preventDuplicates, updatedState.config.isRarityMode, updatedState.config.weightingMethod
+                data.results, 
+                updatedState.config.questionLimit, 
+                updatedState.config.preventDuplicates, 
+                updatedState.config.isRarityMode, 
+                updatedState.config.weightingMethod,
+                poolRng
             );
         }
 
@@ -602,7 +693,6 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
             ui: { ...prev.ui, isLoadingQuizPool: false, activeView: 'quiz-view', quizError: null, isCheckingAnswer: false, isHintVisible: false, isMediaLoaded: false }
         }));
         
-        // Dispatch explicit start event to kick off JIT network calls
         store.dispatchEvent(new CustomEvent('quiz:start'));
         
     } catch (error) {
@@ -854,7 +944,6 @@ document.getElementById('mc-options-container')?.addEventListener('click', (e) =
     if (btnNext) btnNext.focus();
 });
 
-// Global Keyboard Shortcut Handler for Multiple Choice Mode
 window.addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     
@@ -864,7 +953,6 @@ window.addEventListener('keydown', (e) => {
     const q = s.questions[s.currentIndex];
     if (!q || q.isAnswered || s.ui.isCheckingAnswer) return;
 
-    // Check for keys '1', '2', '3', '4'
     if (['1', '2', '3', '4'].includes(e.key)) {
         const optionIndex = parseInt(e.key, 10) - 1;
         const container = document.getElementById('mc-options-container');
@@ -876,12 +964,11 @@ window.addEventListener('keydown', (e) => {
     }
 });
 
-// Advancing State
 document.getElementById('btn-next').addEventListener('click', () => {
     const s = store.getState();
     const nextIdx = s.currentIndex + 1;
     if (nextIdx >= s.questions.length) {
-        store.setState(prev => ({ ui: { ...prev.ui, activeView: 'results-view' } }));
+        finishQuizSession();
     } else {
         store.setState(prev => ({
             currentIndex: nextIdx, currentMediaIndex: 0,
@@ -909,18 +996,122 @@ document.getElementById('btn-retry').addEventListener('click', () => {
 
 document.getElementById('btn-skip-end').addEventListener('click', () => {
     observationService.clearCache();
+    finishQuizSession();
     store.setState(prev => ({
-        questions: prev.questions.slice(0, prev.currentIndex),
-        ui: { ...prev.ui, activeView: 'results-view' }
+        questions: prev.questions.slice(0, prev.currentIndex)
     }));
 });
 
 document.getElementById('btn-restart').addEventListener('click', () => {
     observationService.clearCache();
-    store.resetState();
-    loadPreferences();
+    store.setState(prev => ({
+        currentIndex: 0,
+        score: 0,
+        currentMediaIndex: 0,
+        questions: [],
+        form: {
+            ...prev.form,
+            answerInput: '',
+            rankInput: 'species'
+        },
+        ui: {
+            ...prev.ui,
+            activeView: 'setup-view',
+            quizError: null,
+            answerError: null,
+            isCheckingAnswer: false,
+            isHintVisible: false,
+            isMediaLoaded: false
+        }
+    }));
 });
 
-// Boot
-loadPreferences();
-ui.render(store.getState());
+// --- SOCIAL SHARE HANDLERS ---
+document.getElementById('btn-share-results')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const originalText = btn.textContent;
+
+    const success = await copyResultToClipboard(store.getState());
+
+    btn.textContent = success ? "✅ Score Card Copied!" : "❌ Could Not Copy";
+    setTimeout(() => {
+        btn.textContent = originalText;
+    }, 2500);
+});
+
+document.getElementById('btn-share-link')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const originalText = btn.textContent;
+    const s = store.getState();
+    const mode = s.form.isDailyMode ? 'daily' : 'custom';
+
+    const success = await copyShareLinkToClipboard(s.config, mode);
+
+    btn.textContent = success ? "✅ Link Copied!" : "❌ Could Not Copy";
+    setTimeout(() => {
+        btn.textContent = originalText;
+    }, 2500);
+});
+
+// --- APP BOOTSTRAPPING ---
+async function bootApplication() {
+    loadPreferences();
+
+    const urlOverrides = parseUrlParams();
+    const hasUrlOverrides = Object.keys(urlOverrides).length > 0;
+
+    if (hasUrlOverrides) {
+        let initialForm = { ...store.getState().form, ...urlOverrides };
+
+        // Apply daily enforcements synchronously if launching via daily link
+        if (urlOverrides.quizMode === 'daily') {
+            initialForm = engine.applyDailyEnforcements(initialForm);
+        }
+
+        // Commit initial URL config immutably
+        store.setState(prev => ({
+            form: initialForm,
+            ui: { ...prev.ui, isUrlChallenge: true }
+        }));
+
+        // Fetch place display name asynchronously without mutating state
+        if (urlOverrides.placeId && !store.getState().form.placeName) {
+            try {
+                const placeData = await api.fetchPlaceById(urlOverrides.placeId);
+                if (placeData.results?.[0]) {
+                    const placeName = ui.formatPlaceDisplay(placeData.results[0]);
+                    store.setState(prev => ({
+                        form: { ...prev.form, placeName }
+                    }));
+                }
+            } catch (e) {
+                store.setState(prev => ({
+                    form: { ...prev.form, placeName: `Location #${urlOverrides.placeId}` }
+                }));
+            }
+        }
+
+        // Fetch taxon display name asynchronously without mutating state
+        if (urlOverrides.taxonId && !store.getState().form.taxonName) {
+            try {
+                const taxonData = await api.fetchTaxonById(urlOverrides.taxonId);
+                if (taxonData.results?.[0]) {
+                    const taxonName = ui.formatTaxonDisplay(taxonData.results[0]);
+                    store.setState(prev => ({
+                        form: { ...prev.form, taxonName }
+                    }));
+                }
+            } catch (e) {
+                store.setState(prev => ({
+                    form: { ...prev.form, taxonName: `Taxon #${urlOverrides.taxonId}` }
+                }));
+            }
+        }
+    }
+
+    // Render final resolved state and remove booting screen
+    ui.render(store.getState());
+    document.getElementById('app').classList.remove('booting');
+}
+
+bootApplication();

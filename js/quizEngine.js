@@ -1,14 +1,87 @@
 import * as api from './api.js';
 
+export function getUTCTodayString() {
+    return new Date().toISOString().split('T')[0];
+}
+
+export function hashString(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = Math.imul(31, hash) + str.charCodeAt(i) | 0;
+    }
+    return hash;
+}
+
+export function createPRNG(seedInt) {
+    let s = seedInt >>> 0;
+    return function() {
+        s = (s + 0x6D2B79F5) | 0;
+        let t = Math.imul(s ^ (s >>> 15), 1 | s);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+export function getQuestionRNG(globalSeedInt, questionIndex) {
+    const slotSeed = globalSeedInt + (questionIndex * 10007);
+    return createPRNG(slotSeed);
+}
+
+export function buildLocationSeedKey(config) {
+    const dateStr = config.dailySeedDate || getUTCTodayString();
+    let locStr = '';
+    if (config.locMode === 'search' && config.placeId) {
+        locStr = `place_${config.placeId}`;
+    } else if (config.lat !== null && config.lng !== null) {
+        const latRound = Number(config.lat).toFixed(2);
+        const lngRound = Number(config.lng).toFixed(2);
+        locStr = `coords_${latRound}_${lngRound}_r${config.radius || 10}`;
+    } else {
+        locStr = 'global';
+    }
+
+    if (config.taxonId) {
+        locStr += `_taxon_${config.taxonId}`;
+    }
+
+    const pFlag = config.wantsPhotos ? '1' : '0';
+    const sFlag = config.wantsSounds ? '1' : '0';
+    locStr += `_m${pFlag}${sFlag}`;
+
+    return `${dateStr}:${locStr}`;
+}
+
+export function applyDailyEnforcements(baseFormState) {
+    const todayUTC = getUTCTodayString();
+    const now = new Date();
+    const currentMonthStr = String(now.getUTCMonth() + 1);
+
+    return {
+        ...baseFormState,
+        questionLimit: 10,
+        difficulty: '125',
+        months: [currentMonthStr],
+        lifeListMode: 'off',
+        showIconicTaxonBadge: true,
+        preventDuplicates: true,
+        isRarityMode: false,
+        weightingMethod: 'linear',
+        establishmentStatus: 'any',
+        isMultipleChoice: false,
+        isDailyMode: true,
+        dailySeedDate: baseFormState.dailySeedDate || todayUTC
+    };
+}
+
 function normalize(str) {
     if (!str) return '';
     return str
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '') // Strip diacritics/accents
+        .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase()
-        .replace(/[-—–]/g, ' ')          // Convert ALL hyphens and dashes to spaces
-        .replace(/[^\p{L}\p{N}\s]/gu, '')// Strip all remaining punctuation
-        .replace(/\s+/g, ' ')            // Condense spaces
+        .replace(/[-—–]/g, ' ')
+        .replace(/[^\p{L}\p{N}\s]/gu, '')
+        .replace(/\s+/g, ' ')
         .trim();
 }
 
@@ -39,7 +112,7 @@ function getWeight(count, method = 'linear') {
     return Math.log10(Math.max(1, count) + 1);
 }
 
-export function generateWeightedPool(dataResults, questionLimit, preventDuplicates, isRarityMode = false, weightingMethod = 'linear') {
+export function generateWeightedPool(dataResults, questionLimit, preventDuplicates, isRarityMode = false, weightingMethod = 'linear', rng = Math.random) {
     const questions = [];
     
     let availablePool = dataResults.map(r => {
@@ -61,12 +134,10 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
     for (let i = 0; i < limit; i++) {
         if (availablePool.length === 0) break;
 
-        // 1. Recalculate total weight on every iteration
         const totalWeight = availablePool.reduce((sum, item) => sum + item.weight, 0);
         if (totalWeight <= 0) break;
 
-        // 2. Weighted random sampling
-        const roll = Math.random() * totalWeight;
+        const roll = rng() * totalWeight;
         let runningWeight = 0;
         let selectedIndex = availablePool.length - 1;
 
@@ -79,9 +150,8 @@ export function generateWeightedPool(dataResults, questionLimit, preventDuplicat
         }
 
         const selectedItem = availablePool[selectedIndex];
-        questions.push({ taxon: selectedItem.taxon, observation: null });
+        questions.push({ taxon: selectedItem.taxon, count: selectedItem.count, observation: null });
 
-        // 3. Pool depletion logic
         if (preventDuplicates) {
             availablePool.splice(selectedIndex, 1);
         } else {
@@ -114,10 +184,6 @@ export function calculateDeepPage(totalSpecies) {
     return deepPage;
 }
 
-/**
- * Calculates a standard page number favoring earlier pages via a Zipf's law distribution (1 / p^2)
- * to reflect natural ecological frequency curves in Expert Mode.
- */
 export function calculateStandardPage(totalSpecies) {
     let page = 1;
     if (totalSpecies > 50) {
@@ -172,13 +238,6 @@ function getPointsForRank(rank) {
     }
 }
 
-/**
- * Generates 4 smart multiple choice options (1 target + 3 distractors weighted by confusion count).
- * @param {Object} targetTaxon - The target correct taxon.
- * @param {Array} questionsPool - Active quiz questions pool for fallback distractors.
- * @param {Array} apiSimilarResults - Results array from iNaturalist /identifications/similar_species.
- * @returns {Array<{id: number, displayName: string, isCorrect: boolean}>} Shuffled options.
- */
 export function generateMultipleChoiceOptions(targetTaxon, questionsPool = [], apiSimilarResults = []) {
     if (!targetTaxon) return [];
 
@@ -195,13 +254,11 @@ export function generateMultipleChoiceOptions(targetTaxon, questionsPool = [], a
 
     const distractorCandidates = [];
 
-    // 1. Sort API similar results by count (highest real-world confusion first)
     if (Array.isArray(apiSimilarResults) && apiSimilarResults.length > 0) {
         const sortedByCount = [...apiSimilarResults]
             .filter(item => item.taxon && item.taxon.id !== targetId)
             .sort((a, b) => (b.count || 0) - (a.count || 0));
 
-        // Take up to the top 8 most frequently confused lookalikes
         const topLookalikes = sortedByCount.slice(0, 8);
 
         topLookalikes.forEach(item => {
@@ -213,7 +270,6 @@ export function generateMultipleChoiceOptions(targetTaxon, questionsPool = [], a
         });
     }
 
-    // 2. Fallback A: Same iconic taxon from the active pool (e.g., Birds with Birds)
     if (distractorCandidates.length < 3 && Array.isArray(questionsPool)) {
         const existingIds = new Set(distractorCandidates.map(d => d.id));
         
@@ -232,7 +288,6 @@ export function generateMultipleChoiceOptions(targetTaxon, questionsPool = [], a
         });
     }
 
-    // 3. Fallback B: Any remaining species from the active pool
     if (distractorCandidates.length < 3 && Array.isArray(questionsPool)) {
         const existingIds = new Set(distractorCandidates.map(d => d.id));
 
@@ -249,7 +304,6 @@ export function generateMultipleChoiceOptions(targetTaxon, questionsPool = [], a
         });
     }
 
-    // Randomly pick 3 items from our top candidate pool
     for (let i = distractorCandidates.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [distractorCandidates[i], distractorCandidates[j]] = [distractorCandidates[j], distractorCandidates[i]];
@@ -258,7 +312,6 @@ export function generateMultipleChoiceOptions(targetTaxon, questionsPool = [], a
     const selectedDistractors = distractorCandidates.slice(0, 3);
     const finalOptions = [targetOption, ...selectedDistractors];
 
-    // Final shuffle of option positions (so target isn't always slot #1)
     for (let i = finalOptions.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [finalOptions[i], finalOptions[j]] = [finalOptions[j], finalOptions[i]];
@@ -267,9 +320,6 @@ export function generateMultipleChoiceOptions(targetTaxon, questionsPool = [], a
     return finalOptions;
 }
 
-/**
- * Orchestrates local strict matching and API ancestor validation.
- */
 export async function evaluateAnswer(inputStr, guessedRank, taxon, signal = null) {
     let { isCorrect, matchedNameDisplay, normalizedInput } = checkExactMatch(inputStr, taxon);
     let pointsEarned = 0;
@@ -283,9 +333,6 @@ export async function evaluateAnswer(inputStr, guessedRank, taxon, signal = null
 
     if (!isCorrect) {
         try {
-            // NOTE: checkTaxonSearch filters results by guessedRank at the API level:
-            // - 'species' rank limits API results to species/subspecies/varieties.
-            // - Higher ranks ('genus', 'family', etc.) limit API results strictly to that rank.
             const searchData = await api.checkTaxonSearch(inputStr, guessedRank, signal);
             
             if (searchData.results && searchData.results.length > 0) {
@@ -302,7 +349,6 @@ export async function evaluateAnswer(inputStr, guessedRank, taxon, signal = null
                     
                     if (validNames.includes(normalizedInput)) {
                         if (guessedRank === 'species') {
-                            // Matches exact species, or subspecies/variety parents/children
                             if (isExactMatch || isGuessChildOfTarget || isGuessParentOfTarget) {
                                 isCorrect = true;
                                 pointsEarned = getPointsForRank('species');
@@ -310,7 +356,6 @@ export async function evaluateAnswer(inputStr, guessedRank, taxon, signal = null
                                 break;
                             }
                         } else if (isGuessParentOfTarget) {
-                            // Higher rank guesses (Genus/Family/Order) must be a valid ancestor of the target
                             isCorrect = true;
                             pointsEarned = getPointsForRank(guessedRank);
                             matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;

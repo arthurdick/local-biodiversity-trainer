@@ -39,7 +39,13 @@ body {
     padding: 30px;
     border-radius: var(--radius);
     box-shadow: var(--shadow);
-    transition: max-width 0.3s ease;
+    transition: opacity 0.15s ease-in-out, max-width 0.3s ease;
+    opacity: 1;
+}
+
+#app.booting {
+    opacity: 0;
+    pointer-events: none;
 }
 
 @media (max-width: 600px) {
@@ -94,6 +100,25 @@ button.visually-hidden:focus-visible {
 /* ==========================================================================
    3. Setup Form, Panel Cards & Column Separator
    ========================================================================== */
+.setup-actions-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 15px;
+}
+
+.btn-daily-trigger {
+    background-color: #0d6efd !important;
+}
+.btn-daily-trigger:hover {
+    background-color: #0b5ed7 !important;
+}
+.btn-daily-trigger.btn-daily-active {
+    background-color: #6c757d !important;
+}
+.btn-daily-trigger.btn-daily-active:hover {
+    background-color: #5c636a !important;
+}
+
 .setup-grid {
     display: grid;
     grid-template-columns: 1fr;
@@ -118,7 +143,6 @@ button.visually-hidden:focus-visible {
 }
 
 @media (min-width: 768px) {
-    /* Subtle vertical border dividing the two setup columns */
     .setup-card:first-child {
         position: relative;
     }
@@ -195,7 +219,6 @@ button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 }
 #btn-gps:hover { background-color: #444; }
 
-/* --- Location Toggle & Coordinate Inputs --- */
 .location-toggle {
     display: flex;
     gap: 10px;
@@ -284,8 +307,107 @@ select[multiple] {
     outline-offset: 2px;
 }
 
+.btn-quick-select:disabled,
+.btn-quick-select.input-locked {
+    opacity: 0.5;
+    cursor: not-allowed !important;
+    background-color: var(--bg-color) !important;
+    color: var(--text-muted) !important;
+    border-color: var(--border) !important;
+}
+
 /* ==========================================================================
-   4. Input Helpers & Clear Buttons
+   4. Daily Challenge Banner & Locked Inputs
+   ========================================================================== */
+.daily-banner {
+    background: #eef6ff;
+    border: 1px solid #b6d4fe;
+    border-left: 5px solid #0d6efd;
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.daily-banner-content {
+    flex: 1;
+    min-width: 250px;
+}
+
+.daily-banner-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+}
+
+.daily-badge {
+    background: #0d6efd;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 3px 8px;
+    border-radius: 12px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.daily-date {
+    font-weight: bold;
+    color: #084298;
+    font-size: 14px;
+}
+
+.daily-completed-badge {
+    background: #d1e7dd;
+    color: #0f5132;
+    border: 1px solid #badbcc;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 2px 10px;
+    border-radius: 12px;
+}
+
+.daily-banner-text {
+    margin: 0;
+    font-size: 13px;
+    color: #084298;
+    line-height: 1.4;
+}
+
+.btn-secondary-small {
+    width: auto;
+    padding: 8px 14px;
+    font-size: 13px;
+    background-color: #ffffff;
+    color: #084298;
+    border: 1px solid #b6d4fe;
+    border-radius: var(--radius);
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+    white-space: nowrap;
+}
+
+.btn-secondary-small:hover {
+    background-color: #e2eefa;
+    border-color: #0d6efd;
+}
+
+.input-locked {
+    opacity: 0.75;
+    background-color: #f8f9fa !important;
+    cursor: not-allowed !important;
+    border-color: #ced4da !important;
+}
+
+/* ==========================================================================
+   5. Input Helpers & Clear Buttons
    ========================================================================== */
 .input-relative-wrapper { position: relative; display: block; }
 .input-relative-wrapper input[type="text"],
@@ -301,7 +423,7 @@ select[multiple] {
 .btn-clear:focus-visible { outline: 2px solid var(--primary); border-radius: 4px; }
 
 /* ==========================================================================
-   5. Quiz Split Grid & Media Controls
+   6. Quiz Split Grid & Media Controls
    ========================================================================== */
 .quiz-grid {
     display: grid;
@@ -340,7 +462,6 @@ select[multiple] {
     position: relative; padding: 15px; overflow: hidden;
 }
 
-/* Fluid image height scaling across screen resolutions */
 .quiz-media-stage {
     width: 100%;
     height: clamp(300px, 45vh, 480px);
@@ -464,7 +585,7 @@ select[multiple] {
 }
 
 /* ==========================================================================
-   6. Answer Inputs & Quiz Buttons
+   7. Answer Inputs & Quiz Buttons
    ========================================================================== */
 .answer-inputs-row { display: flex; gap: 10px; }
 #input-rank { flex: 0 0 110px; }
@@ -540,7 +661,7 @@ select[multiple] {
 }
 
 /* ==========================================================================
-   7. Feedback & Errors
+   8. Feedback & Errors
    ========================================================================== */
 .inline-error { color: var(--error); font-size: 13px; font-weight: bold; margin-top: 6px; display: none; }
 #form-error-message { text-align: center; margin-bottom: 15px; }
@@ -580,10 +701,59 @@ select[multiple] {
 .feedback-alias-note { font-size: 0.9em; font-weight: normal; }
 
 /* ==========================================================================
-   8. Results View & Multi-Column Card Grid
+   9. Results View & Social Actions
    ========================================================================== */
 #results-heading { text-align: center; }
 #final-score { text-align: center; font-size: clamp(2rem, 4vw, 2.8rem); margin-bottom: 24px; }
+
+.score-card-preview {
+    background-color: #fafcfb;
+    border: 2px dashed #b6d4fe;
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin: 0 auto 20px auto;
+    max-width: 480px;
+    text-align: left; /* Left-aligned for clean monospaced layout */
+    box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.03);
+}
+
+.score-card-text {
+    margin: 0;
+    font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    color: var(--text-main);
+    font-weight: 600;
+    text-align: left;
+}
+
+.results-actions {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.btn-share-results {
+    flex: 1;
+    margin: 0;
+    background-color: #0d6efd !important;
+}
+.btn-share-results:hover {
+    background-color: #0b5ed7 !important;
+}
+
+.btn-share-link {
+    flex: 1;
+    margin: 0;
+    background-color: #555 !important;
+}
+.btn-share-link:hover {
+    background-color: #444 !important;
+}
 
 .perfect-score-banner {
     text-align: center; padding: 20px; background: #e8f5e9;
@@ -596,7 +766,6 @@ select[multiple] {
     color: var(--text-main); border-bottom: 2px solid var(--border); padding-bottom: 8px;
 }
 
-/* Expands dynamically up to 4 columns on desktop */
 .missed-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
@@ -652,7 +821,7 @@ select[multiple] {
 .missed-card-links a:hover { text-decoration: underline; }
 
 /* ==========================================================================
-   9. Zoom Modal
+   10. Zoom Modal
    ========================================================================== */
 .zoom-modal {
     border: none; padding: 0; background: transparent;
@@ -702,7 +871,7 @@ select[multiple] {
 .btn-close-modal:hover { background: #c9302c; }
 
 /* ==========================================================================
-   10. Footer & License Modal
+   11. Footer & License Modal
    ========================================================================== */
 .app-footer {
     margin-top: 30px; padding-top: 15px; border-top: 1px solid var(--border);

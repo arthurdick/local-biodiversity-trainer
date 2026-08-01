@@ -4,6 +4,17 @@ const API_BASE = 'https://api.inaturalist.org/v2';
 const CC_LICENSES = 'cc0,cc-by,cc-by-nc,cc-by-sa,cc-by-nd,cc-by-nc-sa,cc-by-nc-nd';
 
 /**
+ * Calculates a UTC cutoff timestamp offset by a buffer window (default: 7 days ago).
+ * This allows the initial community identification queue to settle before observations
+ * are sampled for Daily Challenges.
+ */
+export const getDailyCutoffDate = (bufferDays = 7) => {
+    const cutoff = new Date();
+    cutoff.setUTCDate(cutoff.getUTCDate() - bufferDays);
+    return `${cutoff.toISOString().split('T')[0]}T23:59:59Z`;
+};
+
+/**
  * Resolves the user's preferred locale from browser settings.
  */
 export const getLocale = () => {
@@ -28,9 +39,9 @@ export const getDynamicNetworkTimeout = (defaultTimeout = 10000) => {
             switch (connection.effectiveType) {
                 case 'slow-2g':
                 case '2g':
-                    return 30000; // 30 seconds for very slow connections
+                    return 30000;
                 case '3g':
-                    return 20000; // 20 seconds for 3G
+                    return 20000;
                 case '4g':
                 default:
                     return defaultTimeout;
@@ -42,8 +53,6 @@ export const getDynamicNetworkTimeout = (defaultTimeout = 10000) => {
 
 /**
  * Global Request Throttler
- * Ensures request dispatches are spaced by at least `interval` milliseconds,
- * while allowing requests to resolve asynchronously in flight.
  */
 class RequestQueue {
     constructor(interval = 1000) {
@@ -171,12 +180,8 @@ class RequestQueue {
     }
 }
 
-// Instantiate the throttler with a 1000ms limit
 const apiQueue = new RequestQueue(1000);
 
-/**
- * Unified execution helper for building API requests and handling HTTP errors.
- */
 async function request(endpoint, paramsObj, options = {}) {
     const { signal, cache, ...fetchOpts } = options;
     const params = paramsObj instanceof URLSearchParams ? paramsObj : new URLSearchParams(paramsObj);
@@ -193,9 +198,6 @@ async function request(endpoint, paramsObj, options = {}) {
     return res.json();
 }
 
-/**
- * Appends URL query parameters for media requirements.
- */
 const appendMediaParams = (params, wantsPhotos, wantsSounds) => {
     if (wantsPhotos && !wantsSounds) {
         params.set('photos', 'true');
@@ -213,9 +215,6 @@ const appendMediaParams = (params, wantsPhotos, wantsSounds) => {
     }
 };
 
-/**
- * Appends URL query parameters for seasonality filtering.
- */
 const appendMonthParams = (params, months) => {
     if (months && months.length > 0 && months.length < 12) {
         params.set('month', months.join(','));
@@ -228,9 +227,6 @@ const appendEstablishmentParams = (params, status) => {
     if (status === 'endemic') params.set('endemic', 'true');
 };
 
-/**
- * Appends user life list query parameters for filtering observed or unobserved species.
- */
 const appendUserParams = (params, lifeListMode, userLogin, userId) => {
     const userIdentifier = userId || userLogin;
     if (!userIdentifier || !lifeListMode || lifeListMode === 'off') return;
@@ -254,6 +250,14 @@ export const fetchPlaces = async (query, signal, locale = getLocale()) => {
     return request('/places', params, { signal });
 };
 
+export const fetchPlaceById = async (id, signal, locale = getLocale()) => {
+    const params = new URLSearchParams({
+        fields: '(id:!t,name:!t,display_name:!t)',
+        locale: locale
+    });
+    return request(`/places/${id}`, params, { signal });
+};
+
 export const fetchTaxaAutocomplete = async (query, signal, locale = getLocale()) => {
     const params = new URLSearchParams({
         q: query,
@@ -262,6 +266,14 @@ export const fetchTaxaAutocomplete = async (query, signal, locale = getLocale())
     });
 
     return request('/taxa/autocomplete', params, { signal });
+};
+
+export const fetchTaxonById = async (id, signal, locale = getLocale()) => {
+    const params = new URLSearchParams({
+        fields: '(id:!t,name:!t,preferred_common_name:!t)',
+        locale: locale
+    });
+    return request(`/taxa/${id}`, params, { signal });
 };
 
 export const fetchUsersAutocomplete = async (query, signal) => {
@@ -273,7 +285,7 @@ export const fetchUsersAutocomplete = async (query, signal) => {
     return request('/users/autocomplete', params, { signal });
 };
 
-export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, taxonId, establishmentStatus, lifeListMode, userLogin, userId, page = 1, perPage = null, locale = getLocale() }, signal) => {
+export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, taxonId, establishmentStatus, lifeListMode, userLogin, userId, isDailyMode = false, createdD2 = null, page = 1, perPage = null, locale = getLocale() }, signal) => {
     const limit = perPage !== null ? String(perPage) : String(difficulty);
     
     const params = new URLSearchParams({
@@ -285,6 +297,10 @@ export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, m
         fields: '(count:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,ancestor_ids:!t))',
         locale: locale
     });
+
+    if (isDailyMode || createdD2) {
+        params.set('created_d2', createdD2 || getDailyCutoffDate(7));
+    }
 
     appendMediaParams(params, wantsPhotos, wantsSounds);
     appendMonthParams(params, months);
@@ -306,16 +322,24 @@ export const fetchSpeciesPool = async ({ difficulty, wantsPhotos, wantsSounds, m
     return request('/observations/species_counts', params, { signal });
 };
 
-export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, difficulty, taxonId, establishmentStatus, lifeListMode, userLogin, userId, withoutTaxonIds = [], notObsIds = [], locale = getLocale() }, signal) => {
+export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, placeId, lat, lng, radius, difficulty, taxonId, establishmentStatus, lifeListMode, userLogin, userId, isDailyMode = false, createdD2 = null, page = 1, withoutTaxonIds = [], notObsIds = [], locale = getLocale() }, signal) => {
     const params = new URLSearchParams({
         quality_grade: 'research',
         captive: 'false',
         per_page: '1',
-        order_by: 'random',
+        page: String(page),
         rank: 'species,subspecies',
         fields: '(id:!t,uuid:!t,description:!t,observed_on:!t,place_guess:!t,location:!t,geoprivacy:!t,taxon_geoprivacy:!t,license_code:!t,user:(login:!t,name:!t),taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,ancestor_ids:!t),photos:(url:!t,attribution:!t,license_code:!t),sounds:(file_url:!t,attribution:!t,license_code:!t))',
         locale: locale
     });
+
+    if (isDailyMode || createdD2) {
+        params.set('created_d2', createdD2 || getDailyCutoffDate(7));
+        params.set('order_by', 'id');
+        params.set('order', 'desc');
+    } else {
+        params.set('order_by', 'random');
+    }
 
     appendMediaParams(params, wantsPhotos, wantsSounds);
     appendMonthParams(params, months);
@@ -342,12 +366,15 @@ export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, place
         params.set('not_id', notObsIds.join(','));
     }
 
-    return request('/observations', params, { cache: 'no-store', signal });
+    // Enable standard browser HTTP caching for Daily Mode requests; use no-store for random practice requests
+    const fetchOptions = { signal };
+    if (!isDailyMode) {
+        fetchOptions.cache = 'no-store';
+    }
+
+    return request('/observations', params, fetchOptions);
 };
 
-/**
- * Fetches species frequently confused or taxonomically similar to a given taxon ID.
- */
 export const fetchSimilarTaxa = async (taxonId, signal) => {
     const params = new URLSearchParams({
         taxon_id: String(taxonId),
@@ -371,9 +398,6 @@ export const checkTaxonSearch = async (inputStr, guessedRank, signal, locale = g
     return request('/taxa', params, { signal });
 };
 
-/**
- * Fetches the application LICENSE text.
- */
 export const fetchLicense = async (signal) => {
     const res = await fetch('LICENSE', { signal });
     if (!res.ok) {
@@ -382,9 +406,6 @@ export const fetchLicense = async (signal) => {
     return res.text();
 };
 
-/**
- * Flushes the global request throttler and waits for in-flight requests to settle.
- */
 export const clearApiQueue = () => {
     return apiQueue.drain();
 };

@@ -41,7 +41,6 @@ export async function loadObservationForQuestion(index) {
         try {
             let targetTaxon = q.taxon;
             
-            // Require species pre-selection if in Rare Expert mode OR if in Standard Expert mode with active Life List filtering
             const needsPreSelection = isRareExpert || (isStandardExpert && currentConfig.lifeListMode !== 'off');
 
             if (needsPreSelection && !targetTaxon) {
@@ -51,13 +50,11 @@ export async function loadObservationForQuestion(index) {
                 await previousLock.catch(() => {});
 
                 try {
-                    // Re-check state just in case this taxon was populated while waiting in the queue
                     targetTaxon = store.getState().questions[index].taxon;
 
                     if (!targetTaxon) {
                         const totalSpecies = currentConfig.expertTotalSpecies || 0;
                         
-                        // Select page strategy: calculateDeepPage for Rare Mode, calculateStandardPage for Standard Mode
                         let targetPage = isRareExpert
                             ? engine.calculateDeepPage(totalSpecies)
                             : engine.calculateStandardPage(totalSpecies);
@@ -75,7 +72,8 @@ export async function loadObservationForQuestion(index) {
                                 months: currentConfig.months, placeId: currentConfig.placeId,
                                 lat: currentConfig.lat, lng: currentConfig.lng, radius: currentConfig.radius,
                                 taxonId: currentConfig.taxonId, establishmentStatus: currentConfig.establishmentStatus,
-                                lifeListMode: currentConfig.lifeListMode, userLogin: currentConfig.userLogin, userId: currentConfig.userId
+                                lifeListMode: currentConfig.lifeListMode, userLogin: currentConfig.userLogin, userId: currentConfig.userId,
+                                isDailyMode: currentConfig.isDailyMode
                             }, controller.signal);
 
                             if (deepData.results && deepData.results.length > 0) {
@@ -114,7 +112,6 @@ export async function loadObservationForQuestion(index) {
                             const randomItem = engine.selectRareTaxonFromPool(validResults, currentConfig.weightingMethod);
                             targetTaxon = randomItem.taxon;
                         } else {
-                            // Standard Expert uses generateWeightedPool to maintain linear/log frequency weighting
                             const generatedPool = engine.generateWeightedPool(
                                 validResults,
                                 1,
@@ -152,6 +149,19 @@ export async function loadObservationForQuestion(index) {
                     .filter(uuid => uuid !== undefined);
             }
 
+            let dailyPage = 1;
+            if (currentConfig.isDailyMode) {
+                const totalObs = q.count || 1;
+                // Sample uniformly across up to the top 30 most recent observations
+                const maxPages = Math.min(totalObs, 30);
+
+                const seedKey = engine.buildLocationSeedKey(currentConfig);
+                const globalSeedInt = engine.hashString(seedKey);
+                const questionRng = engine.getQuestionRNG(globalSeedInt, index);
+
+                dailyPage = Math.floor(questionRng() * maxPages) + 1;
+            }
+
             const data = await api.fetchObservation({
                 wantsPhotos: currentConfig.wantsPhotos, wantsSounds: currentConfig.wantsSounds,
                 months: currentConfig.months, placeId: currentConfig.placeId,
@@ -160,6 +170,8 @@ export async function loadObservationForQuestion(index) {
                 taxonId: targetTaxon ? targetTaxon.id : currentConfig.taxonId,
                 establishmentStatus: currentConfig.establishmentStatus,
                 lifeListMode: currentConfig.lifeListMode, userLogin: currentConfig.userLogin, userId: currentConfig.userId,
+                isDailyMode: currentConfig.isDailyMode,
+                page: dailyPage,
                 withoutTaxonIds, notObsIds
             }, controller.signal);
 
