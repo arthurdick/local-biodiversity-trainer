@@ -856,6 +856,8 @@ document.getElementById('mc-options-container')?.addEventListener('click', (e) =
 
 // Global Keyboard Shortcut Handler for Multiple Choice Mode
 window.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    
     const s = store.getState();
     if (s.ui.activeView !== 'quiz-view' || !s.config.isMultipleChoice) return;
 
