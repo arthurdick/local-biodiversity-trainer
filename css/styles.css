@@ -32,7 +32,6 @@ body {
     min-height: 100vh;
 }
 
-/* Fluid responsive frame escaping the 600px prison */
 #app {
     background: var(--surface);
     max-width: 1080px;
