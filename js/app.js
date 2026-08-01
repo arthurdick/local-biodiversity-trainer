@@ -1074,7 +1074,7 @@ document.getElementById('btn-retry').addEventListener('click', () => {
     if (audioPlayer) { audioPlayer.removeAttribute('src'); delete audioPlayer.dataset.src; audioPlayer.load(); }
     
     store.setState(prev => ({ ui: { ...prev.ui, quizError: null, isMediaLoaded: false } }));
-    store.dispatchEvent(new CustomEvent('media:retry'));
+    store.dispatchEvent(new CustomEvent('quiz:retry'));
 });
 
 document.getElementById('btn-skip-end').addEventListener('click', () => {
