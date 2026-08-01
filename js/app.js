@@ -156,6 +156,23 @@ store.addEventListener('statechange', (e) => {
     syncUrlWithState(e.detail);
 });
 
+const setupForm = document.getElementById('setup-form');
+if (setupForm) {
+    ['input', 'change', 'click'].forEach(eventType => {
+        setupForm.addEventListener(eventType, (e) => {
+            // Ignore main form submission triggers
+            if (e.target.id === 'btn-start' || e.target.id === 'btn-trigger-daily') return;
+
+            // Delegated check: Reset URL challenge mode on first user edit
+            if (store.getState().ui.isUrlChallenge) {
+                store.setState(prev => ({
+                    ui: { ...prev.ui, isUrlChallenge: false }
+                }));
+            }
+        });
+    });
+}
+
 function finishQuizSession() {
     const s = store.getState();
     
