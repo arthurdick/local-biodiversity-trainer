@@ -88,7 +88,7 @@ store.addEventListener('observation:loaded', async (e) => {
 
             const options = engine.generateMultipleChoiceOptions(
                 targetTaxon,
-                s.questions,
+                s.regionalPool,
                 apiSimilarResults
             );
 
@@ -647,6 +647,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
     try {
         let pool = [];
         let expertCount = 0;
+        let regionalResults = [];
 
         if (isExpert) {
             const preFlightData = await api.fetchSpeciesPool({
@@ -701,6 +702,8 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
                 return;
             }
 
+            regionalResults = data.results;
+
             let poolRng = Math.random;
             if (isDaily) {
                 const seedKey = engine.buildLocationSeedKey(updatedState.config);
@@ -725,6 +728,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
 
         store.setState(prev => ({
             config: { ...prev.config, expertTotalSpecies: expertCount },
+            regionalPool: regionalResults,
             questions: pool, currentIndex: 0, score: 0, currentMediaIndex: 0,
             form: { ...prev.form, answerInput: '', rankInput: 'species' },
             ui: { ...prev.ui, isLoadingQuizPool: false, activeView: 'quiz-view', quizError: null, isCheckingAnswer: false, isHintVisible: false, isMediaLoaded: false }
@@ -1050,6 +1054,7 @@ document.getElementById('btn-restart').addEventListener('click', () => {
         currentIndex: 0,
         score: 0,
         currentMediaIndex: 0,
+        regionalPool: [],
         questions: [],
         form: {
             ...prev.form,

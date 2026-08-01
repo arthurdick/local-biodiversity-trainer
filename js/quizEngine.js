@@ -239,7 +239,7 @@ function getPointsForRank(rank) {
     }
 }
 
-export function generateMultipleChoiceOptions(targetTaxon, questionsPool = [], apiSimilarResults = []) {
+export function generateMultipleChoiceOptions(targetTaxon, fallbackPool = [], apiSimilarResults = []) {
     if (!targetTaxon) return [];
 
     const formatName = (t) => t.preferred_common_name
@@ -271,11 +271,12 @@ export function generateMultipleChoiceOptions(targetTaxon, questionsPool = [], a
         });
     }
 
-    if (distractorCandidates.length < 3 && Array.isArray(questionsPool)) {
+    // Fallback 1: Sample from fallbackPool matching the target iconic_taxon_name
+    if (distractorCandidates.length < 3 && Array.isArray(fallbackPool)) {
         const existingIds = new Set(distractorCandidates.map(d => d.id));
         
-        questionsPool.forEach(q => {
-            const t = q.observation?.taxon || q.taxon;
+        fallbackPool.forEach(item => {
+            const t = item.taxon;
             if (t && t.id !== targetId && !existingIds.has(t.id)) {
                 if (t.iconic_taxon_name && t.iconic_taxon_name === targetTaxon.iconic_taxon_name) {
                     distractorCandidates.push({
@@ -289,11 +290,12 @@ export function generateMultipleChoiceOptions(targetTaxon, questionsPool = [], a
         });
     }
 
-    if (distractorCandidates.length < 3 && Array.isArray(questionsPool)) {
+    // Fallback 2: Sample broadly from fallbackPool if more distractors are needed
+    if (distractorCandidates.length < 3 && Array.isArray(fallbackPool)) {
         const existingIds = new Set(distractorCandidates.map(d => d.id));
 
-        questionsPool.forEach(q => {
-            const t = q.observation?.taxon || q.taxon;
+        fallbackPool.forEach(item => {
+            const t = item.taxon;
             if (t && t.id !== targetId && !existingIds.has(t.id)) {
                 distractorCandidates.push({
                     id: t.id,

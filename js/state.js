@@ -82,6 +82,7 @@ const initialState = {
     },
 
     // 4. Core Game Data
+    regionalPool: [],
     questions: [],
     currentIndex: 0,
     score: 0,
