@@ -675,18 +675,25 @@ function renderAutocomplete(config, results, show, activeIdx) {
     
     if (!list || !input) return;
     
+    // Retrieve cached UI state for this list element
+    const cache = domCache.get(list) || {};
+    
     // Hide and clear if needed
     if (!show || results.length === 0) {
         if (list.childNodes.length > 0) list.replaceChildren();
         list.classList.remove('show');
         input.setAttribute('aria-expanded', 'false');
         input.removeAttribute('aria-activedescendant');
-        list._lastResults = null; // Clear cache
+        
+        // Reset cache reference if it was previously set
+        if (cache.lastResults !== null) {
+            domCache.set(list, { ...cache, lastResults: null });
+        }
         return;
     }
 
     // 1. Content Rendering: Only rebuild DOM if the underlying data reference changed
-    if (list._lastResults !== results) {
+    if (cache.lastResults !== results) {
         const fragment = document.createDocumentFragment();
         
         results.forEach((item, i) => {
@@ -698,7 +705,9 @@ function renderAutocomplete(config, results, show, activeIdx) {
         });
         
         list.replaceChildren(fragment);
-        list._lastResults = results; // Cache the immutable reference
+        
+        // Persist the array reference inside domCache
+        domCache.set(list, { ...cache, lastResults: results });
     }
 
     // 2. State Rendering: Always update visibility and active indices
