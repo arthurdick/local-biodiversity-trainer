@@ -75,6 +75,37 @@ store.addEventListener('observation:loaded', (e) => {
     }
 });
 
+store.addEventListener('observation:loaded', async (e) => {
+    const { index, error } = e.detail;
+    const s = store.getState();
+
+    if (!error && s.config.isMultipleChoice) {
+        const q = s.questions[index];
+        const targetTaxon = q?.observation?.taxon || q?.taxon;
+
+        if (targetTaxon && !q.mcOptions) {
+            let apiSimilarResults = [];
+
+            try {
+                // Fetch visually/taxonomically similar taxa from iNaturalist
+                const similarData = await api.fetchSimilarTaxa(targetTaxon.id);
+                apiSimilarResults = similarData?.results || [];
+            } catch (err) {
+                console.warn('Could not fetch similar species API, falling back to regional pool:', err);
+            }
+
+            // Generate options with API similar species + pool fallbacks
+            const options = engine.generateMultipleChoiceOptions(
+                targetTaxon,
+                s.questions,
+                apiSimilarResults
+            );
+
+            store.updateQuestion(index, { mcOptions: options });
+        }
+    }
+});
+
 // 4. Sequential Prefetch Trigger
 store.addEventListener('media:ready', () => {
     const s = store.getState();
@@ -163,6 +194,7 @@ function sanitizePreferences(raw) {
     if (typeof raw.showIconicTaxonBadge === 'boolean') sanitized.showIconicTaxonBadge = raw.showIconicTaxonBadge;
     if (typeof raw.preventDuplicates === 'boolean') sanitized.preventDuplicates = raw.preventDuplicates;
     if (typeof raw.isRarityMode === 'boolean') sanitized.isRarityMode = raw.isRarityMode;
+    if (typeof raw.isMultipleChoice === 'boolean') sanitized.isMultipleChoice = raw.isMultipleChoice;
 
     if (typeof raw.wantsPhotos === 'boolean') sanitized.wantsPhotos = raw.wantsPhotos;
     if (typeof raw.wantsSounds === 'boolean') sanitized.wantsSounds = raw.wantsSounds;
@@ -190,7 +222,7 @@ function sanitizePreferences(raw) {
 
     const validEstablishment = ['any', 'native', 'introduced', 'endemic'];
     if (validEstablishment.includes(raw.establishmentStatus)) sanitized.establishmentStatus = raw.establishmentStatus;
-
+    
     return sanitized;
 }
 
@@ -248,10 +280,11 @@ function loadPreferences() {
     });
 });
 
-['wantsPhotos', 'wantsSounds', 'preventDuplicates', 'isRarityMode', 'showIconicTaxonBadge'].forEach(prop => {
+['wantsPhotos', 'wantsSounds', 'preventDuplicates', 'isRarityMode', 'showIconicTaxonBadge', 'isMultipleChoice'].forEach(prop => {
     const elId = prop === 'preventDuplicates' ? 'chk-unique' :
                  prop === 'isRarityMode' ? 'chk-rarity' :
                  prop === 'showIconicTaxonBadge' ? 'chk-badge' :
+                 prop === 'isMultipleChoice' ? 'chk-mc' :
                  `chk-${prop.replace('wants', '').toLowerCase()}`;
 
     const el = document.getElementById(elId);
@@ -751,6 +784,61 @@ document.getElementById('answer-form').addEventListener('submit', async (e) => {
     
     const btnNext = document.getElementById('btn-next');
     if (btnNext) btnNext.focus();
+});
+
+document.getElementById('mc-options-container')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-mc-option');
+    if (!btn || btn.disabled) return;
+
+    const s = store.getState();
+    const q = s.questions[s.currentIndex];
+    if (q.isAnswered) return;
+
+    const chosenId = parseInt(btn.dataset.taxonId, 10);
+    const isCorrect = btn.dataset.isCorrect === 'true';
+    
+    const cleanDisplayName = btn.dataset.displayName || btn.textContent.replace(/^\d+\.\s*/, '');
+    
+    const pointsEarned = isCorrect ? 10 : 0;
+    const mediaInfo = engine.getQuestionThumbnail(q, selectCurrentMedia(s));
+
+    store.updateQuestion(s.currentIndex, {
+        isAnswered: true,
+        userAnswer: btn.textContent,
+        userAnswerId: chosenId,
+        guessedRank: 'species',
+        isCorrect,
+        pointsEarned,
+        thumbnailUrl: mediaInfo.url,
+        mediaAttribution: mediaInfo.attribution,
+        matchedNameDisplay: cleanDisplayName,
+        isSkipped: false
+    });
+
+    if (isCorrect) store.setState(prev => ({ score: prev.score + pointsEarned }));
+
+    const btnNext = document.getElementById('btn-next');
+    if (btnNext) btnNext.focus();
+});
+
+// Global Keyboard Shortcut Handler for Multiple Choice Mode
+window.addEventListener('keydown', (e) => {
+    const s = store.getState();
+    if (s.ui.activeView !== 'quiz-view' || !s.config.isMultipleChoice) return;
+
+    const q = s.questions[s.currentIndex];
+    if (!q || q.isAnswered || s.ui.isCheckingAnswer) return;
+
+    // Check for keys '1', '2', '3', '4'
+    if (['1', '2', '3', '4'].includes(e.key)) {
+        const optionIndex = parseInt(e.key, 10) - 1;
+        const container = document.getElementById('mc-options-container');
+        const buttons = container?.querySelectorAll('.btn-mc-option');
+
+        if (buttons && buttons[optionIndex] && !buttons[optionIndex].disabled) {
+            buttons[optionIndex].click();
+        }
+    }
 });
 
 // Advancing State

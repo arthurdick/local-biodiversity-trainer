@@ -263,6 +263,7 @@ export function render(state) {
         syncCheckbox('chk-badge', state.form.showIconicTaxonBadge);
         syncCheckbox('chk-unique', state.form.preventDuplicates);
         syncCheckbox('chk-rarity', state.form.isRarityMode);
+        syncCheckbox('chk-mc', state.form.isMultipleChoice);
 
         const selectMonths = document.getElementById('input-months');
         if (selectMonths) {
@@ -409,6 +410,21 @@ export function render(state) {
         if (answerInput) answerInput.disabled = inputDisabled;
         if (rankInput) rankInput.disabled = inputDisabled;
         
+        const isMC = state.config.isMultipleChoice;
+        const formEl = document.getElementById('answer-form');
+        const mcContainer = document.getElementById('mc-options-container');
+
+        if (isMC) {
+            if (formEl) formEl.style.display = 'none';
+            if (mcContainer) {
+                mcContainer.style.display = isReadyForMedia ? 'grid' : 'none';
+                renderMCOptions(state, mcContainer, q, isAnswered);
+            }
+        } else {
+            if (formEl) formEl.style.display = 'block';
+            if (mcContainer) mcContainer.style.display = 'none';
+        }
+        
         const btnSubmit = document.getElementById('btn-submit');
         btnSubmit.style.display = (!isAnswered && isReadyForMedia) ? 'block' : 'none';
         btnSubmit.disabled = state.ui.isCheckingAnswer;
@@ -439,9 +455,34 @@ export function render(state) {
             btnSubmit.textContent = "Check Answer";
         }
 
+        const answerInputsRow = document.querySelector('.answer-inputs-row');
+
+        if (isMC) {
+            // Hide free-text inputs and Submit button, show MC grid
+            if (answerInputsRow) answerInputsRow.style.display = 'none';
+            if (btnSubmit) btnSubmit.style.display = 'none';
+            if (mcContainer) {
+                mcContainer.style.display = isReadyForMedia ? 'grid' : 'none';
+                renderMCOptions(state, mcContainer, q, isAnswered);
+            }
+        } else {
+            // Restore free-text inputs and Submit button, hide MC grid
+            if (answerInputsRow) answerInputsRow.style.display = 'flex';
+            if (mcContainer) mcContainer.style.display = 'none';
+            if (btnSubmit) {
+                btnSubmit.style.display = (!isAnswered && isReadyForMedia) ? 'block' : 'none';
+                btnSubmit.disabled = state.ui.isCheckingAnswer;
+            }
+        }
+
+        // Skip Button logic: never moves DOM nodes!
         const btnSkip = document.getElementById('btn-skip');
-        btnSkip.style.display = (!isAnswered && isReadyForMedia) ? 'block' : 'none';
-        btnSkip.disabled = state.ui.isCheckingAnswer || (state.form.answerInput || '').trim().length > 0;
+        if (btnSkip) {
+            btnSkip.style.display = (!isAnswered && isReadyForMedia) ? 'block' : 'none';
+            btnSkip.disabled = isMC
+                ? state.ui.isCheckingAnswer
+                : (state.ui.isCheckingAnswer || (state.form.answerInput || '').trim().length > 0);
+        }
         
         document.getElementById('clear-answer').style.display = (!isAnswered && !state.ui.isCheckingAnswer && isReadyForMedia && (state.form.answerInput || '').length > 0) ? 'block' : 'none';
 
@@ -897,12 +938,62 @@ function renderQuizMeta(state, isReadyForMedia) {
     }
 }
 
+function renderMCOptions(state, container, question, isAnswered) {
+    const options = question?.mcOptions || [];
+    const cache = domCache.get(container);
+
+    if (cache?.lastQuestion === question && cache?.isAnswered === isAnswered && cache?.optionsCount === options.length) {
+        return;
+    }
+
+    domCache.set(container, { lastQuestion: question, isAnswered, optionsCount: options.length });
+    container.replaceChildren();
+
+    // If options are still fetching from the API, render 4 disabled skeleton buttons
+    if (options.length === 0) {
+        for (let i = 1; i <= 4; i++) {
+            const skeletonBtn = document.createElement('button');
+            skeletonBtn.type = 'button';
+            skeletonBtn.className = 'btn-mc-option';
+            skeletonBtn.disabled = true;
+            skeletonBtn.style.opacity = '0.5';
+            skeletonBtn.textContent = `⏳ Loading option ${i}...`;
+            container.appendChild(skeletonBtn);
+        }
+        return;
+    }
+
+    options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn-mc-option';
+        btn.dataset.taxonId = opt.id;
+        btn.dataset.isCorrect = opt.isCorrect;
+        btn.dataset.displayName = opt.displayName;
+        // Prefix with [1], [2], [3], [4] so keyboard users see the key bindings!
+        btn.textContent = `${idx + 1}. ${opt.displayName}`;
+
+        if (isAnswered) {
+            btn.disabled = true;
+            if (opt.isCorrect) {
+                btn.classList.add('opt-correct');
+            } else if (question.userAnswerId === opt.id) {
+                btn.classList.add('opt-incorrect');
+            }
+        }
+
+        container.appendChild(btn);
+    });
+}
+
 // --- PURE DOM ELEMENT GENERATORS ---
 
 function buildFeedbackDom(q, feedbackEl) {
     feedbackEl.replaceChildren();
     const taxon = q.observation?.taxon || q.taxon || { name: 'Unknown Species', id: '' };
-    const primaryDisplayName = taxon.preferred_common_name ? `${taxon.preferred_common_name} (${taxon.name})` : taxon.name;
+    const primaryDisplayName = taxon.preferred_common_name
+        ? `${taxon.preferred_common_name} (${taxon.name})`
+        : taxon.name;
 
     if (q.isCorrect) {
         const pointsLabel = `(+${formatPoints(q.pointsEarned)} pts)`;
@@ -914,7 +1005,20 @@ function buildFeedbackDom(q, feedbackEl) {
         feedbackEl.appendChild(document.createElement('br'));
 
         const strong = document.createElement('strong');
-        if (q.matchedNameDisplay && q.matchedNameDisplay.toLowerCase() !== (taxon.preferred_common_name || '').toLowerCase() && q.matchedNameDisplay.toLowerCase() !== taxon.name.toLowerCase()) {
+
+        // Normalize strings for comparison
+        const normMatched = (q.matchedNameDisplay || '').trim().toLowerCase();
+        const normCommon = (taxon.preferred_common_name || '').trim().toLowerCase();
+        const normSci = (taxon.name || '').trim().toLowerCase();
+        const normPrimary = primaryDisplayName.trim().toLowerCase();
+
+        // Check if the matched name is an actual alias (and not the primary, common, or sci name)
+        const isAliasMatch = normMatched &&
+            normMatched !== normCommon &&
+            normMatched !== normSci &&
+            normMatched !== normPrimary;
+
+        if (isAliasMatch) {
             strong.textContent = q.matchedNameDisplay.replace(/\b\w/g, c => c.toUpperCase());
             feedbackEl.appendChild(strong);
             feedbackEl.appendChild(document.createElement('br'));

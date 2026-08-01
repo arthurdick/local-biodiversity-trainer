@@ -150,6 +150,101 @@ function getPointsForRank(rank) {
 }
 
 /**
+ * Generates 4 smart multiple choice options (1 target + 3 distractors weighted by confusion count).
+ * @param {Object} targetTaxon - The target correct taxon.
+ * @param {Array} questionsPool - Active quiz questions pool for fallback distractors.
+ * @param {Array} apiSimilarResults - Results array from iNaturalist /identifications/similar_species.
+ * @returns {Array<{id: number, displayName: string, isCorrect: boolean}>} Shuffled options.
+ */
+export function generateMultipleChoiceOptions(targetTaxon, questionsPool = [], apiSimilarResults = []) {
+    if (!targetTaxon) return [];
+
+    const formatName = (t) => t.preferred_common_name
+        ? `${t.preferred_common_name} (${t.name})`
+        : t.name;
+
+    const targetId = targetTaxon.id;
+    const targetOption = {
+        id: targetId,
+        displayName: formatName(targetTaxon),
+        isCorrect: true
+    };
+
+    const distractorCandidates = [];
+
+    // 1. Sort API similar results by count (highest real-world confusion first)
+    if (Array.isArray(apiSimilarResults) && apiSimilarResults.length > 0) {
+        const sortedByCount = [...apiSimilarResults]
+            .filter(item => item.taxon && item.taxon.id !== targetId)
+            .sort((a, b) => (b.count || 0) - (a.count || 0));
+
+        // Take up to the top 8 most frequently confused lookalikes
+        const topLookalikes = sortedByCount.slice(0, 8);
+
+        topLookalikes.forEach(item => {
+            distractorCandidates.push({
+                id: item.taxon.id,
+                displayName: formatName(item.taxon),
+                isCorrect: false
+            });
+        });
+    }
+
+    // 2. Fallback A: Same iconic taxon from the active pool (e.g., Birds with Birds)
+    if (distractorCandidates.length < 3 && Array.isArray(questionsPool)) {
+        const existingIds = new Set(distractorCandidates.map(d => d.id));
+        
+        questionsPool.forEach(q => {
+            const t = q.observation?.taxon || q.taxon;
+            if (t && t.id !== targetId && !existingIds.has(t.id)) {
+                if (t.iconic_taxon_name && t.iconic_taxon_name === targetTaxon.iconic_taxon_name) {
+                    distractorCandidates.push({
+                        id: t.id,
+                        displayName: formatName(t),
+                        isCorrect: false
+                    });
+                    existingIds.add(t.id);
+                }
+            }
+        });
+    }
+
+    // 3. Fallback B: Any remaining species from the active pool
+    if (distractorCandidates.length < 3 && Array.isArray(questionsPool)) {
+        const existingIds = new Set(distractorCandidates.map(d => d.id));
+
+        questionsPool.forEach(q => {
+            const t = q.observation?.taxon || q.taxon;
+            if (t && t.id !== targetId && !existingIds.has(t.id)) {
+                distractorCandidates.push({
+                    id: t.id,
+                    displayName: formatName(t),
+                    isCorrect: false
+                });
+                existingIds.add(t.id);
+            }
+        });
+    }
+
+    // Randomly pick 3 items from our top candidate pool
+    for (let i = distractorCandidates.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [distractorCandidates[i], distractorCandidates[j]] = [distractorCandidates[j], distractorCandidates[i]];
+    }
+
+    const selectedDistractors = distractorCandidates.slice(0, 3);
+    const finalOptions = [targetOption, ...selectedDistractors];
+
+    // Final shuffle of option positions (so target isn't always slot #1)
+    for (let i = finalOptions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [finalOptions[i], finalOptions[j]] = [finalOptions[j], finalOptions[i]];
+    }
+
+    return finalOptions;
+}
+
+/**
  * Orchestrates local strict matching and API ancestor validation.
  */
 export async function evaluateAnswer(inputStr, guessedRank, taxon, signal = null) {

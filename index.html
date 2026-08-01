@@ -166,13 +166,16 @@
 
                         <div class="form-group checkbox-list">
                             <label class="checkbox-label">
-                                <input type="checkbox" id="chk-badge" checked> Show iconic taxon badge during quiz (e.g., Aves, Insecta)
+                                <input type="checkbox" id="chk-mc"> Enable multiple choice mode
                             </label>
                             <label class="checkbox-label">
                                 <input type="checkbox" id="chk-unique" checked> Prevent duplicate species in quiz
                             </label>
                             <label class="checkbox-label">
                                 <input type="checkbox" id="chk-rarity"> Enable rare mode (inverts frequency weighting)
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="chk-badge" checked> Show iconic taxon badge during quiz (e.g., Aves, Insecta)
                             </label>
                         </div>
                     </div>
@@ -238,6 +241,8 @@
                     <div class="badge-container">
                         <span id="quiz-target-badge" class="target-badge"></span>
                     </div>
+                    
+                    <div id="mc-options-container" class="mc-grid" style="display: none;"></div>
 
                     <form class="form-group" id="answer-form">
                         <label for="input-answer">What species is this?</label>

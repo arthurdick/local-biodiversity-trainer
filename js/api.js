@@ -321,6 +321,18 @@ export const fetchObservation = async ({ wantsPhotos, wantsSounds, months, place
     return request('/observations', params, { cache: 'no-store', signal });
 };
 
+/**
+ * Fetches species frequently confused or taxonomically similar to a given taxon ID.
+ */
+export const fetchSimilarTaxa = async (taxonId, signal) => {
+    const params = new URLSearchParams({
+        taxon_id: String(taxonId),
+        fields: '(count:!t,taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t))'
+    });
+
+    return request('/identifications/similar_species', params, { signal });
+};
+
 export const checkTaxonSearch = async (inputStr, guessedRank, signal, locale = getLocale()) => {
     const rankQuery = guessedRank === 'species' ? 'species,subspecies,variety,form' : guessedRank;
     const params = new URLSearchParams({
