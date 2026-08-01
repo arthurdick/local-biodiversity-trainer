@@ -154,35 +154,58 @@ export const store = new Store(initialState);
 
 /**
  * Retrieves saved daily scores from localStorage.
- * Automatically prunes entries older than 30 days without wiping existing daily records.
+ * Automatically prunes entries that are malformed, unparseable, or older than 7 days.
  */
 export function getDailyScores() {
     try {
         const raw = localStorage.getItem('bio_trainer_daily_scores');
         if (!raw) return { scores: {} };
-        
+
         const data = JSON.parse(raw);
-        const scores = data.scores || {};
-        
-        // Rolling retention: Purge entries older than 7 days
+
+        // Sanity check: Ensure top-level structure is a valid object
+        if (!data || typeof data !== 'object' || typeof data.scores !== 'object' || data.scores === null) {
+            localStorage.removeItem('bio_trainer_daily_scores');
+            return { scores: {} };
+        }
+
+        const scores = data.scores;
         const now = Date.now();
-        const retentionPeriod = 7 * 24 * 60 * 60 * 1000;
+        const retentionPeriod = 7 * 24 * 60 * 60 * 1000; // 7 days
         let isModified = false;
 
         Object.keys(scores).forEach(key => {
-            const completedAt = scores[key]?.completedAt;
-            if (completedAt && (now - new Date(completedAt).getTime() > retentionPeriod)) {
+            const entry = scores[key];
+
+            // 1. Delete non-object entries
+            if (!entry || typeof entry !== 'object') {
+                delete scores[key];
+                isModified = true;
+                return;
+            }
+
+            const timestamp = Date.parse(entry.completedAt);
+
+            // 2. Delete if timestamp is missing/unparseable (NaN) OR exceeds retention period
+            if (Number.isNaN(timestamp) || (now - timestamp > retentionPeriod)) {
                 delete scores[key];
                 isModified = true;
             }
         });
 
+        // Persist cleaned object if any corrupt or expired keys were pruned
         if (isModified) {
             localStorage.setItem('bio_trainer_daily_scores', JSON.stringify({ scores }));
         }
 
         return { scores };
     } catch (e) {
+        console.warn('Could not read daily scores, clearing invalid storage entry:', e);
+        try {
+            localStorage.removeItem('bio_trainer_daily_scores');
+        } catch (_) {
+            // Ignore write errors (e.g. strict private browsing modes)
+        }
         return { scores: {} };
     }
 }
