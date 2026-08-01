@@ -81,6 +81,9 @@ const autocompleteConfigs = [
         nameKey: 'placeName',
         errorKey: 'placeError',
         resultsKey: 'placeResults',
+        showListKey: 'showPlaceList',
+        activeIdxKey: 'activePlaceIdx',
+        type: 'place',
         formatDisplay: formatPlaceDisplay
     },
     {
@@ -90,6 +93,9 @@ const autocompleteConfigs = [
         nameKey: 'taxonName',
         errorKey: 'taxonError',
         resultsKey: 'taxonResults',
+        showListKey: 'showTaxonList',
+        activeIdxKey: 'activeTaxonIdx',
+        type: 'taxon',
         formatDisplay: formatTaxonDisplay
     },
     {
@@ -99,6 +105,9 @@ const autocompleteConfigs = [
         nameKey: 'userLogin',
         errorKey: 'userError',
         resultsKey: 'userResults',
+        showListKey: 'showUserList',
+        activeIdxKey: 'activeUserIdx',
+        type: 'user',
         formatDisplay: formatUserDisplay
     }
 ];
@@ -383,7 +392,7 @@ export function render(state) {
             }
             
             renderInputError(config.inputId, state.ui[config.errorKey]);
-            renderAutocomplete(config, state.ui[config.resultsKey]);
+            renderAutocomplete(config, state.ui[config.resultsKey], state.ui[config.showListKey], state.ui[config.activeIdxKey]);
         });
 
         renderError('form-error-message', state.ui.setupError);
@@ -668,25 +677,63 @@ export function render(state) {
     }
 }
 
-function renderAutocomplete(config, results) {
-    const list = document.getElementById(config.listId);
-    if (!list) return;
-
-    const cache = domCache.get(list);
-    if (cache?.lastResults === results) return;
+function renderAutocomplete(config, results, show, activeIdx) {
+    const { listId, inputId, type, formatDisplay } = config;
+    const list = document.getElementById(listId);
+    const input = document.getElementById(inputId);
     
-    domCache.set(list, { ...cache, lastResults: results });
+    if (!list || !input) return;
+    
+    // Hide and clear if needed
+    if (!show || results.length === 0) {
+        if (list.childNodes.length > 0) list.replaceChildren();
+        list.classList.remove('show');
+        input.setAttribute('aria-expanded', 'false');
+        input.removeAttribute('aria-activedescendant');
+        list._lastResults = null; // Clear cache
+        return;
+    }
 
-    const fragment = document.createDocumentFragment();
-    results.forEach(item => {
-        const option = document.createElement('option');
-        option.value = config.formatDisplay(item);
-        fragment.appendChild(option);
-    });
+    // 1. Content Rendering: Only rebuild DOM if the underlying data reference changed
+    if (list._lastResults !== results) {
+        const fragment = document.createDocumentFragment();
+        
+        results.forEach((item, i) => {
+            const li = document.createElement('li');
+            li.id = `opt-${type}-${i}`;
+            li.setAttribute('role', 'option');
+            li.textContent = formatDisplay(item);
+            fragment.appendChild(li);
+        });
+        
+        list.replaceChildren(fragment);
+        list._lastResults = results; // Cache the immutable reference
+    }
 
-    list.replaceChildren(fragment);
+    // 2. State Rendering: Always update visibility and active indices
+    list.classList.add('show');
+    input.setAttribute('aria-expanded', 'true');
+    
+    // Reset previously active items
+    const prevActive = list.querySelector('.active');
+    if (prevActive) {
+        prevActive.classList.remove('active');
+        prevActive.setAttribute('aria-selected', 'false');
+    }
+
+    // Apply new active item
+    if (activeIdx >= 0) {
+        input.setAttribute('aria-activedescendant', `opt-${type}-${activeIdx}`);
+        const activeLi = document.getElementById(`opt-${type}-${activeIdx}`);
+        if (activeLi) {
+            activeLi.classList.add('active');
+            activeLi.setAttribute('aria-selected', 'true');
+            activeLi.scrollIntoView({ block: 'nearest' });
+        }
+    } else {
+        input.removeAttribute('aria-activedescendant');
+    }
 }
-
 function renderError(id, msg) {
     const el = document.getElementById(id);
     if (!el) return;

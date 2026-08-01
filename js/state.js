@@ -62,9 +62,18 @@ const initialState = {
         userError: null,
         isUrlChallenge: false,
 
+        // Autocomplete search result pools & layout properties
         placeResults: [],
+        showPlaceList: false,
+        activePlaceIdx: -1,
+        
         taxonResults: [],
+        showTaxonList: false,
+        activeTaxonIdx: -1,
+        
         userResults: [],
+        showUserList: false,
+        activeUserIdx: -1,
 
         quizError: null,
         answerError: null,

@@ -383,36 +383,18 @@ document.querySelectorAll('input[name="loc-mode"]').forEach(radio => {
 function setupAutocomplete(config) {
     const {
         inputId, listId, clearBtnId, fetchDataFn,
-        stateKeys: { id, name, error, results },
+        stateKeys: { id, name, error, results, showList, activeIdx },
         formatDisplay, validateOnBlur, errorMsg
     } = config;
 
     let abortController = null;
     const inputEl = document.getElementById(inputId);
+    const listEl = document.getElementById(listId);
     const clearBtn = document.getElementById(clearBtnId);
-
-    const isItemMatch = (item, query) => {
-        if (!item || typeof query !== 'string') return false;
-        const normQuery = query.trim().toLowerCase();
-        if (!normQuery) return false;
-
-        const candidateFields = [
-            formatDisplay(item),
-            item.display_name,
-            item.name,
-            item.preferred_common_name,
-            item.matched_term,
-            item.login
-        ];
-
-        return candidateFields.some(candidate =>
-            typeof candidate === 'string' && candidate.trim().toLowerCase() === normQuery
-        );
-    };
 
     const performSearch = debounce(async (query) => {
         if (inputEl.value.trim() !== query.trim() || query.length < 3) {
-            store.setState(prev => ({ ui: { ...prev.ui, [results]: [] } }));
+            store.setState(prev => ({ ui: { ...prev.ui, [results]: [], [showList]: false } }));
             return;
         }
 
@@ -422,7 +404,7 @@ function setupAutocomplete(config) {
             const data = await fetchDataFn(query, abortController.signal);
             if (inputEl.value.trim() === query.trim()) {
                 store.setState(prev => ({
-                    ui: { ...prev.ui, [results]: data.results, [error]: null }
+                    ui: { ...prev.ui, [results]: data.results, [showList]: data.results.length > 0, [error]: null }
                 }));
             }
         } catch (err) {
@@ -433,7 +415,7 @@ function setupAutocomplete(config) {
                     : "⚠️ Network error: Unable to load suggestions. Check your connection.";
                 
                 store.setState(prev => ({
-                    ui: { ...prev.ui, [error]: errorMessage, [results]: [] }
+                    ui: { ...prev.ui, [error]: errorMessage, [results]: [], [showList]: false }
                 }));
             }
         }
@@ -441,37 +423,94 @@ function setupAutocomplete(config) {
 
     inputEl.addEventListener('input', (e) => {
         const query = e.target.value;
-        const currentResults = store.getState().ui[results];
 
+        // Cancel any pending debounced search or active fetch
         performSearch.cancel();
         if (abortController) {
             abortController.abort();
             abortController = null;
         }
 
-        const selectedItem = currentResults.find(item => isItemMatch(item, query));
-
+        // Clear the ID on raw typing; force explicit selection via click/keyboard
         store.setState(prev => ({
-            form: { ...prev.form, [id]: selectedItem ? selectedItem.id : null, [name]: query },
-            ui: { ...prev.ui, [error]: null }
+            form: { ...prev.form, [id]: null, [name]: query },
+            ui: { ...prev.ui, [activeIdx]: -1, [error]: null }
         }));
 
-        if (!selectedItem) performSearch(query);
+        performSearch(query);
     });
 
     inputEl.addEventListener('focus', () => {
-        store.setState(prev => ({ ui: { ...prev.ui, [error]: null } }));
+        const s = store.getState();
+        const hasNoSelection = !s.form[id];
+        const shouldShow = hasNoSelection && inputEl.value.length >= 3 && s.ui[results].length > 0;
+        store.setState(prev => ({ ui: { ...prev.ui, [error]: null, [showList]: shouldShow } }));
     });
 
     inputEl.addEventListener('blur', () => {
         const s = store.getState();
         const isValid = validateOnBlur ? validateOnBlur(s) : !!s.form[id];
         if ((s.form[name] || '').trim() !== '' && !isValid) {
-            store.setState(prev => ({ ui: { ...prev.ui, [error]: errorMsg } }));
+            store.setState(prev => ({ ui: { ...prev.ui, [error]: errorMsg, [showList]: false } }));
+        } else if (s.ui[showList]) {
+            store.setState(prev => ({ ui: { ...prev.ui, [showList]: false } }));
+        }
+    });
+
+    inputEl.addEventListener('keydown', (e) => {
+        const s = store.getState();
+        if (!s.ui[showList]) return;
+
+        listEl.classList.add('using-keyboard');
+
+        let newIdx = s.ui[activeIdx];
+        const total = s.ui[results].length;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            newIdx = (newIdx < total - 1) ? newIdx + 1 : 0;
+            store.setState(prev => ({ ui: { ...prev.ui, [activeIdx]: newIdx } }));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            newIdx = (newIdx > 0) ? newIdx - 1 : total - 1;
+            store.setState(prev => ({ ui: { ...prev.ui, [activeIdx]: newIdx } }));
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (newIdx >= 0 && newIdx < total) {
+                const item = s.ui[results][newIdx];
+                store.setState(prev => ({
+                    form: { ...prev.form, [id]: item.id, [name]: formatDisplay(item) },
+                    ui: { ...prev.ui, [showList]: false, [error]: null }
+                }));
+            }
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            store.setState(prev => ({ ui: { ...prev.ui, [showList]: false } }));
+        }
+    });
+
+    listEl.addEventListener('mousemove', (e) => e.currentTarget.classList.remove('using-keyboard'));
+
+    listEl.addEventListener('pointerdown', (e) => {
+        const li = e.target.closest('li');
+        if (li) {
+            e.preventDefault();
+            const idx = parseInt(li.id.split('-').pop(), 10);
+            const item = store.getState().ui[results][idx];
+
+            store.setState(prev => ({
+                form: { ...prev.form, [id]: item.id, [name]: formatDisplay(item) },
+                ui: { ...prev.ui, [showList]: false, [error]: null }
+            }));
+
+            inputEl.focus();
         }
     });
 
     if (clearBtn) {
+        // Prevent the button from stealing focus to avoid triggering a premature 'blur' on the input
+        clearBtn.addEventListener('mousedown', (e) => e.preventDefault());
+        
         clearBtn.addEventListener('click', () => {
             performSearch.cancel();
             if (abortController) {
@@ -481,7 +520,7 @@ function setupAutocomplete(config) {
 
             store.setState(prev => ({
                 form: { ...prev.form, [id]: null, [name]: '' },
-                ui: { ...prev.ui, [results]: [], [error]: null }
+                ui: { ...prev.ui, [results]: [], [showList]: false, [error]: null }
             }));
             inputEl.focus();
         });
@@ -491,7 +530,7 @@ function setupAutocomplete(config) {
 setupAutocomplete({
     inputId: 'input-place', listId: 'list-place', clearBtnId: 'clear-place',
     fetchDataFn: api.fetchPlaces,
-    stateKeys: { id: 'placeId', name: 'placeName', error: 'placeError', results: 'placeResults' },
+    stateKeys: { id: 'placeId', name: 'placeName', error: 'placeError', results: 'placeResults', showList: 'showPlaceList', activeIdx: 'activePlaceIdx' },
     formatDisplay: ui.formatPlaceDisplay,
     validateOnBlur: (s) => s.form.locMode === 'search' ? !!s.form.placeId : (s.form.lat !== null && s.form.lng !== null),
     errorMsg: "⚠️ Please select a location from the suggestions list."
@@ -500,7 +539,7 @@ setupAutocomplete({
 setupAutocomplete({
     inputId: 'input-taxon', listId: 'list-taxon', clearBtnId: 'clear-taxon',
     fetchDataFn: api.fetchTaxaAutocomplete,
-    stateKeys: { id: 'taxonId', name: 'taxonName', error: 'taxonError', results: 'taxonResults' },
+    stateKeys: { id: 'taxonId', name: 'taxonName', error: 'taxonError', results: 'taxonResults', showList: 'showTaxonList', activeIdx: 'activeTaxonIdx' },
     formatDisplay: ui.formatTaxonDisplay,
     validateOnBlur: (s) => !!s.form.taxonId,
     errorMsg: "⚠️ Please select a valid target taxon from the suggestions list."
@@ -509,7 +548,7 @@ setupAutocomplete({
 setupAutocomplete({
     inputId: 'input-username', listId: 'list-username', clearBtnId: 'clear-username',
     fetchDataFn: api.fetchUsersAutocomplete,
-    stateKeys: { id: 'userId', name: 'userLogin', error: 'userError', results: 'userResults' },
+    stateKeys: { id: 'userId', name: 'userLogin', error: 'userError', results: 'userResults', showList: 'showUserList', activeIdx: 'activeUserIdx' },
     formatDisplay: ui.formatUserDisplay,
     validateOnBlur: (s) => true,
     errorMsg: "⚠️ Please enter a valid iNaturalist username."
