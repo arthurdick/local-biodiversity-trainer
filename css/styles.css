@@ -11,7 +11,8 @@
     --error: #d9534f;
     --success: #5cb85c;
     --border: #e0e0e0;
-    --radius: 8px;
+    --radius: 12px;
+    --shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
 * {
@@ -24,27 +25,46 @@ body {
     color: var(--text-main);
     line-height: 1.6;
     margin: 0;
-    padding: 20px;
+    padding: 20px 12px;
     display: flex;
     justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
 }
 
+/* Fluid responsive frame escaping the 600px prison */
 #app {
     background: var(--surface);
-    max-width: 600px;
+    max-width: 1080px;
     width: 100%;
     padding: 30px;
     border-radius: var(--radius);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    box-shadow: var(--shadow);
+    transition: max-width 0.3s ease;
+}
+
+@media (max-width: 600px) {
+    body { padding: 10px 6px; }
+    #app { padding: 18px 14px; border-radius: 8px; }
 }
 
 /* ==========================================================================
    2. Typography & Views
    ========================================================================== */
-h1, h2 {
+h1 {
     margin-top: 0;
+    margin-bottom: 6px;
     color: var(--primary);
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
 }
+
+.subtitle {
+    margin-top: 0;
+    margin-bottom: 24px;
+    color: var(--text-muted);
+}
+
+h2 { margin-top: 0; color: var(--primary); }
 
 #setup-heading,
 #quiz-heading,
@@ -73,8 +93,56 @@ button.visually-hidden:focus-visible {
 }
 
 /* ==========================================================================
-   3. Forms & Buttons
+   3. Setup Form, Panel Cards & Column Separator
    ========================================================================== */
+.setup-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+@media (min-width: 768px) {
+    .setup-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 32px;
+    }
+}
+
+.setup-card {
+    background: #fafcfb;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+@media (min-width: 768px) {
+    /* Subtle vertical border dividing the two setup columns */
+    .setup-card:first-child {
+        position: relative;
+    }
+    .setup-card:first-child::after {
+        content: "";
+        position: absolute;
+        top: 10%;
+        bottom: 10%;
+        right: -17px;
+        width: 1px;
+        background-color: var(--border);
+    }
+}
+
+.setup-card-title {
+    font-size: 1.1rem;
+    color: var(--primary);
+    margin-top: 0;
+    margin-bottom: 18px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e8f0e6;
+}
+
 .form-group { margin-bottom: 20px; }
 .form-row { display: flex; gap: 15px; }
 .form-row .form-group { flex: 1; }
@@ -82,16 +150,17 @@ button.visually-hidden:focus-visible {
 label, .group-label {
     display: block;
     font-weight: bold;
-    margin-bottom: 5px;
+    margin-bottom: 6px;
     color: var(--text-main);
 }
 
 input[type="text"], input[type="number"], select {
     width: 100%;
-    padding: 10px;
+    padding: 10px 12px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    font-size: 16px;
+    font-size: 15px;
+    background-color: #fff;
 }
 
 .input-error {
@@ -103,16 +172,23 @@ button {
     background-color: var(--primary);
     color: white;
     border: none;
-    padding: 10px 20px;
-    font-size: 16px;
+    padding: 11px 20px;
+    font-size: 15px;
     border-radius: var(--radius);
     cursor: pointer;
-    transition: background 0.2s;
+    transition: background 0.2s, transform 0.1s;
     width: 100%;
     font-weight: bold;
 }
 button:hover { background-color: var(--primary-hover); }
-button:disabled { opacity: 0.6; cursor: not-allowed; }
+button:active { transform: translateY(1px); }
+button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+.btn-primary-large {
+    font-size: 17px;
+    padding: 14px;
+    margin-top: 10px;
+}
 
 #btn-gps {
     margin-bottom: 10px;
@@ -144,48 +220,27 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
     transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
 
-/* Visually hide the radio buttons but keep them focusable */
 .location-toggle input[type="radio"] {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    border: 0;
+    position: absolute; width: 1px; height: 1px; margin: -1px;
+    padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0;
 }
 
-/* Apply styles when checked */
 .location-toggle input[type="radio"]:checked + .location-toggle-label {
     background: var(--primary);
     color: white;
     border-color: var(--primary);
 }
 
-/* Show a focus ring on the label when the hidden radio is focused via keyboard */
 .location-toggle input[type="radio"]:focus-visible + .location-toggle-label {
     outline: 2px solid var(--primary);
     outline-offset: 2px;
 }
 
-.location-section {
-    display: none;
-}
+.location-section { display: none; }
+.location-section.active { display: block; }
 
-.location-section.active {
-    display: block;
-}
-
-.coords-row {
-    display: flex;
-    gap: 10px;
-}
-
-.coords-group {
-    flex: 1;
-    margin-bottom: 0;
-}
+.coords-row { display: flex; gap: 10px; }
+.coords-group { flex: 1; margin-bottom: 0; }
 
 select[multiple] {
     height: auto;
@@ -193,9 +248,11 @@ select[multiple] {
 }
 
 .fieldset-reset { border: none; padding: 0; margin: 0 0 20px 0; }
-.checkbox-group { display: flex; gap: 20px; margin-top: 8px; }
+.checkbox-group { display: flex; gap: 20px; margin-top: 8px; flex-wrap: wrap; }
+.checkbox-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+
 .checkbox-label { display: flex; align-items: center; gap: 8px; font-weight: normal; cursor: pointer; }
-.checkbox-label input { width: 18px; height: 18px; cursor: pointer; }
+.checkbox-label input { width: 18px; height: 18px; cursor: pointer; flex-shrink: 0; }
 
 .quick-selectors {
     display: flex;
@@ -245,33 +302,49 @@ select[multiple] {
 .btn-clear:focus-visible { outline: 2px solid var(--primary); border-radius: 4px; }
 
 /* ==========================================================================
-   5. Quiz Interface & Media
+   5. Quiz Split Grid & Media Controls
    ========================================================================== */
+.quiz-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
+
+@media (min-width: 768px) {
+    .quiz-grid {
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 28px;
+        align-items: start;
+    }
+}
+
 .progress {
     display: flex; justify-content: space-between;
-    color: var(--text-muted); font-size: 14px;
+    color: var(--text-muted); font-size: 15px;
+    font-weight: bold;
     margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px;
 }
 
-.badge-container { text-align: center; margin-bottom: 10px; }
+.badge-container { text-align: center; margin-bottom: 15px; }
 .target-badge {
     display: none;
     background-color: var(--primary); color: white;
-    padding: 4px 12px; border-radius: 16px;
+    padding: 5px 14px; border-radius: 16px;
     font-size: 13px; font-weight: bold;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-transform: capitalize;
 }
 
 .quiz-media-container {
-    text-align: center; margin-bottom: 20px; min-height: 350px;
+    text-align: center; margin-bottom: 15px;
     display: flex; flex-direction: column; justify-content: center; align-items: center;
     background: #111; border-radius: var(--radius); border: 1px solid var(--border);
-    position: relative; padding: 15px;
+    position: relative; padding: 15px; overflow: hidden;
 }
 
+/* Fluid image height scaling across screen resolutions */
 .quiz-media-stage {
     width: 100%;
-    height: 320px;
+    height: clamp(300px, 45vh, 480px);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -282,7 +355,7 @@ select[multiple] {
 #quiz-image {
     display: none;
     max-width: 100%; max-height: 100%;
-    border-radius: 4px; object-fit: contain;
+    border-radius: 6px; object-fit: contain;
     transition: opacity 0.2s ease; margin: 0 auto;
 }
 #quiz-image:hover { opacity: 0.9; }
@@ -296,13 +369,13 @@ select[multiple] {
 #btn-zoom-image:focus-visible { outline: 2px solid var(--primary); }
 
 .audio-player-wrapper {
-    background: #222; border: 1px solid #444; padding: 20px;
+    background: #222; border: 1px solid #444; padding: 24px;
     border-radius: var(--radius); width: 100%; max-width: 450px;
     margin: 0; display: none;
-    flex-direction: column; align-items: center; gap: 12px;
+    flex-direction: column; align-items: center; gap: 14px;
 }
 .audio-player-wrapper audio { width: 100%; }
-.audio-icon { font-size: 48px; color: var(--primary); }
+.audio-icon { font-size: 52px; color: var(--primary); }
 
 .media-controls {
     display: none;
@@ -329,11 +402,11 @@ select[multiple] {
     font-size: 13px;
     color: #ccc;
     margin-top: 10px;
-    background-color: #333;
+    background-color: #222;
     padding: 10px 15px;
-    border-radius: 12px;
+    border-radius: 10px;
     text-align: center;
-    max-width: 90%;
+    width: 100%;
 }
 .quiz-meta a { color: #81c784; text-decoration: none; transition: color 0.2s; }
 .quiz-meta a:hover { text-decoration: underline; color: #a5d6a7; }
@@ -342,23 +415,18 @@ select[multiple] {
     display: none;
     font-size: 12px; 
     color: #aaa; 
-    margin-top: 5px;
-    margin-bottom: 5px;
+    margin-top: 6px;
 }
 
-/* Media Attribution License Link */
 .license-link {
     color: inherit;
     text-decoration: underline;
     transition: opacity 0.2s;
 }
-
-.license-link:hover {
-    opacity: 0.8;
-}
+.license-link:hover { opacity: 0.8; }
 
 .hint-wrapper {
-    margin: 12px 0;
+    margin: 12px 0 20px 0;
     text-align: center;
     width: 100%;
 }
@@ -367,7 +435,7 @@ select[multiple] {
     background-color: #e8f5e9;
     color: var(--primary);
     border: 1px solid var(--primary);
-    padding: 6px 14px;
+    padding: 8px 18px;
     font-size: 13px;
     border-radius: 20px;
     cursor: pointer;
@@ -384,16 +452,16 @@ select[multiple] {
 
 .hint-content {
     margin-top: 10px;
-    padding: 12px 16px;
+    padding: 14px 18px;
     background-color: #fffde7;
     border-left: 4px solid #fbc02d;
-    border-radius: 4px;
-    font-size: 13px;
+    border-radius: 6px;
+    font-size: 14px;
     color: #5d4037;
     text-align: left;
     word-break: break-word;
     white-space: pre-wrap;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
 }
 
 /* ==========================================================================
@@ -403,38 +471,18 @@ select[multiple] {
 #input-rank { flex: 0 0 110px; }
 #input-answer { flex: 1; }
 
-.answer-buttons-row { display: flex; gap: 10px; margin-top: 10px; }
-#btn-submit, #btn-skip {
-    flex: 1;
-}
-#btn-skip {
-    display: none;
-    background-color: #666;
-}
+.answer-buttons-row { display: flex; gap: 10px; margin-top: 12px; }
+#btn-submit, #btn-skip { flex: 1; }
+#btn-skip { display: none; background-color: #666; }
 #btn-skip:hover { background-color: #555; }
 
-#btn-retry {
-    display: none;
-    margin-top: 15px;
-    background-color: #f0ad4e;
-}
-#btn-retry:hover {
-    background-color: #ec971f;
-}
+#btn-retry { display: none; margin-top: 15px; background-color: #f0ad4e; }
+#btn-retry:hover { background-color: #ec971f; }
 
-#btn-skip-end {
-    display: none;
-    margin-top: 15px;
-    background-color: #666;
-}
-#btn-skip-end:hover {
-    background-color: #555;
-}
+#btn-skip-end { display: none; margin-top: 15px; background-color: #666; }
+#btn-skip-end:hover { background-color: #555; }
 
-#btn-next {
-    display: none;
-    margin-top: 15px;
-}
+#btn-next { display: none; margin-top: 15px; }
 
 /* ==========================================================================
    7. Feedback & Errors
@@ -445,8 +493,8 @@ select[multiple] {
 #quiz-loading {
     position: absolute;
     z-index: 5;
-    background: rgba(0, 0, 0, 0.65);
-    padding: 8px 16px;
+    background: rgba(0, 0, 0, 0.75);
+    padding: 10px 20px;
     border-radius: 20px;
     font-size: 14px;
     font-weight: bold;
@@ -463,7 +511,7 @@ select[multiple] {
 }
 .error-hint { color: #aaa; font-weight: normal; }
 
-#feedback { font-weight: bold; margin-top: 15px; padding: 10px; border-radius: var(--radius); display: none; }
+#feedback { font-weight: bold; margin-top: 15px; padding: 12px 16px; border-radius: var(--radius); display: none; }
 #feedback.correct { background-color: #e8f5e9; color: var(--success); border: 1px solid var(--success); }
 #feedback.incorrect { background-color: #fdeaea; color: var(--error); border: 1px solid var(--error); }
 
@@ -477,10 +525,10 @@ select[multiple] {
 .feedback-alias-note { font-size: 0.9em; font-weight: normal; }
 
 /* ==========================================================================
-   8. Results View
+   8. Results View & Multi-Column Card Grid
    ========================================================================== */
 #results-heading { text-align: center; }
-#final-score { text-align: center; font-size: 2.5em; margin-bottom: 20px; }
+#final-score { text-align: center; font-size: clamp(2rem, 4vw, 2.8rem); margin-bottom: 24px; }
 
 .perfect-score-banner {
     text-align: center; padding: 20px; background: #e8f5e9;
@@ -489,53 +537,49 @@ select[multiple] {
 }
 
 .missed-title {
-    font-size: 1.1em; font-weight: bold; margin-bottom: 12px;
-    color: var(--text-main); border-bottom: 2px solid var(--border); padding-bottom: 6px;
+    font-size: 1.1em; font-weight: bold; margin-bottom: 14px;
+    color: var(--text-main); border-bottom: 2px solid var(--border); padding-bottom: 8px;
 }
+
+/* Expands dynamically up to 4 columns on desktop */
 .missed-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 12px; max-height: 420px; overflow-y: auto; padding-right: 5px; margin-bottom: 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 16px;
+    max-height: 520px;
+    overflow-y: auto;
+    padding-right: 5px;
+    margin-bottom: 24px;
 }
+
 .missed-card {
     background: var(--bg-color); border: 1px solid var(--border);
     border-radius: var(--radius); overflow: hidden;
     display: flex; flex-direction: column; font-size: 13px;
 }
-.missed-card img { width: 100%; height: 130px; object-fit: cover; background: #222; }
-.media-placeholder {
-    height: 130px; background: #333; display: flex;
-    align-items: center; justify-content: center; color: #888;
-}
-
-.missed-card-body { padding: 10px; display: flex; flex-direction: column; flex-grow: 1; justify-content: space-between; }
-
 .missed-card-media {
     position: relative;
     width: 100%;
-    height: 130px;
+    height: 140px;
     background: #222;
 }
 
 .missed-card-media img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
+    width: 100%; height: 100%; object-fit: cover; display: block;
 }
 
-/* Attribution overlay badge sitting on the image */
+.media-placeholder {
+    height: 140px; background: #333; display: flex;
+    align-items: center; justify-content: center; color: #888;
+}
+
+.missed-card-body { padding: 12px; display: flex; flex-direction: column; flex-grow: 1; justify-content: space-between; }
+
 .missed-card-attribution {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: rgba(0, 0, 0, 0.65);
-    color: #ffffff;
-    font-size: 10px;
-    padding: 3px 6px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: rgba(0, 0, 0, 0.7); color: #ffffff;
+    font-size: 10px; padding: 3px 6px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 .missed-card-name { font-weight: bold; color: var(--text-main); line-height: 1.2; margin-bottom: 2px; }
@@ -560,58 +604,36 @@ select[multiple] {
     width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh;
     overflow: hidden;
 }
-.zoom-modal::backdrop {
-    background: rgba(0, 0, 0, 0.95);
-}
+.zoom-modal::backdrop { background: rgba(0, 0, 0, 0.95); }
 
 .zoom-loading {
-    position: absolute;
-    top: 50%;
-    left: 50%;
+    position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    color: #ffffff;
-    background: rgba(0, 0, 0, 0.65);
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 14px;
-    font-weight: bold;
-    pointer-events: none;
-    z-index: 10;
-    animation: pulse 1.5s infinite;
-    display: none;
+    color: #ffffff; background: rgba(0, 0, 0, 0.75);
+    padding: 10px 20px; border-radius: 20px;
+    font-size: 14px; font-weight: bold;
+    pointer-events: none; z-index: 10;
+    animation: pulse 1.5s infinite; display: none;
 }
 
-/* css/styles.css */
 .btn-zoom-toggle {
-    background: transparent;
-    border: none;
-    padding: 0;
-    margin: 0;
-    width: auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    background: transparent; border: none; padding: 0; margin: 0;
+    width: auto; display: inline-flex; align-items: center; justify-content: center;
 }
 
 .zoom-modal-content {
-    width: 100%;
-    height: 100%;
-    overflow: auto; /* Restore native scrolling */
-    -webkit-overflow-scrolling: touch;
-    display: grid;
-    place-items: safe center;
+    width: 100%; height: 100%;
+    overflow: auto; -webkit-overflow-scrolling: touch;
+    display: grid; place-items: safe center;
 }
 
 .zoom-modal img {
-    max-width: 100vw;
-    max-height: 100vh;
-    cursor: zoom-in;
-    background: #111;
+    max-width: 100vw; max-height: 100vh;
+    cursor: zoom-in; background: #111;
 }
 
 .zoom-modal img.zoomed-in {
-    max-width: none;
-    max-height: none;
+    max-width: none; max-height: none;
     cursor: zoom-out;
 }
 
@@ -625,10 +647,10 @@ select[multiple] {
 .btn-close-modal:hover { background: #c9302c; }
 
 /* ==========================================================================
-   10. Footer & Utilities
+   10. Footer & License Modal
    ========================================================================== */
 .app-footer {
-    margin-top: 25px; padding-top: 15px; border-top: 1px solid var(--border);
+    margin-top: 30px; padding-top: 15px; border-top: 1px solid var(--border);
     text-align: center; font-size: 12px; color: var(--text-muted);
 }
 .app-footer a { color: var(--primary); text-decoration: none; font-weight: bold; }
@@ -637,111 +659,52 @@ select[multiple] {
 .disabled-link { pointer-events: none; }
 .enabled-link { pointer-events: auto; }
 
-/* Footer License & Source Metadata */
 .app-footer .footer-meta {
-    display: inline-block;
-    margin-top: 6px;
-    opacity: 0.9;
+    display: inline-block; margin-top: 6px; opacity: 0.9;
 }
 
-/* ==========================================================================
-   11. License Modal
-   ========================================================================== */
 .license-modal {
-    border: none;
-    padding: 0;
-    background: transparent;
-    max-width: 850px; /* Increased from 600px to allow clean un-wrapped lines */
-    width: 92%;
+    border: none; padding: 0; background: transparent;
+    max-width: 850px; width: 92%;
     border-radius: var(--radius);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
 }
-
-.license-modal::backdrop {
-    background: rgba(0, 0, 0, 0.8);
-}
+.license-modal::backdrop { background: rgba(0, 0, 0, 0.8); }
 
 .license-modal-container {
-    background: var(--surface);
-    border-radius: var(--radius);
-    padding: 24px;
-    display: flex;
-    flex-direction: column;
-    max-height: 85vh;
+    background: var(--surface); border-radius: var(--radius);
+    padding: 24px; display: flex; flex-direction: column; max-height: 85vh;
 }
 
 .license-modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 12px;
-    margin-bottom: 15px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 15px;
 }
 
-.license-modal-header h2 {
-    margin: 0;
-    font-size: 1.25rem;
-    color: var(--primary);
-}
+.license-modal-header h2 { margin: 0; font-size: 1.25rem; color: var(--primary); }
 
 .license-modal-header .btn-close-modal {
-    position: static;
-    font-size: 20px;
-    width: 32px;
-    height: 32px;
-    flex-shrink: 0;
+    position: static; font-size: 20px; width: 32px; height: 32px; flex-shrink: 0;
 }
 
-.license-modal-content {
-    overflow-y: auto;
-    max-height: 60vh;
-}
+.license-modal-content { overflow-y: auto; max-height: 60vh; }
 
 .license-text {
-    white-space: pre-wrap;
-    word-break: break-word;
+    white-space: pre-wrap; word-break: break-word;
     font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 13px;
-    line-height: 1.5;
-    margin: 0;
-    background: var(--bg-color);
-    padding: 15px;
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
+    font-size: 13px; line-height: 1.5; margin: 0;
+    background: var(--bg-color); padding: 15px;
+    border-radius: var(--radius); border: 1px solid var(--border);
     color: var(--text-main);
 }
 
-.license-loading {
-    text-align: center;
-    padding: 20px;
-    color: var(--text-muted);
-    font-weight: bold;
-}
+.license-loading { text-align: center; padding: 20px; color: var(--text-muted); font-weight: bold; }
 
 .btn-license-link {
-    background: none;
-    border: none;
-    color: var(--primary);
-    text-decoration: none;
-    font-weight: bold;
-    font-size: inherit;
-    padding: 0;
-    cursor: pointer;
-    display: inline;
-    width: auto;
-    font-family: inherit;
-    transition: color 0.2s;
+    background: none; border: none; color: var(--primary);
+    text-decoration: none; font-weight: bold; font-size: inherit;
+    padding: 0; cursor: pointer; display: inline; width: auto;
+    font-family: inherit; transition: color 0.2s;
 }
-
-.btn-license-link:hover {
-    background: transparent;
-    color: var(--primary-hover);
-    text-decoration: underline;
-}
-
-.btn-license-link:focus-visible {
-    outline: 2px solid var(--primary);
-    outline-offset: 2px;
-    border-radius: 2px;
-}
+.btn-license-link:hover { background: transparent; color: var(--primary-hover); text-decoration: underline; }
+.btn-license-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }

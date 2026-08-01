@@ -17,234 +17,255 @@
         <!-- Setup View -->
         <div id="setup-view" class="view active">
             <h1 id="setup-heading" tabindex="-1">Biodiversity Trainer</h1>
-            <p>Learn local species weighted by observation frequency. <em>Subject to synanthropic & observer bias.</em></p>
+            <p class="subtitle">Learn local species weighted by observation frequency. <em>Subject to synanthropic & observer bias.</em></p>
 
             <form id="setup-form">
-                <fieldset class="form-group fieldset-reset">
-                    <legend class="group-label">1. Location</legend>
+                <div class="setup-grid">
                     
-                    <fieldset class="location-toggle fieldset-reset">
-                        <legend class="visually-hidden">Location selection mode</legend>
-                        
-                        <input type="radio" id="mode-search" name="loc-mode" value="search" checked>
-                        <label for="mode-search" class="location-toggle-label">Search Place</label>
-                        
-                        <input type="radio" id="mode-coords" name="loc-mode" value="coords">
-                        <label for="mode-coords" class="location-toggle-label">Custom Coordinates</label>
-                    </fieldset>
+                    <!-- Panel 1: Target Ecosystem Scope -->
+                    <div class="setup-card">
+                        <h2 class="setup-card-title">📍 Target Ecosystem Scope</h2>
 
-                    <!-- Search Mode Section -->
-                    <div id="section-search" class="location-section active">
-                        <div class="input-relative-wrapper">
-                            <input type="text" id="input-place" list="list-place" placeholder="Search a city, park, or country..." autocomplete="off">
-                            <button type="button" id="clear-place" class="btn-clear" aria-label="Clear location input" title="Clear location">&times;</button>
+                        <fieldset class="form-group fieldset-reset">
+                            <legend class="group-label">Location Target</legend>
+                            
+                            <fieldset class="location-toggle fieldset-reset">
+                                <legend class="visually-hidden">Location selection mode</legend>
+                                
+                                <input type="radio" id="mode-search" name="loc-mode" value="search" checked>
+                                <label for="mode-search" class="location-toggle-label">Search Place</label>
+                                
+                                <input type="radio" id="mode-coords" name="loc-mode" value="coords">
+                                <label for="mode-coords" class="location-toggle-label">Custom Coordinates</label>
+                            </fieldset>
+
+                            <!-- Search Mode Section -->
+                            <div id="section-search" class="location-section active">
+                                <div class="input-relative-wrapper">
+                                    <input type="text" id="input-place" list="list-place" placeholder="Search a city, park, or country..." autocomplete="off">
+                                    <button type="button" id="clear-place" class="btn-clear" aria-label="Clear location input" title="Clear location">&times;</button>
+                                </div>
+                                <datalist id="list-place"></datalist>
+                            </div>
+
+                            <!-- Coordinate Mode Section -->
+                            <div id="section-coords" class="location-section">
+                                <button id="btn-gps" type="button">📍 Use My Exact Location (GPS)</button>
+                                <div class="coords-row">
+                                    <div class="coords-group">
+                                        <label for="input-lat">Latitude</label>
+                                        <input type="number" id="input-lat" step="any" min="-90" max="90" placeholder="e.g. 51.0447">
+                                    </div>
+                                    <div class="coords-group">
+                                        <label for="input-lng">Longitude</label>
+                                        <input type="number" id="input-lng" step="any" min="-180" max="180" placeholder="e.g. -114.0719">
+                                    </div>
+                                    <div class="coords-group">
+                                        <label for="input-radius">Radius (km)</label>
+                                        <input type="number" id="input-radius" min="1" max="100" value="10">
+                                    </div>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <div class="form-group">
+                            <label for="input-taxon">Target Taxon Filter (Optional)</label>
+                            <div class="input-relative-wrapper">
+                                <input type="text" id="input-taxon" list="list-taxon" placeholder="e.g., Birds, Fungi, Owls..." autocomplete="off">
+                                <button type="button" id="clear-taxon" class="btn-clear" aria-label="Clear target taxon input" title="Clear taxon">&times;</button>
+                            </div>
+                            <datalist id="list-taxon"></datalist>
                         </div>
-                        <datalist id="list-place"></datalist>
+
+                        <fieldset class="form-group fieldset-reset">
+                            <legend class="group-label">Observation Media Types</legend>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="chk-photos" checked> 📷 Photos
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="chk-sounds"> 🔊 Audio Sounds
+                                </label>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="form-group fieldset-reset">
+                            <legend class="group-label">Seasonality (Months)</legend>
+                            
+                            <div class="quick-selectors" role="group" aria-label="Seasonality quick presets">
+                                <button type="button" class="btn-quick-select" data-months="all">Select All</button>
+                                <button type="button" class="btn-quick-select" data-months="clear">Clear</button>
+                                <button type="button" class="btn-quick-select" data-months="spring">Spring</button>
+                                <button type="button" class="btn-quick-select" data-months="summer">Summer</button>
+                                <button type="button" class="btn-quick-select" data-months="autumn">Autumn</button>
+                                <button type="button" class="btn-quick-select" data-months="winter">Winter</button>
+                            </div>
+
+                            <label for="input-months" class="visually-hidden">Select active months</label>
+                            <select id="input-months" multiple size="6">
+                                <option value="1" selected>January</option>
+                                <option value="2" selected>February</option>
+                                <option value="3" selected>March</option>
+                                <option value="4" selected>April</option>
+                                <option value="5" selected>May</option>
+                                <option value="6" selected>June</option>
+                                <option value="7" selected>July</option>
+                                <option value="8" selected>August</option>
+                                <option value="9" selected>September</option>
+                                <option value="10" selected>October</option>
+                                <option value="11" selected>November</option>
+                                <option value="12" selected>December</option>
+                            </select>
+                        </fieldset>
                     </div>
 
-                    <!-- Coordinate Mode Section -->
-                    <div id="section-coords" class="location-section">
-                        <button id="btn-gps" type="button">📍 Use My Exact Location (GPS)</button>
-                        <div class="coords-row">
-                            <div class="coords-group">
-                                <label for="input-lat">Latitude</label>
-                                <input type="number" id="input-lat" step="any" min="-90" max="90" placeholder="e.g. 51.0447">
+                    <!-- Panel 2: Quiz Engine & Algorithm Tuning -->
+                    <div class="setup-card">
+                        <h2 class="setup-card-title">⚙️ Quiz Engine & Algorithm Rules</h2>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="input-difficulty">Pool Size</label>
+                                <select id="input-difficulty">
+                                    <option value="15">Beginner (Top 15 Most Common)</option>
+                                    <option value="50" selected>Easy (Top 50 Species)</option>
+                                    <option value="125">Medium (Top 125 Species)</option>
+                                    <option value="500">Hard (Top 500 Species)</option>
+                                    <option value="all">Expert (All Observations)</option>
+                                </select>
                             </div>
-                            <div class="coords-group">
-                                <label for="input-lng">Longitude</label>
-                                <input type="number" id="input-lng" step="any" min="-180" max="180" placeholder="e.g. -114.0719">
-                            </div>
-                            <div class="coords-group">
-                                <label for="input-radius">Radius (km)</label>
-                                <input type="number" id="input-radius" min="1" max="100" value="10">
+                            <div class="form-group">
+                                <label for="input-questions">Questions</label>
+                                <select id="input-questions">
+                                    <option value="5">5</option>
+                                    <option value="10" selected>10</option>
+                                    <option value="20">20</option>
+                                    <option value="50">50</option>
+                                </select>
                             </div>
                         </div>
-                    </div>
-                </fieldset>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="input-weighting">Weighting Method</label>
+                                <select id="input-weighting">
+                                    <option value="linear" selected>Linear (True Abundance)</option>
+                                    <option value="log">Logarithmic (Flattened)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="input-establishment">Establishment</label>
+                                <select id="input-establishment">
+                                    <option value="any" selected>Any</option>
+                                    <option value="native">Native Only</option>
+                                    <option value="introduced">Introduced Only</option>
+                                    <option value="endemic">Endemic Only</option>
+                                </select>
+                            </div>
+                        </div>
 
-                <div class="form-group">
-                    <label for="input-taxon">2. Target Taxon (Optional)</label>
-                    <div class="input-relative-wrapper">
-                        <input type="text" id="input-taxon" list="list-taxon" placeholder="e.g., Birds, Fungi, Owls..." autocomplete="off">
-                        <button type="button" id="clear-taxon" class="btn-clear" aria-label="Clear target taxon input" title="Clear taxon">&times;</button>
+                        <div class="form-group checkbox-list">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="chk-badge" checked> Show iconic taxon badge during quiz (e.g., Aves, Insecta)
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="chk-unique" checked> Prevent duplicate species in quiz
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="chk-rarity"> Enable rare mode (inverts frequency weighting)
+                            </label>
+                        </div>
                     </div>
-                    <datalist id="list-taxon"></datalist>
-                </div>
-
-                <fieldset class="form-group fieldset-reset">
-                    <legend class="group-label">3. Observation Media Types</legend>
-                    <div class="checkbox-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="chk-photos" checked> 📷 Photos
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="chk-sounds"> 🔊 Audio Sounds
-                        </label>
-                    </div>
-                </fieldset>
-
-                <fieldset class="form-group fieldset-reset">
-                    <legend class="group-label">4. Seasonality (Months)</legend>
-                    
-                    <div class="quick-selectors" role="group" aria-label="Seasonality quick presets">
-                        <button type="button" class="btn-quick-select" data-months="all">Select All</button>
-                        <button type="button" class="btn-quick-select" data-months="clear">Clear</button>
-                        <button type="button" class="btn-quick-select" data-months="spring">Spring</button>
-                        <button type="button" class="btn-quick-select" data-months="summer">Summer</button>
-                        <button type="button" class="btn-quick-select" data-months="autumn">Autumn</button>
-                        <button type="button" class="btn-quick-select" data-months="winter">Winter</button>
-                    </div>
-
-                    <label for="input-months" class="visually-hidden">Select active months</label>
-                    <select id="input-months" multiple size="6">
-                        <option value="1" selected>January</option>
-                        <option value="2" selected>February</option>
-                        <option value="3" selected>March</option>
-                        <option value="4" selected>April</option>
-                        <option value="5" selected>May</option>
-                        <option value="6" selected>June</option>
-                        <option value="7" selected>July</option>
-                        <option value="8" selected>August</option>
-                        <option value="9" selected>September</option>
-                        <option value="10" selected>October</option>
-                        <option value="11" selected>November</option>
-                        <option value="12" selected>December</option>
-                    </select>
-                </fieldset>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="input-difficulty">5. Pool Size</label>
-                        <select id="input-difficulty">
-                            <option value="15">Beginner (Top 15 Most Common)</option>
-                            <option value="50" selected>Easy (Top 50 Species)</option>
-                            <option value="125">Medium (Top 125 Species)</option>
-                            <option value="500">Hard (Top 500 Species)</option>
-                            <option value="all">Expert (All Observations)</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="input-questions">6. Questions</label>
-                        <select id="input-questions">
-                            <option value="5">5</option>
-                            <option value="10" selected>10</option>
-                            <option value="20">20</option>
-                            <option value="50">50</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="input-weighting">7. Weighting Method</label>
-                        <select id="input-weighting">
-                            <option value="linear" selected>Linear (True Relative Abundance)</option>
-                            <option value="log">Logarithmic (Flattened Diversity)</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="input-establishment">8. Establishment Status</label>
-                        <select id="input-establishment">
-                            <option value="any" selected>Any</option>
-                            <option value="native">Native Only</option>
-                            <option value="introduced">Introduced Only</option>
-                            <option value="endemic">Endemic Only</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="chk-badge" checked> Show iconic taxon badge during quiz (e.g., Aves, Insecta)
-                    </label>
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="chk-unique" checked> Prevent duplicate species in quiz
-                    </label>
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="chk-rarity"> Enable rare mode (inverts frequency weighting)
-                    </label>
                 </div>
 
                 <div id="form-error-message" class="inline-error"></div>
-                <button type="submit" id="btn-start">Load Quiz Pool</button>
+                <button type="submit" id="btn-start" class="btn-primary-large">Load Quiz Pool</button>
             </form>
         </div>
 
         <!-- Quiz View -->
         <div id="quiz-view" class="view">
             <h2 id="quiz-heading" class="visually-hidden" tabindex="-1">Quiz Active</h2>
-            <div class="progress">
-                <span id="quiz-counter" tabindex="-1">Question 1 of 10</span>
-                <span id="quiz-score">Score: 0</span>
-            </div>
             
-            <div class="badge-container">
-                <span id="quiz-target-badge" class="target-badge"></span>
-            </div>
-            
-            <!-- Quiz Media Container -->
-            <div class="quiz-media-container">
-                <div class="quiz-media-stage">
-                    <div id="quiz-loading">Fetching random observation...</div>
-                    <div id="quiz-error"></div>
+            <div class="quiz-grid">
+                <!-- Left Column: Media & Field Notes -->
+                <div class="quiz-media-column">
+                    <div class="quiz-media-container">
+                        <div class="quiz-media-stage">
+                            <div id="quiz-loading">Fetching random observation...</div>
+                            <div id="quiz-error"></div>
+                            
+                            <button type="button" id="btn-zoom-image" aria-label="View full resolution image" title="Click to view full resolution">
+                                <img id="quiz-image" src="" alt="Observation photo">
+                            </button>
+                            
+                            <div id="quiz-audio-container" class="audio-player-wrapper">
+                                <div class="audio-icon" aria-hidden="true">🎧</div>
+                                <audio id="quiz-audio-player" controls preload="auto"></audio>
+                            </div>
+                        </div>
+                        
+                        <span id="quiz-attribution" class="attribution"></span>
+
+                        <div id="media-controls" class="media-controls">
+                            <button type="button" id="btn-prev-media" aria-label="Previous Media">◀</button>
+                            <span id="media-counter">1 / 1</span>
+                            <button type="button" id="btn-next-media" aria-label="Next Media">▶</button>
+                        </div>
+                        
+                        <div id="quiz-meta" class="quiz-meta">
+                            <span id="meta-date"></span>
+                            <a id="meta-location" target="_blank" href="#"></a>
+                            <span id="meta-observer"></span>
+                        </div>
+                    </div>
                     
-                    <button type="button" id="btn-zoom-image" aria-label="View full resolution image" title="Click to view full resolution">
-                        <img id="quiz-image" src="" alt="Observation photo">
-                    </button>
-                    
-                    <div id="quiz-audio-container" class="audio-player-wrapper">
-                        <div class="audio-icon" aria-hidden="true">🎧</div>
-                        <audio id="quiz-audio-player" controls preload="auto"></audio>
+                    <div id="quiz-hint-wrapper" class="hint-wrapper">
+                        <button type="button" id="btn-toggle-hint" class="btn-hint" style="display: none;" aria-expanded="false" aria-controls="quiz-hint-content">
+                            💡 Show Field Notes (Hint)
+                        </button>
+                        <div id="quiz-hint-content" class="hint-content" style="display: none;"></div>
                     </div>
                 </div>
-                
-                <span id="quiz-attribution" class="attribution"></span>
 
-                <div id="media-controls" class="media-controls">
-                    <button type="button" id="btn-prev-media" aria-label="Previous Media">◀</button>
-                    <span id="media-counter">1 / 1</span>
-                    <button type="button" id="btn-next-media" aria-label="Next Media">▶</button>
-                </div>
-                
-                <div id="quiz-meta" class="quiz-meta">
-                    <span id="meta-date"></span>
-                    <a id="meta-location" target="_blank" href="#"></a>
-                    <span id="meta-observer"></span>
-                </div>
-            </div>
-            
-            <div id="quiz-hint-wrapper" class="hint-wrapper">
-                <button type="button" id="btn-toggle-hint" class="btn-hint" style="display: none;" aria-expanded="false" aria-controls="quiz-hint-content">
-                    💡 Show Field Notes (Hint)
-                </button>
-                <div id="quiz-hint-content" class="hint-content" style="display: none;"></div>
-            </div>
-
-            <form class="form-group" id="answer-form">
-                <label for="input-answer">What is this?</label>
-                <div class="answer-inputs-row">
-                    <label for="input-rank" class="visually-hidden">Taxonomic Rank</label>
-                    <select id="input-rank" aria-label="Taxonomic Rank">
-                        <option value="species" selected>Species</option>
-                        <option value="genus">Genus</option>
-                        <option value="family">Family</option>
-                        <option value="order">Order</option>
-                    </select>
-                    <div class="input-relative-wrapper" style="flex: 1;">
-                        <input type="text" id="input-answer" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Common or scientific name...">
-                        <button type="button" id="clear-answer" class="btn-clear" aria-label="Clear answer input" title="Clear input">&times;</button>
+                <!-- Right Column: Question Status & Controls -->
+                <div class="quiz-controls-column">
+                    <div class="progress">
+                        <span id="quiz-counter" tabindex="-1">Question 1 of 10</span>
+                        <span id="quiz-score">Score: 0</span>
                     </div>
-                </div>
-                <div class="answer-buttons-row">
-                    <button type="submit" id="btn-submit">Check Answer</button>
-                    <button type="button" id="btn-skip">Skip</button>
-                </div>
-            </form>
+                    
+                    <div class="badge-container">
+                        <span id="quiz-target-badge" class="target-badge"></span>
+                    </div>
 
-            <div id="feedback"></div>
-            <button type="button" id="btn-retry">Retry Loading ↻</button>
-            <button type="button" id="btn-skip-end">Skip to End ➔</button>
-            <button type="button" id="btn-next">Next Observation ➔</button>
+                    <form class="form-group" id="answer-form">
+                        <label for="input-answer">What species is this?</label>
+                        <div class="answer-inputs-row">
+                            <label for="input-rank" class="visually-hidden">Taxonomic Rank</label>
+                            <select id="input-rank" aria-label="Taxonomic Rank">
+                                <option value="species" selected>Species</option>
+                                <option value="genus">Genus</option>
+                                <option value="family">Family</option>
+                                <option value="order">Order</option>
+                            </select>
+                            <div class="input-relative-wrapper" style="flex: 1;">
+                                <input type="text" id="input-answer" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Common or scientific name...">
+                                <button type="button" id="clear-answer" class="btn-clear" aria-label="Clear answer input" title="Clear input">&times;</button>
+                            </div>
+                        </div>
+                        <div class="answer-buttons-row">
+                            <button type="submit" id="btn-submit">Check Answer</button>
+                            <button type="button" id="btn-skip">Skip</button>
+                        </div>
+                    </form>
+
+                    <div id="feedback"></div>
+                    <button type="button" id="btn-retry">Retry Loading ↻</button>
+                    <button type="button" id="btn-skip-end">Skip to End ➔</button>
+                    <button type="button" id="btn-next">Next Observation ➔</button>
+                </div>
+            </div>
         </div>
 
         <!-- Results View -->
@@ -254,7 +275,7 @@
             
             <div id="review-container"></div>
             
-            <button type="button" id="btn-restart">Play Again</button>
+            <button type="button" id="btn-restart" class="btn-primary-large">Play Again</button>
         </div>
         
         <!-- Accessible Zoom Modal -->
