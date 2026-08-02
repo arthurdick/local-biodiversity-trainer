@@ -379,7 +379,7 @@ export const fetchObservation = async ({
         captive: 'false',
         per_page: '1',
         page: String(page),
-        rank: 'species,subspecies',
+        hrank: 'species',
         fields: '(id:!t,uuid:!t,description:!t,observed_on:!t,place_guess:!t,location:!t,geoprivacy:!t,taxon_geoprivacy:!t,license_code:!t,user:(login:!t,name:!t),taxon:(id:!t,name:!t,preferred_common_name:!t,iconic_taxon_name:!t,iconic_taxon_id:!t,ancestor_ids:!t),photos:(url:!t,attribution:!t,license_code:!t),sounds:(file_url:!t,attribution:!t,license_code:!t))',
         locale: locale
     });
@@ -435,7 +435,23 @@ export const fetchSimilarTaxa = async (taxonId, signal) => {
 };
 
 export const checkTaxonSearch = async (inputStr, guessedRank, signal, locale = getLocale()) => {
-    const rankQuery = guessedRank === 'species' ? 'species,subspecies,variety,form' : guessedRank;
+    let rankQuery;
+    switch (guessedRank) {
+        case 'species':
+            rankQuery = 'species,subspecies,variety,form,hybrid';
+            break;
+        case 'genus':
+            rankQuery = 'genus,genushybrid';
+            break;
+        case 'family':
+            rankQuery = 'family,subfamily,supertribe,tribe,subtribe';
+            break;
+        case 'order':
+            rankQuery = 'order,suborder,infraorder';
+            break;
+        default:
+            rankQuery = guessedRank;
+    }
     const params = new URLSearchParams({
         q: inputStr,
         rank: rankQuery,
