@@ -1,23 +1,12 @@
-/**
- * js/urlService.js
- * Bi-directional URL parameter parsing, sanitization, share link generation, and score card formatting.
- */
-
-/**
- * Parses and sanitizes URL query parameters from window.location.search.
- * @returns {Object} Clean configuration patch derived from URL parameters.
- */
 export function parseUrlParams() {
     const params = new URLSearchParams(window.location.search);
     const urlConfig = {};
 
-    // 1. Quiz Mode
     const rawMode = params.get('mode');
     if (['daily', 'custom'].includes(rawMode)) {
         urlConfig.quizMode = rawMode;
     }
 
-    // 2. Location Mode & Coordinates vs. Place
     if (params.has('place')) {
         const placeId = parseInt(params.get('place'), 10);
         if (!isNaN(placeId) && placeId > 0) {
@@ -38,7 +27,6 @@ export function parseUrlParams() {
         }
     }
 
-    // 3. Target Taxon Filter
     if (params.has('taxon')) {
         const taxonId = parseInt(params.get('taxon'), 10);
         if (!isNaN(taxonId) && taxonId > 0) {
@@ -47,7 +35,6 @@ export function parseUrlParams() {
         }
     }
 
-    // 4. Media Options
     if (params.has('photos')) {
         urlConfig.wantsPhotos = params.get('photos') !== '0';
     }
@@ -55,7 +42,6 @@ export function parseUrlParams() {
         urlConfig.wantsSounds = params.get('sounds') === '1';
     }
 
-    // 5. Gameplay Rules
     if (params.has('q')) {
         const qCount = parseInt(params.get('q'), 10);
         if ([5, 10, 20, 50].includes(qCount)) {
@@ -74,7 +60,6 @@ export function parseUrlParams() {
         }
     }
 
-    // 6. Daily Date Override
     if (params.has('date')) {
         const rawDate = params.get('date');
         if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
@@ -85,16 +70,9 @@ export function parseUrlParams() {
     return urlConfig;
 }
 
-/**
- * Builds a clean, canonical share URL string based on active form state.
- * @param {Object} formState - The current state.form or state.config object.
- * @param {'daily'|'custom'} [mode='custom'] - The mode to encode into the link.
- * @returns {string} Full shareable URL.
- */
 export function buildShareableUrl(formState, mode = 'custom') {
     const baseUrl = window.location.protocol + '//' + window.location.host + window.location.pathname;
 
-    // Custom Mode shares link directly to the base application root
     if (mode === 'custom') {
         return baseUrl;
     }
@@ -116,7 +94,6 @@ export function buildShareableUrl(formState, mode = 'custom') {
         url.searchParams.set('taxon', String(formState.taxonId));
     }
 
-    // Encode Media Options in Daily Mode
     if (formState.wantsPhotos === false) {
         url.searchParams.set('photos', '0');
     }
@@ -134,35 +111,23 @@ export function buildShareableUrl(formState, mode = 'custom') {
     return url.toString();
 }
 
-/**
- * Copies a generated share link to the user's clipboard.
- * @param {Object} formState - Active form configuration.
- * @param {'daily'|'custom'} mode - Mode to encode.
- * @returns {Promise<boolean>} Resolves to true on success, false on failure.
- */
 export async function copyShareLinkToClipboard(formState, mode = 'custom') {
     const shareUrl = buildShareableUrl(formState, mode);
     return copyToClipboard(shareUrl);
 }
 
-/**
- * Generates a Wordle-style formatted text block representing quiz performance.
- * @param {Object} state - Full application state tree.
- * @returns {string} Formatted shareable result text block.
- */
 export function generateResultShareText(state) {
-    const { questions, score, form, config } = state;
+    const { game, form, config } = state;
+    const { questions, score } = game;
     const total = questions.length;
     const isDaily = !!config.isDailyMode || !!form.isDailyMode;
     const isReplay = !!config.isReplay;
 
-    // 1. Title Header
     const dateStr = form.dailySeedDate || config.dailySeedDate || new Date().toISOString().split('T')[0];
     const header = isDaily 
         ? `Local Bio Daily 📅 (${dateStr})`
         : `Local Biodiversity Trainer 🌿`;
 
-    // 2. Location Line
     let locationLine = '';
     if (form.locMode === 'search' && form.placeName) {
         locationLine = `📍 ${form.placeName}`;
@@ -170,14 +135,12 @@ export function generateResultShareText(state) {
         locationLine = `📍 Coordinates (${Number(form.lat).toFixed(3)}, ${Number(form.lng).toFixed(3)})`;
     }
 
-    // 3. Score Line
     const formattedScore = Number((score / 10).toFixed(1));
     let scoreLine = `Score: ${formattedScore} / ${total}`;
     if (isDaily && isReplay) {
         scoreLine += ` (Replay)`;
     }
 
-    // 4. Emoji Row Generation (Chunked in rows of 10)
     const emojis = questions.map(q => {
         if (q.isSkipped) return '⬜';
         if (q.isCorrect) {
@@ -193,7 +156,6 @@ export function generateResultShareText(state) {
     }
     const emojiBlock = emojiRows.join('\n');
 
-    // 5. Challenge Link
     const mode = isDaily ? 'daily' : 'custom';
     const shareUrl = buildShareableUrl(config, mode);
 
@@ -206,11 +168,6 @@ export function generateResultShareText(state) {
     ].filter(Boolean).join('\n');
 }
 
-/**
- * Copies the Wordle-style result text block to the user's clipboard.
- * @param {Object} state - Full application state tree.
- * @returns {Promise<boolean>}
- */
 export async function copyResultToClipboard(state) {
     const resultText = generateResultShareText(state);
     return copyToClipboard(resultText);

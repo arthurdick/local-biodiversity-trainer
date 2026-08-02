@@ -5,10 +5,6 @@ import * as ui from './ui.js';
 import * as observationService from './observationService.js';
 import { parseUrlParams, copyResultToClipboard, copyShareLinkToClipboard, buildShareableUrl } from './urlService.js';
 
-// ==========================================================================
-// EVENT TARGET LIFECYCLE ROUTER
-// ==========================================================================
-
 const debouncedSavePreferences = debounce(savePreferences, 300);
 
 store.addEventListener('statechange', (e) => {
@@ -21,22 +17,22 @@ store.addEventListener('statechange', (e) => {
 });
 
 store.addEventListener('quiz:start', () => {
-    observationService.loadObservationForQuestion(store.getState().currentIndex);
+    observationService.loadObservationForQuestion(store.getState().game.currentIndex);
 });
 
 store.addEventListener('quiz:next', () => {
-    observationService.loadObservationForQuestion(store.getState().currentIndex);
+    observationService.loadObservationForQuestion(store.getState().game.currentIndex);
 });
 
 store.addEventListener('quiz:retry', () => {
     const s = store.getState();
-    const q = s.questions[s.currentIndex];
+    const q = s.game.questions[s.game.currentIndex];
     
     if (q.observation && !q.observation.error) {
         checkMediaReadiness();
     } else {
-        store.updateQuestion(s.currentIndex, { observation: null });
-        observationService.loadObservationForQuestion(s.currentIndex);
+        store.updateQuestion(s.game.currentIndex, { observation: null });
+        observationService.loadObservationForQuestion(s.game.currentIndex);
     }
 });
 
@@ -44,11 +40,11 @@ store.addEventListener('observation:loaded', (e) => {
     const { index, error, emptyPool } = e.detail;
     const s = store.getState();
     
-    if (index !== s.currentIndex) return;
+    if (index !== s.game.currentIndex) return;
     
     if (error) {
         if (emptyPool && s.config.difficulty === 'all') {
-            if (s.currentIndex === 0) {
+            if (s.game.currentIndex === 0) {
                 store.setState(prev => ({
                     ui: {
                         ...prev.ui,
@@ -79,24 +75,18 @@ store.addEventListener('observation:loaded', async (e) => {
     const { index, error } = e.detail;
     const initialState = store.getState();
 
-    // Early exit if the observation failed to load or multiple choice mode is disabled
     if (error || !initialState.config.isMultipleChoice) return;
 
-    const q = initialState.questions[index];
+    const q = initialState.game.questions[index];
     const targetTaxon = q?.observation?.taxon || q?.taxon;
 
-    // Early exit if there is no valid target taxon or options are already generated
     if (!targetTaxon || q.mcOptions) return;
 
-    /**
-     * Helper guard to verify that the session state, view, and target question
-     * remain valid and unfulfilled across asynchronous network boundary awaits.
-     */
     const isStillValid = (idx, targetId) => {
         const s = store.getState();
         if (s.ui.activeView !== 'quiz-view') return false;
         
-        const currentQ = s.questions[idx];
+        const currentQ = s.game.questions[idx];
         if (!currentQ) return false;
 
         const currentTaxon = currentQ.observation?.taxon || currentQ.taxon;
@@ -105,21 +95,17 @@ store.addEventListener('observation:loaded', async (e) => {
 
     let distractorPool = [];
 
-    // Gather all taxon IDs currently assigned to questions in the active session
     const sessionTaxonIds = new Set(
-        initialState.questions
+        initialState.game.questions
             .map(quest => quest.taxon?.id || quest.observation?.taxon?.id)
             .filter(Boolean)
     );
-    // Always exclude the target taxon itself from candidate distractors
     sessionTaxonIds.add(targetTaxon.id);
 
     const isExcluded = (id) => sessionTaxonIds.has(id) || distractorPool.some(d => d.id === id);
 
-    // --- GUARD CHECK BEFORE TIER 1 ---
     if (!isStillValid(index, targetTaxon.id)) return;
 
-    // --- TIER 1: Fetch Lookalikes from iNaturalist API ---
     try {
         const similarData = await api.fetchSimilarTaxa(targetTaxon.id);
         (similarData?.results || []).forEach(item => {
@@ -131,10 +117,8 @@ store.addEventListener('observation:loaded', async (e) => {
         console.warn('Could not fetch similar species API:', err);
     }
 
-    // --- GUARD CHECK BEFORE TIER 2 ---
     if (!isStillValid(index, targetTaxon.id)) return;
 
-    // --- TIER 2: Fetch Regional Iconic Taxon Species (Same Group in Region) ---
     if (distractorPool.length < 3 && targetTaxon.iconic_taxon_name) {
         const currentConfig = store.getState().config;
         try {
@@ -162,10 +146,8 @@ store.addEventListener('observation:loaded', async (e) => {
         }
     }
 
-    // --- GUARD CHECK BEFORE TIER 3 ---
     if (!isStillValid(index, targetTaxon.id)) return;
 
-    // --- TIER 3: Fetch Broad Regional Species (Any Local Species) ---
     if (distractorPool.length < 3) {
         const currentConfig = store.getState().config;
         try {
@@ -192,12 +174,11 @@ store.addEventListener('observation:loaded', async (e) => {
         }
     }
 
-    // --- FINAL VALIDATION & RENDER ---
     if (isStillValid(index, targetTaxon.id)) {
         const currentState = store.getState();
         const options = engine.generateMultipleChoiceOptions(
             targetTaxon,
-            currentState.regionalPool,
+            currentState.game.regionalPool,
             distractorPool,
             sessionTaxonIds
         );
@@ -209,7 +190,7 @@ store.addEventListener('observation:loaded', async (e) => {
 store.addEventListener('media:ready', () => {
     const s = store.getState();
     if (s.ui.activeView === 'quiz-view') {
-        observationService.loadObservationForQuestion(s.currentIndex + 1);
+        observationService.loadObservationForQuestion(s.game.currentIndex + 1);
     }
 });
 
@@ -222,7 +203,7 @@ function checkMediaReadiness() {
     if (s.ui.activeView !== 'quiz-view' || s.ui.isMediaLoaded) return;
 
     const mediaArray = selectCurrentMedia(s);
-    const currentMedia = mediaArray[s.currentMediaIndex];
+    const currentMedia = mediaArray[s.game.currentMediaIndex];
 
     if (currentMedia?.type === 'photo') {
         const imgEl = document.getElementById('quiz-image');
@@ -240,12 +221,10 @@ function checkMediaReadiness() {
 }
 
 function syncUrlWithState(state) {
-    // Only update address bar while on the setup screen
     if (state.ui.activeView !== 'setup-view') return;
 
     const cleanBase = window.location.protocol + "//" + window.location.host + window.location.pathname;
 
-    // Do not wipe URL search parameters if the session was loaded via a deep link / URL challenge
     if (state.ui.isUrlChallenge) return;
 
     if (state.form.isDailyMode) {
@@ -254,7 +233,6 @@ function syncUrlWithState(state) {
             window.history.replaceState(null, '', activeDailyUrl);
         }
     } else if (window.location.search) {
-        // Clear query parameters in standard Custom Mode
         window.history.replaceState(null, '', cleanBase);
     }
 }
@@ -263,10 +241,8 @@ const setupForm = document.getElementById('setup-form');
 if (setupForm) {
     ['input', 'change', 'click'].forEach(eventType => {
         setupForm.addEventListener(eventType, (e) => {
-            // Ignore main form submission triggers
             if (e.target.id === 'btn-start' || e.target.id === 'btn-trigger-daily') return;
 
-            // Delegated check: Reset URL challenge mode on first user edit
             if (store.getState().ui.isUrlChallenge) {
                 store.setState(prev => ({
                     ui: { ...prev.ui, isUrlChallenge: false }
@@ -281,7 +257,7 @@ function finishQuizSession() {
     
     if (s.config.isDailyMode) {
         const locKey = engine.buildLocationSeedKey(s.config);
-        saveInitialDailyScore(locKey, s.score, s.questions.length);
+        saveInitialDailyScore(locKey, s.game.score, s.game.questions.length);
     }
 
     store.setState(prev => ({
@@ -387,7 +363,6 @@ function savePreferences() {
         
         const prefsToSave = { ...currentForm };
         
-        // Wipe raw text from preferences if no valid item ID is tied to it
         if (!prefsToSave.placeId) prefsToSave.placeName = '';
         if (!prefsToSave.taxonId) prefsToSave.taxonName = '';
         if (!prefsToSave.userId) prefsToSave.userLogin = '';
@@ -520,14 +495,12 @@ function setupAutocomplete(config) {
     inputEl.addEventListener('input', (e) => {
         const query = e.target.value;
 
-        // Cancel any pending debounced search or active fetch
         performSearch.cancel();
         if (abortController) {
             abortController.abort();
             abortController = null;
         }
 
-        // Clear the ID on raw typing; force explicit selection via click/keyboard
         store.setState(prev => ({
             form: { ...prev.form, [id]: null, [name]: query },
             ui: { ...prev.ui, [activeIdx]: -1, [error]: null }
@@ -587,14 +560,12 @@ function setupAutocomplete(config) {
 
     listEl.addEventListener('mousemove', (e) => e.currentTarget.classList.remove('using-keyboard'));
 
-    // Prevent input blur when pressing down on list items
     listEl.addEventListener('mousedown', (e) => {
         if (e.target.closest('li')) {
             e.preventDefault();
         }
     });
 
-    // Handle item selection cleanly on standard click event
     listEl.addEventListener('click', (e) => {
         const li = e.target.closest('li');
         if (li) {
@@ -613,7 +584,6 @@ function setupAutocomplete(config) {
     });
 
     if (clearBtn) {
-        // Prevent the button from stealing focus to avoid triggering a premature 'blur' on the input
         clearBtn.addEventListener('mousedown', (e) => e.preventDefault());
         
         clearBtn.addEventListener('click', () => {
@@ -663,7 +633,6 @@ document.getElementById('btn-gps').addEventListener('click', () => {
     store.setState(prev => ({ ui: { ...prev.ui, isLocatingGps: true } }));
     navigator.geolocation.getCurrentPosition(
         (pos) => {
-            // Round to 3 decimal places immediately on capture
             const lat = Number(pos.coords.latitude.toFixed(3));
             const lng = Number(pos.coords.longitude.toFixed(3));
 
@@ -688,7 +657,7 @@ function exitDailyMode() {
         console.warn('Could not read saved preferences on exit:', e);
     }
 
-    ui.clearDOMCache(); // Clear UI cache on mode exit
+    ui.clearDOMCache();
 
     store.setState(prev => ({
         form: {
@@ -754,13 +723,11 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
         store.setState(prev => ({ ui: { ...prev.ui, placeError, setupError, taxonError, userError } })); return;
     }
 
-    // Cancel pending debounced save and persist preferences immediately
     debouncedSavePreferences.cancel();
     savePreferences();
     observationService.clearCache();
     ui.clearDOMCache();
 
-    // Determine if this Daily Challenge run is a Replay!
     let isReplay = false;
     if (s.form.isDailyMode) {
         const locKey = engine.buildLocationSeedKey(s.form);
@@ -865,8 +832,13 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
 
         store.setState(prev => ({
             config: { ...prev.config, expertTotalSpecies: expertCount },
-            regionalPool: regionalResults,
-            questions: pool, currentIndex: 0, score: 0, currentMediaIndex: 0,
+            game: {
+                regionalPool: regionalResults,
+                questions: pool,
+                currentIndex: 0,
+                score: 0,
+                currentMediaIndex: 0
+            },
             form: { ...prev.form, answerInput: '', rankInput: 'species' },
             ui: { ...prev.ui, isLoadingQuizPool: false, activeView: 'quiz-view', quizError: null, isCheckingAnswer: false, isHintVisible: false, isMediaLoaded: false }
         }));
@@ -883,7 +855,7 @@ document.getElementById('setup-form').addEventListener('submit', async (e) => {
 
 document.getElementById('quiz-image').onload = (e) => {
     const s = store.getState();
-    const media = selectCurrentMedia(s)[s.currentMediaIndex];
+    const media = selectCurrentMedia(s)[s.game.currentMediaIndex];
     if (media && e.target.dataset.src === media.mediumUrl) {
         store.setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true } }));
         store.dispatchEvent(new CustomEvent('media:ready'));
@@ -895,7 +867,7 @@ document.getElementById('quiz-audio-player').onerror = () => store.setState(prev
 
 document.getElementById('quiz-audio-player').oncanplay = (e) => {
     const s = store.getState();
-    const media = selectCurrentMedia(s)[s.currentMediaIndex];
+    const media = selectCurrentMedia(s)[s.game.currentMediaIndex];
     if (media && media.type === 'sound' && e.target.dataset.src === media.fileUrl) {
         store.setState(prev => ({ ui: { ...prev.ui, isMediaLoaded: true } }));
         store.dispatchEvent(new CustomEvent('media:ready'));
@@ -903,16 +875,22 @@ document.getElementById('quiz-audio-player').oncanplay = (e) => {
 };
 
 document.getElementById('btn-prev-media').addEventListener('click', () => {
-    if (store.getState().currentMediaIndex > 0) {
-        store.setState(prev => ({ currentMediaIndex: prev.currentMediaIndex - 1, ui: { ...prev.ui, isMediaLoaded: false } }));
+    if (store.getState().game.currentMediaIndex > 0) {
+        store.setState(prev => ({
+            game: { ...prev.game, currentMediaIndex: prev.game.currentMediaIndex - 1 },
+            ui: { ...prev.ui, isMediaLoaded: false }
+        }));
         store.dispatchEvent(new CustomEvent('media:navigate'));
     }
 });
 
 document.getElementById('btn-next-media').addEventListener('click', () => {
     const s = store.getState();
-    if (s.currentMediaIndex < selectCurrentMedia(s).length - 1) {
-        store.setState(prev => ({ currentMediaIndex: prev.currentMediaIndex + 1, ui: { ...prev.ui, isMediaLoaded: false } }));
+    if (s.game.currentMediaIndex < selectCurrentMedia(s).length - 1) {
+        store.setState(prev => ({
+            game: { ...prev.game, currentMediaIndex: prev.game.currentMediaIndex + 1 },
+            ui: { ...prev.ui, isMediaLoaded: false }
+        }));
         store.dispatchEvent(new CustomEvent('media:navigate'));
     }
 });
@@ -921,7 +899,7 @@ document.getElementById('btn-toggle-hint').addEventListener('click', () => store
 
 // Modal Bindings
 document.getElementById('btn-zoom-image').addEventListener('click', () => {
-    const media = selectCurrentMedia(store.getState())[store.getState().currentMediaIndex];
+    const media = selectCurrentMedia(store.getState())[store.getState().game.currentMediaIndex];
     store.setState(prev => ({ ui: { ...prev.ui, zoomMediaUrl: media.originalUrl, isZoomedIn: false } }));
 });
 document.getElementById('zoom-modal-img').addEventListener('load', (e) => {
@@ -1027,10 +1005,10 @@ document.getElementById('clear-answer').addEventListener('click', () => {
 
 document.getElementById('btn-skip').addEventListener('click', () => {
     let s = store.getState();
-    const q = s.questions[s.currentIndex];
+    const q = s.game.questions[s.game.currentIndex];
     const mediaInfo = engine.getQuestionThumbnail(q, selectCurrentMedia(s));
 
-    store.updateQuestion(s.currentIndex, {
+    store.updateQuestion(s.game.currentIndex, {
         isAnswered: true, userAnswer: "(Skipped)", isCorrect: false, pointsEarned: 0, thumbnailUrl: mediaInfo.url, mediaAttribution: mediaInfo.attribution, isSkipped: true
     });
     
@@ -1042,7 +1020,7 @@ document.getElementById('answer-form').addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const s = store.getState();
-    const q = s.questions[s.currentIndex];
+    const q = s.game.questions[s.game.currentIndex];
 
     if (s.ui.isCheckingAnswer || q.isAnswered) return;
 
@@ -1068,7 +1046,7 @@ document.getElementById('answer-form').addEventListener('submit', async (e) => {
 
     const mediaInfo = engine.getQuestionThumbnail(q, selectCurrentMedia(store.getState()));
 
-    store.updateQuestion(s.currentIndex, {
+    store.updateQuestion(s.game.currentIndex, {
         isAnswered: true,
         userAnswer: `${inputStr} (${s.form.rankInput})`,
         guessedRank: s.form.rankInput,
@@ -1080,7 +1058,9 @@ document.getElementById('answer-form').addEventListener('submit', async (e) => {
         isSkipped: false
     });
 
-    if (isCorrect) store.setState(prev => ({ score: prev.score + pointsEarned }));
+    if (isCorrect) {
+        store.setState(prev => ({ game: { ...prev.game, score: prev.game.score + pointsEarned } }));
+    }
     store.setState(prev => ({ ui: { ...prev.ui, isCheckingAnswer: false } }));
     
     const btnNext = document.getElementById('btn-next');
@@ -1092,7 +1072,7 @@ document.getElementById('mc-options-container')?.addEventListener('click', (e) =
     if (!btn || btn.disabled) return;
 
     const s = store.getState();
-    const q = s.questions[s.currentIndex];
+    const q = s.game.questions[s.game.currentIndex];
     if (q.isAnswered) return;
 
     const chosenId = parseInt(btn.dataset.taxonId, 10);
@@ -1103,7 +1083,7 @@ document.getElementById('mc-options-container')?.addEventListener('click', (e) =
     const pointsEarned = isCorrect ? 10 : 0;
     const mediaInfo = engine.getQuestionThumbnail(q, selectCurrentMedia(s));
 
-    store.updateQuestion(s.currentIndex, {
+    store.updateQuestion(s.game.currentIndex, {
         isAnswered: true,
         userAnswer: cleanDisplayName,
         userAnswerId: chosenId,
@@ -1116,7 +1096,9 @@ document.getElementById('mc-options-container')?.addEventListener('click', (e) =
         isSkipped: false
     });
 
-    if (isCorrect) store.setState(prev => ({ score: prev.score + pointsEarned }));
+    if (isCorrect) {
+        store.setState(prev => ({ game: { ...prev.game, score: prev.game.score + pointsEarned } }));
+    }
 
     const btnNext = document.getElementById('btn-next');
     if (btnNext) btnNext.focus();
@@ -1135,7 +1117,7 @@ window.addEventListener('keydown', (e) => {
     const s = store.getState();
     if (s.ui.activeView !== 'quiz-view' || !s.config.isMultipleChoice) return;
 
-    const q = s.questions[s.currentIndex];
+    const q = s.game.questions[s.game.currentIndex];
     if (!q || q.isAnswered || s.ui.isCheckingAnswer) return;
 
     if (['1', '2', '3', '4'].includes(e.key)) {
@@ -1151,12 +1133,16 @@ window.addEventListener('keydown', (e) => {
 
 document.getElementById('btn-next').addEventListener('click', () => {
     const s = store.getState();
-    const nextIdx = s.currentIndex + 1;
-    if (nextIdx >= s.questions.length) {
+    const nextIdx = s.game.currentIndex + 1;
+    if (nextIdx >= s.game.questions.length) {
         finishQuizSession();
     } else {
         store.setState(prev => ({
-            currentIndex: nextIdx, currentMediaIndex: 0,
+            game: {
+                ...prev.game,
+                currentIndex: nextIdx,
+                currentMediaIndex: 0
+            },
             form: { ...prev.form, answerInput: '', rankInput: 'species' },
             ui: { ...prev.ui, isMediaLoaded: false, isCheckingAnswer: false, quizError: null, isHintVisible: false }
         }));
@@ -1183,7 +1169,10 @@ document.getElementById('btn-skip-end').addEventListener('click', () => {
     observationService.clearCache();
     finishQuizSession();
     store.setState(prev => ({
-        questions: prev.questions.slice(0, prev.currentIndex)
+        game: {
+            ...prev.game,
+            questions: prev.game.questions.slice(0, prev.game.currentIndex)
+        }
     }));
 });
 
@@ -1191,11 +1180,13 @@ document.getElementById('btn-restart').addEventListener('click', () => {
     observationService.clearCache();
     ui.clearDOMCache();
     store.setState(prev => ({
-        currentIndex: 0,
-        score: 0,
-        currentMediaIndex: 0,
-        regionalPool: [],
-        questions: [],
+        game: {
+            currentIndex: 0,
+            score: 0,
+            currentMediaIndex: 0,
+            regionalPool: [],
+            questions: []
+        },
         form: {
             ...prev.form,
             answerInput: '',
@@ -1242,11 +1233,9 @@ document.getElementById('btn-share-link')?.addEventListener('click', async (e) =
 
 // --- APP BOOTSTRAPPING ---
 async function bootApplication() {
-    // 1. Parse URL parameters FIRST before any state changes occur
     const urlOverrides = parseUrlParams();
     const hasUrlOverrides = Object.keys(urlOverrides).length > 0;
 
-    // 2. Read saved localStorage preferences without committing to state yet
     let savedPrefs = {};
     try {
         const saved = localStorage.getItem('bio_trainer_prefs');
@@ -1257,7 +1246,6 @@ async function bootApplication() {
         console.warn("Could not load preferences:", e);
     }
 
-    // 3. Compose initial form state (base -> preferences -> URL overrides)
     let initialForm = {
         ...store.getState().form,
         ...savedPrefs
@@ -1275,7 +1263,6 @@ async function bootApplication() {
         }
     }
 
-    // 4. Commit settled state in a SINGLE store update
     store.setState(prev => ({
         form: initialForm,
         ui: {
@@ -1284,7 +1271,6 @@ async function bootApplication() {
         }
     }));
 
-    // 5. Asynchronously hydrate place and taxon display names if loaded via ID
     if (hasUrlOverrides) {
         if (urlOverrides.placeId && !store.getState().form.placeName) {
             try {
@@ -1319,7 +1305,6 @@ async function bootApplication() {
         }
     }
 
-    // Render final resolved state and reveal the application
     ui.render(store.getState());
     document.getElementById('app').classList.remove('booting');
 }

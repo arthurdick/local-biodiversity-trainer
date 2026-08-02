@@ -22,9 +22,9 @@ export function clearCache() {
 
 export async function loadObservationForQuestion(index) {
     const s = store.getState();
-    if (index >= s.questions.length) return;
+    if (index >= s.game.questions.length) return;
     
-    if (s.questions[index].observation) return s.questions[index].observation;
+    if (s.game.questions[index].observation) return s.game.questions[index].observation;
     if (pendingFetches.has(index)) return pendingFetches.get(index);
 
     const requestSessionId = currentSessionId;
@@ -32,7 +32,7 @@ export async function loadObservationForQuestion(index) {
     activeControllers.set(index, controller);
 
     const fetchPromise = (async () => {
-        const q = store.getState().questions[index];
+        const q = store.getState().game.questions[index];
         const currentConfig = store.getState().config;
         
         const isStandardExpert = currentConfig.difficulty === 'all' && !currentConfig.isRarityMode;
@@ -49,7 +49,7 @@ export async function loadObservationForQuestion(index) {
                 await previousLock.catch(() => {});
 
                 try {
-                    targetTaxon = store.getState().questions[index].taxon;
+                    targetTaxon = store.getState().game.questions[index].taxon;
 
                     if (!targetTaxon) {
                         const totalSpecies = currentConfig.expertTotalSpecies || 0;
@@ -80,11 +80,11 @@ export async function loadObservationForQuestion(index) {
 
                             if (deepData.results && deepData.results.length > 0) {
                                 if (currentConfig.preventDuplicates) {
-                                    const existingIds = store.getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined);
+                                    const existingIds = store.getState().game.questions.map(quest => quest.taxon?.id).filter(id => id !== undefined);
                                     validResults = deepData.results.filter(r => !existingIds.includes(r.taxon.id));
                                 } else {
                                     const existingIdCounts = {};
-                                    store.getState().questions.forEach(quest => {
+                                    store.getState().game.questions.forEach(quest => {
                                         if (quest.taxon?.id) existingIdCounts[quest.taxon.id] = (existingIdCounts[quest.taxon.id] || 0) + 1;
                                     });
                                     
@@ -133,7 +133,7 @@ export async function loadObservationForQuestion(index) {
             }
             
             const withoutTaxonIds = (isStandardExpert && currentConfig.preventDuplicates && !targetTaxon)
-                ? store.getState().questions.map(quest => quest.taxon?.id).filter(id => id !== undefined)
+                ? store.getState().game.questions.map(quest => quest.taxon?.id).filter(id => id !== undefined)
                 : [];
                 
             let notObsIds = [];
@@ -141,12 +141,12 @@ export async function loadObservationForQuestion(index) {
             if (isStandardExpert && currentConfig.preventDuplicates && !targetTaxon) {
                 notObsIds = [];
             } else if (targetTaxon) {
-                notObsIds = store.getState().questions
+                notObsIds = store.getState().game.questions
                     .filter(quest => quest.taxon?.id === targetTaxon.id)
                     .map(quest => quest.observation?.uuid)
                     .filter(uuid => uuid !== undefined);
             } else {
-                notObsIds = store.getState().questions
+                notObsIds = store.getState().game.questions
                     .map(quest => quest.observation?.uuid)
                     .filter(uuid => uuid !== undefined);
             }

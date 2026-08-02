@@ -1,96 +1,89 @@
-const initialState = {
-    // 1. Single Source of Truth for Form Inputs
-    form: {
-        locMode: 'search',
-        placeId: null,
-        placeName: '',
-        lat: null,
-        lng: null,
-        radius: 10,
-        taxonId: null,
-        taxonName: '',
-        userLogin: '',
-        userId: null,
-        lifeListMode: 'off',
-        wantsPhotos: true,
-        wantsSounds: false,
-        months: ['1','2','3','4','5','6','7','8','9','10','11','12'],
-        difficulty: '50',
-        questionLimit: 10,
-        showIconicTaxonBadge: true,
-        preventDuplicates: true,
-        isRarityMode: false,
-        isMultipleChoice: false,
-        weightingMethod: 'linear',
-        establishmentStatus: 'any',
-        answerInput: '',
-        rankInput: 'species',
-        isDailyMode: false,
-        dailySeedDate: null
-    },
+// ==========================================================================
+// 1. Initial State Slices
+// ==========================================================================
 
-    // 2. Snapshot of configuration when the game starts
-    config: {
-        wantsPhotos: true,
-        wantsSounds: false,
-        months: [],
-        difficulty: '50',
-        showIconicTaxonBadge: true,
-        preventDuplicates: true,
-        isRarityMode: false,
-        isMultipleChoice: false,
-        expertTotalSpecies: 0,
-        questionLimit: 10,
-        weightingMethod: 'linear',
-        establishmentStatus: 'any',
-        userLogin: '',
-        userId: null,
-        lifeListMode: 'off',
-        isDailyMode: false,
-        dailySeedDate: null
-    },
+const initialFormState = {
+    locMode: 'search',
+    placeId: null,
+    placeName: '',
+    lat: null,
+    lng: null,
+    radius: 10,
+    taxonId: null,
+    taxonName: '',
+    userLogin: '',
+    userId: null,
+    lifeListMode: 'off',
+    wantsPhotos: true,
+    wantsSounds: false,
+    months: ['1','2','3','4','5','6','7','8','9','10','11','12'],
+    difficulty: '50',
+    questionLimit: 10,
+    showIconicTaxonBadge: true,
+    preventDuplicates: true,
+    isRarityMode: false,
+    isMultipleChoice: false,
+    weightingMethod: 'linear',
+    establishmentStatus: 'any',
+    answerInput: '',
+    rankInput: 'species',
+    isDailyMode: false,
+    dailySeedDate: null
+};
 
-    // 3. Centralized UI & View Flags
-    ui: {
-        activeView: 'setup-view',
+const initialConfigState = {
+    wantsPhotos: true,
+    wantsSounds: false,
+    months: [],
+    difficulty: '50',
+    showIconicTaxonBadge: true,
+    preventDuplicates: true,
+    isRarityMode: false,
+    isMultipleChoice: false,
+    expertTotalSpecies: 0,
+    questionLimit: 10,
+    weightingMethod: 'linear',
+    establishmentStatus: 'any',
+    userLogin: '',
+    userId: null,
+    lifeListMode: 'off',
+    isDailyMode: false,
+    dailySeedDate: null,
+    isReplay: false
+};
 
-        isLocatingGps: false,
-        isLoadingQuizPool: false,
-        setupError: null,
-        placeError: null,
-        taxonError: null,
-        userError: null,
-        isUrlChallenge: false,
+const initialUIState = {
+    activeView: 'setup-view',
+    isLocatingGps: false,
+    isLoadingQuizPool: false,
+    setupError: null,
+    placeError: null,
+    taxonError: null,
+    userError: null,
+    isUrlChallenge: false,
+    placeResults: [],
+    showPlaceList: false,
+    activePlaceIdx: -1,
+    taxonResults: [],
+    showTaxonList: false,
+    activeTaxonIdx: -1,
+    userResults: [],
+    showUserList: false,
+    activeUserIdx: -1,
+    quizError: null,
+    answerError: null,
+    isCheckingAnswer: false,
+    isHintVisible: false,
+    isMediaLoaded: false,
+    zoomMediaUrl: null,
+    isZoomedIn: false,
+    isLicenseModalOpen: false,
+    licenseText: null,
+    isLoadingLicense: false,
+    licenseError: null
+};
 
-        // Autocomplete search result pools & layout properties
-        placeResults: [],
-        showPlaceList: false,
-        activePlaceIdx: -1,
-        
-        taxonResults: [],
-        showTaxonList: false,
-        activeTaxonIdx: -1,
-        
-        userResults: [],
-        showUserList: false,
-        activeUserIdx: -1,
-
-        quizError: null,
-        answerError: null,
-        isCheckingAnswer: false,
-        isHintVisible: false,
-        isMediaLoaded: false,
-
-        zoomMediaUrl: null,
-        isZoomedIn: false,
-
-        isLicenseModalOpen: false,
-        licenseText: null,
-        isLoadingLicense: false,
-        licenseError: null
-    },
-
-    // 4. Core Game Data
+const initialGameState = {
     regionalPool: [],
     questions: [],
     currentIndex: 0,
@@ -98,10 +91,12 @@ const initialState = {
     currentMediaIndex: 0
 };
 
-const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+// ==========================================================================
+// 2. Core Store Logic
+// ==========================================================================
 
 function deepFreeze(obj) {
-    if (!isDevelopment) return obj;
+    if (obj === null || typeof obj !== 'object') return obj;
     Object.keys(obj).forEach(prop => {
         if (typeof obj[prop] === 'object' && obj[prop] !== null && !Object.isFrozen(obj[prop])) {
             deepFreeze(obj[prop]);
@@ -110,47 +105,91 @@ function deepFreeze(obj) {
     return Object.freeze(obj);
 }
 
-class Store extends EventTarget {
+class SubStore {
     #state;
-    
     constructor(initial) {
-        super();
-        this.initialState = initial;
         this.#state = deepFreeze(structuredClone(initial));
     }
-
+    
     getState() { 
         return this.#state; 
     }
-
+    
     setState(updater) {
-        if (typeof updater !== 'function') {
-            throw new Error('setState strictly requires an updater function.');
-        }
-
-        this.#state = deepFreeze({ ...this.#state, ...updater(this.#state) });
-        this.dispatchEvent(new CustomEvent('statechange', { detail: this.#state }));
-    }
-
-    updateQuestion(index, updates) {
-        this.setState(prevState => {
-            if (index < 0 || index >= prevState.questions.length) return prevState;
-            const newQuestions = [...prevState.questions];
-            newQuestions[index] = deepFreeze({ ...newQuestions[index], ...updates });
-            return { questions: newQuestions };
-        });
+        const updates = updater(this.#state);
+        this.#state = deepFreeze({ ...this.#state, ...updates });
     }
 }
 
-// Export Singleton Store
-export const store = new Store(initialState);
+class RootStore extends EventTarget {
+    #stores;
 
-// --- DAILY SCORES PERSISTENCE HELPERS ---
+    constructor() {
+        super();
+        this.#stores = {
+            form: new SubStore(initialFormState),
+            config: new SubStore(initialConfigState),
+            ui: new SubStore(initialUIState),
+            game: new SubStore(initialGameState)
+        };
+    }
 
-/**
- * Retrieves saved daily scores from localStorage.
- * Automatically prunes entries that are malformed, unparseable, or older than 7 days.
- */
+    // Fully namespaced state tree
+    getState() {
+        return {
+            form: this.#stores.form.getState(),
+            config: this.#stores.config.getState(),
+            ui: this.#stores.ui.getState(),
+            game: this.#stores.game.getState()
+        };
+    }
+
+    setState(updater) {
+        const prevState = this.getState();
+        const updates = updater(prevState);
+        
+        let hasChanged = false;
+
+        if (updates.form !== undefined) {
+            this.#stores.form.setState(() => updates.form);
+            hasChanged = true;
+        }
+        if (updates.config !== undefined) {
+            this.#stores.config.setState(() => updates.config);
+            hasChanged = true;
+        }
+        if (updates.ui !== undefined) {
+            this.#stores.ui.setState(() => updates.ui);
+            hasChanged = true;
+        }
+        if (updates.game !== undefined) {
+            this.#stores.game.setState(() => updates.game);
+            hasChanged = true;
+        }
+
+        if (hasChanged) {
+            this.dispatchEvent(new CustomEvent('statechange', { detail: this.getState() }));
+        }
+    }
+
+    updateQuestion(index, updates) {
+        const gamePrev = this.#stores.game.getState();
+        if (index < 0 || index >= gamePrev.questions.length) return;
+        
+        const newQuestions = [...gamePrev.questions];
+        newQuestions[index] = deepFreeze({ ...newQuestions[index], ...updates });
+        
+        this.#stores.game.setState(() => ({ questions: newQuestions }));
+        this.dispatchEvent(new CustomEvent('statechange', { detail: this.getState() }));
+    }
+}
+
+export const store = new RootStore();
+
+// ==========================================================================
+// 3. Daily Scores Persistence Helpers
+// ==========================================================================
+
 export function getDailyScores() {
     try {
         const raw = localStorage.getItem('bio_trainer_daily_scores');
@@ -158,7 +197,6 @@ export function getDailyScores() {
 
         const data = JSON.parse(raw);
 
-        // Sanity check: Ensure top-level structure is a valid object
         if (!data || typeof data !== 'object' || typeof data.scores !== 'object' || data.scores === null) {
             localStorage.removeItem('bio_trainer_daily_scores');
             return { scores: {} };
@@ -166,13 +204,12 @@ export function getDailyScores() {
 
         const scores = data.scores;
         const now = Date.now();
-        const retentionPeriod = 7 * 24 * 60 * 60 * 1000; // 7 days
+        const retentionPeriod = 7 * 24 * 60 * 60 * 1000;
         let isModified = false;
 
         Object.keys(scores).forEach(key => {
             const entry = scores[key];
 
-            // 1. Delete non-object entries
             if (!entry || typeof entry !== 'object') {
                 delete scores[key];
                 isModified = true;
@@ -180,15 +217,12 @@ export function getDailyScores() {
             }
 
             const timestamp = Date.parse(entry.completedAt);
-
-            // 2. Delete if timestamp is missing/unparseable (NaN) OR exceeds retention period
             if (Number.isNaN(timestamp) || (now - timestamp > retentionPeriod)) {
                 delete scores[key];
                 isModified = true;
             }
         });
 
-        // Persist cleaned object if any corrupt or expired keys were pruned
         if (isModified) {
             localStorage.setItem('bio_trainer_daily_scores', JSON.stringify({ scores }));
         }
@@ -198,16 +232,11 @@ export function getDailyScores() {
         console.warn('Could not read daily scores, clearing invalid storage entry:', e);
         try {
             localStorage.removeItem('bio_trainer_daily_scores');
-        } catch (_) {
-            // Ignore write errors (e.g. strict private browsing modes)
-        }
+        } catch (_) {}
         return { scores: {} };
     }
 }
 
-/**
- * Persists an initial daily challenge score under the specified location key.
- */
 export function saveInitialDailyScore(locationKey, scoreVal, totalQuestions) {
     try {
         const currentRecord = getDailyScores();
@@ -229,9 +258,12 @@ export function saveInitialDailyScore(locationKey, scoreVal, totalQuestions) {
     }
 }
 
-// --- SELECTORS ---
+// ==========================================================================
+// 4. Selectors
+// ==========================================================================
+
 export function selectCurrentMedia(currentState) {
-    const q = currentState.questions[currentState.currentIndex];
+    const q = currentState.game.questions[currentState.game.currentIndex];
     const obs = q?.observation;
     if (!obs || obs.error) return [];
 
@@ -266,7 +298,7 @@ export function selectCurrentMedia(currentState) {
 }
 
 export function selectCurrentMeta(currentState) {
-    const obs = currentState.questions[currentState.currentIndex]?.observation;
+    const obs = currentState.game.questions[currentState.game.currentIndex]?.observation;
     if (!obs || obs.error) return null;
     return {
         date: obs.observed_on,

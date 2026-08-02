@@ -4,13 +4,8 @@ import { buildLocationSeedKey } from './quizEngine.js';
 import { generateResultShareText } from './urlService.js';
 
 let currentView = null;
-
-// Changed to `let` so the WeakMap can be reinitialized on session resets
 let domCache = new WeakMap();
 
-/**
- * Resets the DOM cache to release all retained UI signatures and scalar state.
- */
 export function clearDOMCache() {
     domCache = new WeakMap();
 }
@@ -232,7 +227,7 @@ export function render(state) {
         stopAudio();
     }
 
-    // 2. Setup View
+    // Setup View
     if (state.ui.activeView === 'setup-view') {
         const isDaily = !!state.form.isDailyMode;
 
@@ -266,7 +261,6 @@ export function render(state) {
             }
         }
 
-        // Toggle Launcher Button Text & Active Styling
         const btnDailyTrigger = document.getElementById('btn-trigger-daily');
         if (btnDailyTrigger) {
             if (isDaily) {
@@ -389,9 +383,9 @@ export function render(state) {
         renderError('form-error-message', state.ui.setupError);
     }
 
-    // 3. Quiz View
+    // Quiz View
     if (state.ui.activeView === 'quiz-view') {
-        const q = state.questions[state.currentIndex];
+        const q = state.game.questions[state.game.currentIndex];
         const isAnswered = q?.isAnswered;
         
         const hasObservation = !!q?.observation;
@@ -405,11 +399,11 @@ export function render(state) {
         } else if (hasError) {
             currentPhase = 'Error loading observation data. Please check your connection or retry.';
         } else if (!hasObservation) {
-            currentPhase = `Question ${state.currentIndex + 1}. Fetching observation.`;
+            currentPhase = `Question ${state.game.currentIndex + 1}. Fetching observation.`;
         } else if (!state.ui.isMediaLoaded) {
             currentPhase = 'Loading media.';
         } else if (isReadyForMedia && !isAnswered && !state.ui.isCheckingAnswer) {
-            currentPhase = `Question ${state.currentIndex + 1} ready. Media loaded.`;
+            currentPhase = `Question ${state.game.currentIndex + 1} ready. Media loaded.`;
         } else if (state.ui.isCheckingAnswer) {
             currentPhase = 'Checking answer...';
         } else if (isAnswered) {
@@ -424,8 +418,8 @@ export function render(state) {
             domCache.set(quizViewEl, { ...quizCache, lastPhase: currentPhase });
         }
 
-        document.getElementById('quiz-counter').textContent = `Question ${state.currentIndex + 1} of ${state.questions.length}`;
-        document.getElementById('quiz-score').textContent = `Score: ${formatPoints(state.score)}`;
+        document.getElementById('quiz-counter').textContent = `Question ${state.game.currentIndex + 1} of ${state.game.questions.length}`;
+        document.getElementById('quiz-score').textContent = `Score: ${formatPoints(state.game.score)}`;
 
         const loadingEl = document.getElementById('quiz-loading');
         if (!hasObservation && !hasError) {
@@ -553,7 +547,7 @@ export function render(state) {
         const btnNext = document.getElementById('btn-next');
         btnNext.style.display = isAnswered ? 'block' : 'none';
         if (isAnswered) {
-            const isLastQuestion = state.currentIndex === state.questions.length - 1;
+            const isLastQuestion = state.game.currentIndex === state.game.questions.length - 1;
             btnNext.textContent = isLastQuestion ? 'View Results ➔' : 'Next Observation ➔';
         }
 
@@ -567,9 +561,9 @@ export function render(state) {
             feedback.style.display = 'block';
             feedback.className = q.isCorrect ? 'correct' : 'incorrect';
             
-            if (feedbackCache?.lastQuestionIndex !== state.currentIndex) {
+            if (feedbackCache?.lastQuestionIndex !== state.game.currentIndex) {
                 buildFeedbackDom(q, feedback);
-                domCache.set(feedback, { ...feedbackCache, lastQuestionIndex: state.currentIndex });
+                domCache.set(feedback, { ...feedbackCache, lastQuestionIndex: state.game.currentIndex });
             }
         } else {
             feedback.style.display = 'none';
@@ -580,14 +574,13 @@ export function render(state) {
         }
     }
 
-    // 4. Results View
+    // Results View
     if (state.ui.activeView === 'results-view') {
-        const totalQuestions = state.questions.length;
+        const totalQuestions = state.game.questions.length;
         document.getElementById('final-score').textContent = totalQuestions > 0
-            ? `${formatPoints(state.score)} / ${totalQuestions}`
+            ? `${formatPoints(state.game.score)} / ${totalQuestions}`
             : 'Session Aborted';
 
-        // Render the Live Score Card Preview block
         const scoreCardEl = document.getElementById('score-card-text');
         if (scoreCardEl && totalQuestions > 0) {
             scoreCardEl.textContent = generateResultShareText(state);
@@ -595,13 +588,13 @@ export function render(state) {
 
         const container = document.getElementById('review-container');
         if (!container.hasChildNodes()) { 
-            buildResultsDom(state.questions, container);
+            buildResultsDom(state.game.questions, container);
         }
     } else {
         document.getElementById('review-container').replaceChildren();
     }
 
-    // 5. Zoom Modal
+    // Zoom Modal
     const modal = document.getElementById('zoom-modal');
     const zoomImg = document.getElementById('zoom-modal-img');
     const zoomLoading = document.getElementById('zoom-loading');
@@ -629,7 +622,7 @@ export function render(state) {
         }
     }
 
-    // 6. License Modal
+    // License Modal
     const licenseModal = document.getElementById('license-modal');
     const licenseTextEl = document.getElementById('license-text');
     const licenseLoadingEl = document.getElementById('license-loading');
@@ -675,24 +668,20 @@ function renderAutocomplete(config, results, show, activeIdx) {
     
     if (!list || !input) return;
     
-    // Retrieve cached UI state for this list element
     const cache = domCache.get(list) || {};
     
-    // Hide and clear if needed
     if (!show || results.length === 0) {
         if (list.childNodes.length > 0) list.replaceChildren();
         list.classList.remove('show');
         input.setAttribute('aria-expanded', 'false');
         input.removeAttribute('aria-activedescendant');
         
-        // Reset cache reference if it was previously set
         if (cache.lastResults !== null) {
             domCache.set(list, { ...cache, lastResults: null });
         }
         return;
     }
 
-    // 1. Content Rendering: Only rebuild DOM if the underlying data reference changed
     if (cache.lastResults !== results) {
         const fragment = document.createDocumentFragment();
         
@@ -706,22 +695,18 @@ function renderAutocomplete(config, results, show, activeIdx) {
         
         list.replaceChildren(fragment);
         
-        // Persist the array reference inside domCache
         domCache.set(list, { ...cache, lastResults: results });
     }
 
-    // 2. State Rendering: Always update visibility and active indices
     list.classList.add('show');
     input.setAttribute('aria-expanded', 'true');
     
-    // Reset previously active items
     const prevActive = list.querySelector('.active');
     if (prevActive) {
         prevActive.classList.remove('active');
         prevActive.setAttribute('aria-selected', 'false');
     }
 
-    // Apply new active item
     if (activeIdx >= 0) {
         input.setAttribute('aria-activedescendant', `opt-${type}-${activeIdx}`);
         const activeLi = document.getElementById(`opt-${type}-${activeIdx}`);
@@ -788,11 +773,10 @@ function renderInputError(id, msg) {
 function renderQuizMedia(state, isReadyForMedia) {
     const mediaContainer = document.querySelector('.quiz-media-container');
     const mediaArray = selectCurrentMedia(state);
-    const media = mediaArray[state.currentMediaIndex];
+    const media = mediaArray[state.game.currentMediaIndex];
     
     if (mediaContainer) {
         const mediaCache = domCache.get(mediaContainer);
-        // Store scalar primitive key instead of retaining the entire `media` object
         const mediaKey = media ? (media.mediumUrl || media.fileUrl) : null;
         
         const cacheKeyChanged =
@@ -800,7 +784,7 @@ function renderQuizMedia(state, isReadyForMedia) {
             mediaCache.mediaKey !== mediaKey ||
             mediaCache.isReady !== isReadyForMedia ||
             mediaCache.isLoaded !== state.ui.isMediaLoaded ||
-            mediaCache.mediaIndex !== state.currentMediaIndex ||
+            mediaCache.mediaIndex !== state.game.currentMediaIndex ||
             mediaCache.mediaCount !== mediaArray.length;
 
         if (!cacheKeyChanged) return;
@@ -809,7 +793,7 @@ function renderQuizMedia(state, isReadyForMedia) {
             mediaKey,
             isReady: isReadyForMedia,
             isLoaded: state.ui.isMediaLoaded,
-            mediaIndex: state.currentMediaIndex,
+            mediaIndex: state.game.currentMediaIndex,
             mediaCount: mediaArray.length
         });
     }
@@ -875,12 +859,12 @@ function renderQuizMedia(state, isReadyForMedia) {
             
         if (mediaArray.length > 1) {
             controls.style.display = 'flex';
-            document.getElementById('media-counter').textContent = `${state.currentMediaIndex + 1} / ${mediaArray.length}`;
+            document.getElementById('media-counter').textContent = `${state.game.currentMediaIndex + 1} / ${mediaArray.length}`;
             
             const prevBtn = document.getElementById('btn-prev-media');
             const nextBtn = document.getElementById('btn-next-media');
-            const isNextDisabled = state.currentMediaIndex === mediaArray.length - 1;
-            const isPrevDisabled = state.currentMediaIndex === 0;
+            const isNextDisabled = state.game.currentMediaIndex === mediaArray.length - 1;
+            const isPrevDisabled = state.game.currentMediaIndex === 0;
 
             if (isNextDisabled && document.activeElement === nextBtn) {
                 prevBtn.focus();
@@ -913,7 +897,7 @@ function renderQuizMedia(state, isReadyForMedia) {
 }
 
 function renderQuizMeta(state, isReadyForMedia) {
-    const q = state.questions[state.currentIndex];
+    const q = state.game.questions[state.game.currentIndex];
     const taxon = q?.observation?.taxon || q?.taxon;
     const meta = selectCurrentMeta(state);
 
@@ -921,7 +905,6 @@ function renderQuizMeta(state, isReadyForMedia) {
     if (metaEl) {
         const metaCache = domCache.get(metaEl);
         
-        // Scalar string signature instead of keeping direct reference to `meta` object
         const metaSignature = meta 
             ? `${meta.date}_${meta.locationText}_${meta.coordinates}_${meta.observer}_${meta.license}_${meta.isObscured}` 
             : null;
@@ -1006,7 +989,7 @@ function renderQuizMeta(state, isReadyForMedia) {
             cache.lastTaxonId === taxonId &&
             cache.lastIsReady === isReadyForMedia &&
             cache.lastHintVisible === state.ui.isHintVisible &&
-            cache.lastIndex === state.currentIndex
+            cache.lastIndex === state.game.currentIndex
         ) {
             return;
         }
@@ -1030,7 +1013,7 @@ function renderQuizMeta(state, isReadyForMedia) {
                 lastTaxonId: taxonId,
                 lastIsReady: isReadyForMedia,
                 lastHintVisible: state.ui.isHintVisible,
-                lastIndex: state.currentIndex,
+                lastIndex: state.game.currentIndex,
                 lastRawDesc: rawDesc,
                 lastRedactedDesc: descToDisplay
             });
@@ -1048,7 +1031,7 @@ function renderQuizMeta(state, isReadyForMedia) {
                 lastTaxonId: taxonId,
                 lastIsReady: isReadyForMedia,
                 lastHintVisible: state.ui.isHintVisible,
-                lastIndex: state.currentIndex
+                lastIndex: state.game.currentIndex
             });
 
             hintBtn.style.display = 'none';
@@ -1061,8 +1044,7 @@ function renderMCOptions(state, container, question, isAnswered) {
     const options = question?.mcOptions || [];
     const cache = domCache.get(container);
     
-    // Primitive scalar key signature
-    const questionKey = question ? `${state.currentIndex}_${question.observation?.id || ''}` : null;
+    const questionKey = question ? `${state.game.currentIndex}_${question.observation?.id || ''}` : null;
 
     if (cache?.lastQuestionKey === questionKey && cache?.isAnswered === isAnswered && cache?.optionsCount === options.length) {
         return;
