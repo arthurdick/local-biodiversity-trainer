@@ -127,7 +127,7 @@ store.addEventListener('observation:loaded', async (e) => {
         const similarData = await api.fetchSimilarTaxa(targetTaxon.id);
         (similarData?.results || []).forEach(item => {
             if (item.taxon && !isExcluded(item.taxon.id)) {
-                distractorPool.push({ taxon: item.taxon, count: item.count || 1 });
+                distractorPool.push({ taxon: item.taxon, count: item.count || 1, tier: 1 });
             }
         });
     } catch (err) {
@@ -154,7 +154,7 @@ store.addEventListener('observation:loaded', async (e) => {
 
                 (ancestorData?.results || []).forEach(r => {
                     if (r.taxon && !isExcluded(r.taxon.id)) {
-                        distractorPool.push({ taxon: r.taxon, count: r.count || 1 });
+                        distractorPool.push({ taxon: r.taxon, count: r.count || 1, tier: 2 });
                     }
                 });
 
@@ -177,7 +177,7 @@ store.addEventListener('observation:loaded', async (e) => {
 
             (iconicData?.results || []).forEach(r => {
                 if (r.taxon && !isExcluded(r.taxon.id)) {
-                    distractorPool.push({ taxon: r.taxon, count: r.count || 1 });
+                    distractorPool.push({ taxon: r.taxon, count: r.count || 1, tier: 3 });
                 }
             });
         } catch (err) {
@@ -197,7 +197,7 @@ store.addEventListener('observation:loaded', async (e) => {
 
             (regionalData?.results || []).forEach(r => {
                 if (r.taxon && !isExcluded(r.taxon.id)) {
-                    distractorPool.push({ taxon: r.taxon, count: r.count || 1 });
+                    distractorPool.push({ taxon: r.taxon, count: r.count || 1, tier: 4 });
                 }
             });
         } catch (err) {

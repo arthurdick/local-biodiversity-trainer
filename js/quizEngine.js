@@ -253,17 +253,17 @@ export function generateMultipleChoiceOptions(targetTaxon, fallbackPool = [], ca
         isCorrect: true
     };
 
-    const distractorCandidates = [];
     const usedIds = new Set([targetId, ...excludedIds]);
+    const tiers = { 1: [], 2: [], 3: [], 4: [] }; // Group candidates by priority
 
-    // Helper to safely extract taxon and count weight
-    const addCandidate = (item) => {
+    const addCandidate = (item, defaultTier) => {
         if (!item) return;
         const t = item.taxon || item;
         const count = Math.max(1, item.count || t.count || 1);
+        const assignedTier = item.tier || defaultTier;
         
         if (t && t.id && !usedIds.has(t.id)) {
-            distractorCandidates.push({
+            tiers[assignedTier].push({
                 id: t.id,
                 displayName: formatName(t),
                 count: count,
@@ -273,33 +273,42 @@ export function generateMultipleChoiceOptions(targetTaxon, fallbackPool = [], ca
         }
     };
 
-    // 1. Add candidates fetched from API tiers (lookalikes, ancestors, iconic)
+    // 1. Process candidate taxa (Lookalikes, Ancestors, etc.) defaulting to Tier 1 if unlabeled
     if (Array.isArray(candidateTaxa)) {
-        candidateTaxa.forEach(addCandidate);
+        candidateTaxa.forEach(c => addCandidate(c, 1));
     }
 
-    // 2. Fallback pool (regional pool)
-    if (distractorCandidates.length < 3 && Array.isArray(fallbackPool)) {
-        fallbackPool.forEach(addCandidate);
+    // 2. Process regional fallback pool, assigning it to Tier 4 (lowest priority)
+    if (Array.isArray(fallbackPool)) {
+        fallbackPool.forEach(f => addCandidate(f, 4));
     }
 
-    // Weighted sampling without replacement based on observation/confusion count
     const selectedDistractors = [];
-    while (selectedDistractors.length < 3 && distractorCandidates.length > 0) {
-        const totalWeight = distractorCandidates.reduce((sum, c) => sum + c.count, 0);
-        let roll = Math.random() * totalWeight;
-        let chosenIndex = distractorCandidates.length - 1;
 
-        for (let i = 0; i < distractorCandidates.length; i++) {
-            roll -= distractorCandidates[i].count;
-            if (roll <= 0) {
-                chosenIndex = i;
-                break;
+    // 3. Draw distractors by exhausting highest priority tiers first
+    for (let currentTier = 1; currentTier <= 4; currentTier++) {
+        const pool = tiers[currentTier];
+        
+        // Weighted sampling without replacement WITHIN the current tier
+        while (selectedDistractors.length < 3 && pool.length > 0) {
+            const totalWeight = pool.reduce((sum, c) => sum + c.count, 0);
+            let roll = Math.random() * totalWeight;
+            let chosenIndex = pool.length - 1;
+
+            for (let i = 0; i < pool.length; i++) {
+                roll -= pool[i].count;
+                if (roll <= 0) {
+                    chosenIndex = i;
+                    break;
+                }
             }
+
+            selectedDistractors.push(pool[chosenIndex]);
+            pool.splice(chosenIndex, 1);
         }
 
-        selectedDistractors.push(distractorCandidates[chosenIndex]);
-        distractorCandidates.splice(chosenIndex, 1);
+        // Move to shuffle phase as soon as we have 3 distractors
+        if (selectedDistractors.length >= 3) break;
     }
 
     const finalOptions = [targetOption, ...selectedDistractors];
