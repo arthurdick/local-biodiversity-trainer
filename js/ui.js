@@ -689,6 +689,8 @@ function renderAutocomplete(config, results, show, activeIdx) {
             const li = document.createElement('li');
             li.id = `opt-${type}-${i}`;
             li.setAttribute('role', 'option');
+            li.setAttribute('aria-selected', 'false');
+            
             li.textContent = formatDisplay(item);
             fragment.appendChild(li);
         });
