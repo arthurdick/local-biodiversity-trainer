@@ -95,7 +95,7 @@ store.addEventListener('observation:loaded', async (e) => {
 
     let distractorPool = [];
 
-    // Target taxon is always excluded; other session taxa are only excluded when preventDuplicates is enabled
+    // Target taxon is always excluded; session taxa only when preventDuplicates is true
     const excludedTaxonIds = new Set([targetTaxon.id]);
     if (initialState.config.preventDuplicates) {
         initialState.game.questions.forEach(quest => {
@@ -104,7 +104,7 @@ store.addEventListener('observation:loaded', async (e) => {
         });
     }
 
-    const isExcluded = (id) => excludedTaxonIds.has(id) || distractorPool.some(d => d.id === id);
+    const isExcluded = (id) => excludedTaxonIds.has(id) || distractorPool.some(d => (d.taxon?.id || d.id) === id);
 
     if (!isStillValid(index, targetTaxon.id)) return;
 
@@ -127,7 +127,7 @@ store.addEventListener('observation:loaded', async (e) => {
         const similarData = await api.fetchSimilarTaxa(targetTaxon.id);
         (similarData?.results || []).forEach(item => {
             if (item.taxon && !isExcluded(item.taxon.id)) {
-                distractorPool.push(item.taxon);
+                distractorPool.push({ taxon: item.taxon, count: item.count || 1 });
             }
         });
     } catch (err) {
@@ -138,13 +138,11 @@ store.addEventListener('observation:loaded', async (e) => {
 
     // --- TIER 2: Intermediate Taxonomic Ancestors (Family / Order) ---
     if (distractorPool.length < 3 && Array.isArray(targetTaxon.ancestor_ids) && targetTaxon.ancestor_ids.length > 0) {
-        // Reverse ancestor IDs to search closest relatives (immediate parent ranks) first
         const candidateAncestors = targetTaxon.ancestor_ids
             .slice()
             .reverse()
             .filter(id => id !== 1 && id !== targetTaxon.iconic_taxon_id);
 
-        // Cap at 2 attempts
         const closeAncestors = candidateAncestors.slice(0, 2);
 
         for (const ancestorId of closeAncestors) {
@@ -156,7 +154,7 @@ store.addEventListener('observation:loaded', async (e) => {
 
                 (ancestorData?.results || []).forEach(r => {
                     if (r.taxon && !isExcluded(r.taxon.id)) {
-                        distractorPool.push(r.taxon);
+                        distractorPool.push({ taxon: r.taxon, count: r.count || 1 });
                     }
                 });
 
@@ -179,7 +177,7 @@ store.addEventListener('observation:loaded', async (e) => {
 
             (iconicData?.results || []).forEach(r => {
                 if (r.taxon && !isExcluded(r.taxon.id)) {
-                    distractorPool.push(r.taxon);
+                    distractorPool.push({ taxon: r.taxon, count: r.count || 1 });
                 }
             });
         } catch (err) {
@@ -194,12 +192,12 @@ store.addEventListener('observation:loaded', async (e) => {
         try {
             const regionalData = await api.fetchSpeciesPool({
                 ...baseQueryParams,
-                taxonId: currentConfig.taxonId || null // Maintains user setup taxon filter
+                taxonId: currentConfig.taxonId || null
             });
 
             (regionalData?.results || []).forEach(r => {
                 if (r.taxon && !isExcluded(r.taxon.id)) {
-                    distractorPool.push(r.taxon);
+                    distractorPool.push({ taxon: r.taxon, count: r.count || 1 });
                 }
             });
         } catch (err) {

@@ -256,46 +256,55 @@ export function generateMultipleChoiceOptions(targetTaxon, fallbackPool = [], ca
     const distractorCandidates = [];
     const usedIds = new Set([targetId, ...excludedIds]);
 
-    // 1. Add candidates fetched from API tiers
+    // Helper to safely extract taxon and count weight
+    const addCandidate = (item) => {
+        if (!item) return;
+        const t = item.taxon || item;
+        const count = Math.max(1, item.count || t.count || 1);
+        
+        if (t && t.id && !usedIds.has(t.id)) {
+            distractorCandidates.push({
+                id: t.id,
+                displayName: formatName(t),
+                count: count,
+                isCorrect: false
+            });
+            usedIds.add(t.id);
+        }
+    };
+
+    // 1. Add candidates fetched from API tiers (lookalikes, ancestors, iconic)
     if (Array.isArray(candidateTaxa)) {
-        candidateTaxa.forEach(t => {
-            if (t && t.id && !usedIds.has(t.id)) {
-                distractorCandidates.push({
-                    id: t.id,
-                    displayName: formatName(t),
-                    isCorrect: false
-                });
-                usedIds.add(t.id);
-            }
-        });
+        candidateTaxa.forEach(addCandidate);
     }
 
-    // 2. Fallback pool (Beginner / Easy / Hard non-expert regional cache)
+    // 2. Fallback pool (regional pool)
     if (distractorCandidates.length < 3 && Array.isArray(fallbackPool)) {
-        fallbackPool.forEach(item => {
-            const t = item.taxon;
-            if (t && t.id && !usedIds.has(t.id)) {
-                distractorCandidates.push({
-                    id: t.id,
-                    displayName: formatName(t),
-                    isCorrect: false
-                });
-                usedIds.add(t.id);
+        fallbackPool.forEach(addCandidate);
+    }
+
+    // Weighted sampling without replacement based on observation/confusion count
+    const selectedDistractors = [];
+    while (selectedDistractors.length < 3 && distractorCandidates.length > 0) {
+        const totalWeight = distractorCandidates.reduce((sum, c) => sum + c.count, 0);
+        let roll = Math.random() * totalWeight;
+        let chosenIndex = distractorCandidates.length - 1;
+
+        for (let i = 0; i < distractorCandidates.length; i++) {
+            roll -= distractorCandidates[i].count;
+            if (roll <= 0) {
+                chosenIndex = i;
+                break;
             }
-        });
+        }
+
+        selectedDistractors.push(distractorCandidates[chosenIndex]);
+        distractorCandidates.splice(chosenIndex, 1);
     }
 
-    // Shuffle distractor options
-    for (let i = distractorCandidates.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [distractorCandidates[i], distractorCandidates[j]] = [distractorCandidates[j], distractorCandidates[i]];
-    }
-
-    // Select top 3 distractors
-    const selectedDistractors = distractorCandidates.slice(0, 3);
     const finalOptions = [targetOption, ...selectedDistractors];
 
-    // Final shuffle of the 4 grid options
+    // Uniform shuffle of grid button positions (1–4)
     for (let i = finalOptions.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [finalOptions[i], finalOptions[j]] = [finalOptions[j], finalOptions[i]];
