@@ -6,8 +6,8 @@ const CC_LICENSES = 'cc0,cc-by,cc-by-nc,cc-by-sa,cc-by-nd,cc-by-nc-sa,cc-by-nc-n
 export const RANK_GROUPINGS = {
     species: ['species', 'subspecies', 'variety', 'form', 'hybrid'],
     genus: ['genus', 'genushybrid'],
-    family: ['family', 'subfamily', 'supertribe', 'tribe', 'subtribe'],
-    order: ['order', 'suborder', 'infraorder']
+    family: ['superfamily', 'epifamily', 'family', 'subfamily', 'supertribe', 'tribe', 'subtribe'],
+    order: ['superorder', 'order', 'suborder', 'infraorder']
 };
 
 /**
