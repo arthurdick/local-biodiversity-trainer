@@ -331,7 +331,6 @@ export async function evaluateAnswer(inputStr, guessedRank, taxon, signal = null
             if (searchData.results && searchData.results.length > 0) {
                 for (const result of searchData.results) {
                     const isExactMatch = result.id === taxon.id;
-                    const isGuessChildOfTarget = result.ancestor_ids && result.ancestor_ids.includes(taxon.id);
                     const isGuessParentOfTarget = taxon.ancestor_ids && taxon.ancestor_ids.includes(result.id);
                     
                     const validNames = [
@@ -341,14 +340,11 @@ export async function evaluateAnswer(inputStr, guessedRank, taxon, signal = null
                     ];
                     
                     if (validNames.includes(normalizedInput)) {
-                        if (guessedRank === 'species') {
-                            if (isExactMatch || isGuessChildOfTarget || isGuessParentOfTarget) {
-                                isCorrect = true;
-                                pointsEarned = getPointsForRank('species');
-                                matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;
-                                break;
-                            }
-                        } else if (isGuessParentOfTarget) {
+                        // 1. Fetch the exact same array used to build the API query
+                        const acceptableRanks = api.RANK_GROUPINGS[guessedRank] || [guessedRank];
+                        
+                        // 2. Unify the validation: Exact match, OR a valid parent in the acceptable ranks
+                        if (isExactMatch || (isGuessParentOfTarget && acceptableRanks.includes(result.rank))) {
                             isCorrect = true;
                             pointsEarned = getPointsForRank(guessedRank);
                             matchedNameDisplay = result.matched_term || result.preferred_common_name || result.name;

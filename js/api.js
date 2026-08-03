@@ -3,6 +3,13 @@ const API_BASE = 'https://api.inaturalist.org/v2';
 // Valid Creative Commons licenses
 const CC_LICENSES = 'cc0,cc-by,cc-by-nc,cc-by-sa,cc-by-nd,cc-by-nc-sa,cc-by-nc-nd';
 
+export const RANK_GROUPINGS = {
+    species: ['species', 'subspecies', 'variety', 'form', 'hybrid'],
+    genus: ['genus', 'genushybrid'],
+    family: ['family', 'subfamily', 'supertribe', 'tribe', 'subtribe'],
+    order: ['order', 'suborder', 'infraorder']
+};
+
 /**
  * Calculates a UTC cutoff timestamp offset by a buffer window (default: 7 days ago).
  * Derives the timestamp from baseDate (e.g., '2026-08-01') to preserve session determinism.
@@ -435,26 +442,11 @@ export const fetchSimilarTaxa = async (taxonId, signal) => {
 };
 
 export const checkTaxonSearch = async (inputStr, guessedRank, signal, locale = getLocale()) => {
-    let rankQuery;
-    switch (guessedRank) {
-        case 'species':
-            rankQuery = 'species,subspecies,variety,form,hybrid';
-            break;
-        case 'genus':
-            rankQuery = 'genus,genushybrid';
-            break;
-        case 'family':
-            rankQuery = 'family,subfamily,supertribe,tribe,subtribe';
-            break;
-        case 'order':
-            rankQuery = 'order,suborder,infraorder';
-            break;
-        default:
-            rankQuery = guessedRank;
-    }
+    const rankList = RANK_GROUPINGS[guessedRank] || [guessedRank];
+    
     const params = new URLSearchParams({
         q: inputStr,
-        rank: rankQuery,
+        rank: rankList.join(','),
         is_active: 'true',
         per_page: '50',
         fields: '(id:!t,name:!t,preferred_common_name:!t,matched_term:!t,ancestor_ids:!t,rank:!t)',
