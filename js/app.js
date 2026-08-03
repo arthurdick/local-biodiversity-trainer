@@ -95,17 +95,34 @@ store.addEventListener('observation:loaded', async (e) => {
 
     let distractorPool = [];
 
-    const sessionTaxonIds = new Set(
-        initialState.game.questions
-            .map(quest => quest.taxon?.id || quest.observation?.taxon?.id)
-            .filter(Boolean)
-    );
-    sessionTaxonIds.add(targetTaxon.id);
+    // Target taxon is always excluded; other session taxa are only excluded when preventDuplicates is enabled
+    const excludedTaxonIds = new Set([targetTaxon.id]);
+    if (initialState.config.preventDuplicates) {
+        initialState.game.questions.forEach(quest => {
+            const id = quest.taxon?.id || quest.observation?.taxon?.id;
+            if (id) excludedTaxonIds.add(id);
+        });
+    }
 
-    const isExcluded = (id) => sessionTaxonIds.has(id) || distractorPool.some(d => d.id === id);
+    const isExcluded = (id) => excludedTaxonIds.has(id) || distractorPool.some(d => d.id === id);
 
     if (!isStillValid(index, targetTaxon.id)) return;
 
+    const currentConfig = store.getState().config;
+    const baseQueryParams = {
+        perPage: 20,
+        wantsPhotos: currentConfig.wantsPhotos,
+        wantsSounds: currentConfig.wantsSounds,
+        months: currentConfig.months,
+        locMode: currentConfig.locMode,
+        placeId: currentConfig.placeId,
+        lat: currentConfig.lat,
+        lng: currentConfig.lng,
+        radius: currentConfig.radius,
+        establishmentStatus: currentConfig.establishmentStatus
+    };
+
+    // --- TIER 1: Direct Similar / Confused Taxa API ---
     try {
         const similarData = await api.fetchSimilarTaxa(targetTaxon.id);
         (similarData?.results || []).forEach(item => {
@@ -119,21 +136,45 @@ store.addEventListener('observation:loaded', async (e) => {
 
     if (!isStillValid(index, targetTaxon.id)) return;
 
-    if (distractorPool.length < 3 && targetTaxon.iconic_taxon_name) {
-        const currentConfig = store.getState().config;
+    // --- TIER 2: Intermediate Taxonomic Ancestors (Family / Order) ---
+    if (distractorPool.length < 3 && Array.isArray(targetTaxon.ancestor_ids) && targetTaxon.ancestor_ids.length > 0) {
+        // Reverse ancestor IDs to search closest relatives (immediate parent ranks) first
+        const candidateAncestors = targetTaxon.ancestor_ids
+            .slice()
+            .reverse()
+            .filter(id => id !== 1 && id !== targetTaxon.iconic_taxon_id);
+
+        // Cap at 2 attempts
+        const closeAncestors = candidateAncestors.slice(0, 2);
+
+        for (const ancestorId of closeAncestors) {
+            try {
+                const ancestorData = await api.fetchSpeciesPool({
+                    ...baseQueryParams,
+                    taxonId: ancestorId
+                });
+
+                (ancestorData?.results || []).forEach(r => {
+                    if (r.taxon && !isExcluded(r.taxon.id)) {
+                        distractorPool.push(r.taxon);
+                    }
+                });
+
+                if (distractorPool.length >= 3) break;
+            } catch (err) {
+                console.warn(`Could not fetch distractors for ancestor ${ancestorId}:`, err);
+            }
+        }
+    }
+
+    if (!isStillValid(index, targetTaxon.id)) return;
+
+    // --- TIER 3: Iconic Taxon Fallback ---
+    if (distractorPool.length < 3 && targetTaxon.iconic_taxon_id) {
         try {
             const iconicData = await api.fetchSpeciesPool({
-                perPage: 20,
-                wantsPhotos: currentConfig.wantsPhotos,
-                wantsSounds: currentConfig.wantsSounds,
-                months: currentConfig.months,
-                locMode: currentConfig.locMode,
-                placeId: currentConfig.placeId,
-                lat: currentConfig.lat,
-                lng: currentConfig.lng,
-                radius: currentConfig.radius,
-                taxonId: targetTaxon.iconic_taxon_id || null,
-                establishmentStatus: currentConfig.establishmentStatus
+                ...baseQueryParams,
+                taxonId: targetTaxon.iconic_taxon_id
             });
 
             (iconicData?.results || []).forEach(r => {
@@ -148,20 +189,12 @@ store.addEventListener('observation:loaded', async (e) => {
 
     if (!isStillValid(index, targetTaxon.id)) return;
 
+    // --- TIER 4: Regional Setup Scope Fallback ---
     if (distractorPool.length < 3) {
-        const currentConfig = store.getState().config;
         try {
             const regionalData = await api.fetchSpeciesPool({
-                perPage: 20,
-                wantsPhotos: currentConfig.wantsPhotos,
-                wantsSounds: currentConfig.wantsSounds,
-                months: currentConfig.months,
-                locMode: currentConfig.locMode,
-                placeId: currentConfig.placeId,
-                lat: currentConfig.lat,
-                lng: currentConfig.lng,
-                radius: currentConfig.radius,
-                establishmentStatus: currentConfig.establishmentStatus
+                ...baseQueryParams,
+                taxonId: currentConfig.taxonId || null // Maintains user setup taxon filter
             });
 
             (regionalData?.results || []).forEach(r => {
@@ -180,7 +213,7 @@ store.addEventListener('observation:loaded', async (e) => {
             targetTaxon,
             currentState.game.regionalPool,
             distractorPool,
-            sessionTaxonIds
+            excludedTaxonIds
         );
 
         store.updateQuestion(index, { mcOptions: options });
