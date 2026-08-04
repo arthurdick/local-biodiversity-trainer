@@ -23,12 +23,12 @@
             <form id="setup-form">
 
                 <!-- Daily Challenge Banner -->
-                <div id="daily-challenge-banner" class="daily-banner" style="display: none;">
+                <div id="daily-challenge-banner" class="daily-banner">
                     <div class="daily-banner-content">
                         <div class="daily-banner-title">
                             <span class="daily-badge">📅 DAILY CHALLENGE</span>
                             <span id="daily-banner-date" class="daily-date">August 1, 2026</span>
-                            <span id="daily-completion-badge" class="daily-completed-badge" style="display: none;"></span>
+                            <span id="daily-completion-badge" class="daily-completed-badge"></span>
                         </div>
                         <p class="daily-banner-text">
                             Rules are locked to <strong>10 questions</strong> with <strong>linear weighting</strong> for global score consistency.
@@ -106,7 +106,7 @@
                             </select>
                         </div>
 
-                        <div class="form-group autocomplete-wrapper" id="group-username" style="display: none;">
+                        <div class="form-group autocomplete-wrapper" id="group-username">
                             <label for="input-username">iNaturalist Username</label>
                             <div class="input-relative-wrapper">
                                 <input type="text" id="input-username" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="list-username" aria-haspopup="listbox" placeholder="Search or type iNaturalist username..." autocomplete="off">
@@ -222,8 +222,8 @@
                 <div id="form-error-message" class="inline-error"></div>
                 
                 <div class="setup-actions-row">
-                    <button type="submit" id="btn-start" class="btn-primary-large" style="flex: 2; margin: 0;">Load Quiz Pool</button>
-                    <button type="button" id="btn-trigger-daily" class="btn-primary-large btn-daily-trigger" style="flex: 1; margin: 0;">📅 Daily Mode</button>
+                    <button type="submit" id="btn-start" class="btn-primary-large">Load Quiz Pool</button>
+                    <button type="button" id="btn-trigger-daily" class="btn-primary-large btn-daily-trigger">📅 Daily Mode</button>
                 </div>
             </form>
         </div>
@@ -266,10 +266,10 @@
                     </div>
                     
                     <div id="quiz-hint-wrapper" class="hint-wrapper">
-                        <button type="button" id="btn-toggle-hint" class="btn-hint" style="display: none;" aria-expanded="false" aria-controls="quiz-hint-content">
+                        <button type="button" id="btn-toggle-hint" class="btn-hint" aria-expanded="false" aria-controls="quiz-hint-content">
                             💡 Show Field Notes (Hint)
                         </button>
-                        <div id="quiz-hint-content" class="hint-content" style="display: none;"></div>
+                        <div id="quiz-hint-content" class="hint-content"></div>
                     </div>
                 </div>
 
@@ -284,7 +284,7 @@
                         <span id="quiz-target-badge" class="target-badge"></span>
                     </div>
                     
-                    <div id="mc-options-container" class="mc-grid" style="display: none;"></div>
+                    <div id="mc-options-container" class="mc-grid"></div>
 
                     <form class="form-group" id="answer-form">
                         <label for="input-answer">What species is this?</label>
@@ -336,7 +336,7 @@
 
             <div id="review-container"></div>
             
-            <button type="button" id="btn-restart" class="btn-primary-large" style="margin-top: 10px;">Play Again</button>
+            <button type="button" id="btn-restart" class="btn-primary-large">Play Again</button>
         </div>
         
         <!-- Accessible Zoom Modal -->
@@ -359,8 +359,8 @@
                 </div>
                 <div id="license-modal-content" class="license-modal-content">
                     <div id="license-loading" class="license-loading">Loading license...</div>
-                    <div id="license-error" class="inline-error" style="display: none; text-align: center; padding: 10px;"></div>
-                    <pre id="license-text" class="license-text" style="display: none;"></pre>
+                    <div id="license-error" class="inline-error"></div>
+                    <pre id="license-text" class="license-text"></pre>
                 </div>
             </div>
         </dialog>

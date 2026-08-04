@@ -106,17 +106,27 @@ button.visually-hidden:focus-visible {
     margin-top: 15px;
 }
 
-.btn-daily-trigger {
-    background-color: #0d6efd !important;
+#btn-start {
+    flex: 2;
+    margin: 0;
 }
-.btn-daily-trigger:hover {
-    background-color: #0b5ed7 !important;
+
+#btn-trigger-daily {
+    flex: 1;
+    margin: 0;
 }
-.btn-daily-trigger.btn-daily-active {
-    background-color: #6c757d !important;
+
+button.btn-daily-trigger {
+    background-color: #0d6efd;
 }
-.btn-daily-trigger.btn-daily-active:hover {
-    background-color: #5c636a !important;
+button.btn-daily-trigger:hover {
+    background-color: #0b5ed7;
+}
+button.btn-daily-trigger.btn-daily-active {
+    background-color: #6c757d;
+}
+button.btn-daily-trigger.btn-daily-active:hover {
+    background-color: #5c636a;
 }
 
 .setup-grid {
@@ -170,6 +180,10 @@ button.visually-hidden:focus-visible {
 .form-row { display: flex; gap: 15px; }
 .form-row .form-group { flex: 1; }
 
+#group-username {
+    display: none;
+}
+
 label, .group-label {
     display: block;
     font-weight: bold;
@@ -186,9 +200,11 @@ input[type="text"], input[type="number"], select {
     background-color: #fff;
 }
 
-.input-error {
-    border-color: var(--error) !important;
-    border-width: 2px !important;
+input[type="text"].input-error, 
+input[type="number"].input-error, 
+select.input-error {
+    border-color: var(--error);
+    border-width: 2px;
 }
 
 button {
@@ -307,18 +323,27 @@ select[multiple] {
     outline-offset: 2px;
 }
 
-.btn-quick-select:disabled,
-.btn-quick-select.input-locked {
+button.btn-quick-select:disabled,
+button.btn-quick-select.input-locked,
+button.btn-quick-select:disabled:hover,
+button.btn-quick-select.input-locked:hover,
+button.btn-quick-select:disabled:focus-visible,
+button.btn-quick-select.input-locked:focus-visible {
     opacity: 0.5;
-    cursor: not-allowed !important;
-    background-color: var(--bg-color) !important;
-    color: var(--text-muted) !important;
-    border-color: var(--border) !important;
+    cursor: not-allowed;
+    background-color: var(--bg-color);
+    color: var(--text-muted);
+    border-color: var(--border);
+    outline: none;
 }
 
 /* ==========================================================================
    4. Daily Challenge Banner & Locked Inputs
    ========================================================================== */
+#daily-challenge-banner {
+    display: none;
+}
+
 .daily-banner {
     background: #eef6ff;
     border: 1px solid #b6d4fe;
@@ -363,6 +388,10 @@ select[multiple] {
     font-size: 14px;
 }
 
+#daily-completion-badge {
+    display: none;
+}
+
 .daily-completed-badge {
     background: #d1e7dd;
     color: #0f5132;
@@ -399,11 +428,14 @@ select[multiple] {
     border-color: #0d6efd;
 }
 
-.input-locked {
+input.input-locked,
+select.input-locked,
+button.input-locked,
+button.input-locked:hover {
     opacity: 0.75;
-    background-color: #f8f9fa !important;
-    cursor: not-allowed !important;
-    border-color: #ced4da !important;
+    background-color: #f8f9fa;
+    cursor: not-allowed;
+    border-color: #ced4da;
 }
 
 /* ==========================================================================
@@ -579,6 +611,10 @@ select[multiple] {
     width: 100%;
 }
 
+#btn-toggle-hint {
+    display: none;
+}
+
 .btn-hint {
     background-color: #e8f5e9;
     color: var(--primary);
@@ -596,6 +632,10 @@ select[multiple] {
 .btn-hint:hover {
     background-color: var(--primary);
     color: #ffffff;
+}
+
+#quiz-hint-content {
+    display: none;
 }
 
 .hint-content {
@@ -631,6 +671,10 @@ select[multiple] {
 #btn-skip-end:hover { background-color: #555; }
 
 #btn-next { display: none; margin-top: 15px; }
+
+#mc-options-container {
+    display: none;
+}
 
 .mc-grid {
     display: grid;
@@ -674,17 +718,19 @@ select[multiple] {
     opacity: 0.85;
 }
 
-.btn-mc-option.opt-correct {
-    background-color: #e8f5e9 !important;
-    border-color: var(--success) !important;
-    color: #1b5e20 !important;
+button.btn-mc-option.opt-correct,
+button.btn-mc-option.opt-correct:hover:not(:disabled) {
+    background-color: #e8f5e9;
+    border-color: var(--success);
+    color: #1b5e20;
     font-weight: bold;
 }
 
-.btn-mc-option.opt-incorrect {
-    background-color: #fdeaea !important;
-    border-color: var(--error) !important;
-    color: #c62828 !important;
+button.btn-mc-option.opt-incorrect,
+button.btn-mc-option.opt-incorrect:hover:not(:disabled) {
+    background-color: #fdeaea;
+    border-color: var(--error);
+    color: #c62828;
     text-decoration: line-through;
 }
 
@@ -734,6 +780,10 @@ select[multiple] {
 #results-heading { text-align: center; }
 #final-score { text-align: center; font-size: clamp(2rem, 4vw, 2.8rem); margin-bottom: 24px; }
 
+#btn-restart {
+    margin-top: 10px;
+}
+
 .score-card-preview {
     background-color: #fafcfb;
     border: 2px dashed #b6d4fe;
@@ -741,7 +791,7 @@ select[multiple] {
     padding: 16px 20px;
     margin: 0 auto 20px auto;
     max-width: 480px;
-    text-align: left; /* Left-aligned for clean monospaced layout */
+    text-align: left;
     box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.03);
 }
 
@@ -765,22 +815,22 @@ select[multiple] {
     flex-wrap: wrap;
 }
 
-.btn-share-results {
+button.btn-share-results {
     flex: 1;
     margin: 0;
-    background-color: #0d6efd !important;
+    background-color: #0d6efd;
 }
-.btn-share-results:hover {
-    background-color: #0b5ed7 !important;
+button.btn-share-results:hover {
+    background-color: #0b5ed7;
 }
 
-.btn-share-link {
+button.btn-share-link {
     flex: 1;
     margin: 0;
-    background-color: #555 !important;
+    background-color: #555;
 }
-.btn-share-link:hover {
-    background-color: #444 !important;
+button.btn-share-link:hover {
+    background-color: #444;
 }
 
 .perfect-score-banner {
@@ -941,6 +991,10 @@ select[multiple] {
 
 .license-modal-content { overflow-y: auto; max-height: 60vh; }
 
+#license-text {
+    display: none;
+}
+
 .license-text {
     white-space: pre-wrap; word-break: break-word;
     font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
@@ -951,6 +1005,12 @@ select[multiple] {
 }
 
 .license-loading { text-align: center; padding: 20px; color: var(--text-muted); font-weight: bold; }
+
+#license-error {
+    display: none;
+    text-align: center;
+    padding: 10px;
+}
 
 .btn-license-link {
     background: none; border: none; color: var(--primary);
